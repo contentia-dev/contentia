@@ -34,6 +34,13 @@ interface NavProps {
   cta: { label: string, href: string };
 }
 
+/* A tab stays active on the pages below it (`/blog/<post>` marks Blog), except
+   the root, which would otherwise match every page. */
+function isActive(path: string, to: string): boolean {
+  if (path === to) return true;
+  return to !== '/' && path.startsWith(`${to}/`);
+}
+
 export function Nav({ path, tabs, githubLabel, githubHref, cta }: NavProps) {
   return (
     <header
@@ -51,7 +58,7 @@ export function Nav({ path, tabs, githubLabel, githubHref, cta }: NavProps) {
               key={tab.label}
               href={tab.to ?? tab.href}
               role="tab"
-              className={TAB + (tab.to !== undefined && path === tab.to ? TAB_ACTIVE : TAB_IDLE)}
+              className={TAB + (tab.to !== undefined && isActive(path, tab.to) ? TAB_ACTIVE : TAB_IDLE)}
             >
               {tab.label}
             </a>

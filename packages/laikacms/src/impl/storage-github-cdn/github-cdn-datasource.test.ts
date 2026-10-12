@@ -256,3 +256,35 @@ describe('GithubCdnDataSource tree caching', () => {
     expect(treeCallCount()).toBe(2);
   });
 });
+
+describe('GithubCdnDataSource — fetch receiver', () => {
+  /** Mimics browsers: `fetch` throws "Illegal invocation" unless called with no receiver or `globalThis`. */
+  const receiverStrictFetch = (seen: unknown[]): typeof fetch =>
+    function(this: unknown) {
+      seen.push(this);
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response('# hello', { status: 200 }));
+    } as typeof fetch;
+
+  const options = { owner: OWNER, repo: REPO, cdnBaseUrl: CDN_BASE, dataApiBaseUrl: DATA_API_BASE };
+
+  it('calls an explicit `fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const ds = new GithubCdnDataSource({ ...options, fetch: receiverStrictFetch(seen) });
+    expect(Result.isSuccess(await ds.getFileContents('posts/hello.md'))).toBe(true);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('calls the default `globalThis.fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = receiverStrictFetch(seen);
+    try {
+      const ds = new GithubCdnDataSource(options);
+      expect(Result.isSuccess(await ds.getFileContents('posts/hello.md'))).toBe(true);
+      expect(seen).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

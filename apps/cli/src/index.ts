@@ -1,5 +1,5 @@
 export { layerStorageServer } from './server.js';
-export type { LocalStorageServerOptions } from './server.js';
+export type { StorageServerOptions } from './server.js';
 
 export { discoverConfig, generateConfig, loadConfig, serialize, writeGenerated } from './cms/decap-config.js';
 export type { SerializeOptions } from './cms/decap-config.js';
@@ -32,5 +32,7 @@ export {
   makeMigrateCommand,
   makeServeCommand,
   migrateCommand,
+  resolveServeBackend,
   serveCommand,
 } from './commands.js';
+export type { ServeEvent } from './commands.js';

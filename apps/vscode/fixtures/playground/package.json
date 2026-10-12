@@ -1,0 +1,8 @@
+{
+  "name": "laika-vscode-playground",
+  "private": true,
+  "description": "Workspace opened by the VS Code extension's launch config. Its laikacli is the local apps/cli build.",
+  "devDependencies": {
+    "laikacli": "workspace:*"
+  }
+}

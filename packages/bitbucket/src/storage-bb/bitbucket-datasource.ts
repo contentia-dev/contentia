@@ -114,10 +114,12 @@ export class BitbucketDataSource {
   private readonly branch: string;
 
   constructor(options: BitbucketDataSourceOptions) {
-    this.fetchImpl = options.fetch ?? globalThis.fetch;
-    if (typeof this.fetchImpl !== 'function') {
+    if (typeof (options.fetch ?? globalThis.fetch) !== 'function') {
       throw new InternalError('No `fetch` implementation available; pass one via BitbucketDataSourceOptions.fetch');
     }
+    // Called with no receiver and resolved per request: browsers throw "Illegal invocation" when
+    // `fetch` runs as a method of another object, and late stubs/polyfills stay honoured.
+    this.fetchImpl = (input, init) => (options.fetch ?? globalThis.fetch)(input, init);
     if (!options.auth.appPassword && !options.auth.oauthToken && !options.auth.tokenProvider) {
       throw new InternalError(
         'BitbucketDataSource requires `auth.appPassword`, `auth.oauthToken`, or `auth.tokenProvider`',

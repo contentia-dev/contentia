@@ -1,0 +1,10 @@
+{
+  "laika.connections": [
+    {
+      "name": "Playground content",
+      "type": "local",
+      "backend": "fs",
+      "options": { "root": "content" }
+    }
+  ]
+}

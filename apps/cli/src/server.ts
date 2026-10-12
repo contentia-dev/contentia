@@ -2,48 +2,36 @@ import { NodeHttpServer } from '@effect/platform-node';
 import * as Effect from 'effect/Effect';
 import * as Layer from 'effect/Layer';
 import * as HttpRouter from 'effect/unstable/http/HttpRouter';
+import * as HttpServer from 'effect/unstable/http/HttpServer';
 import type * as HttpServerError from 'effect/unstable/http/HttpServerError';
 import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest';
 import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse';
 import { createServer } from 'node:http';
 
 import { allowAll } from 'laikacms/json-api';
-import type { StorageSerializerRegistry } from 'laikacms/storage';
+import type { StorageRepository } from 'laikacms/storage';
 import { buildJsonApi } from 'laikacms/storage-api';
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
-import { jsonSerializer } from 'laikacms/storage-serializers-json';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
 
 import { bearerTokenMatches } from './auth.js';
 
-export interface LocalStorageServerOptions {
-  /** Filesystem path the storage repository roots at. */
-  root: string;
-  /** Listen port. */
+export interface StorageServerOptions {
+  /**
+   * The repository to expose. Build one with `buildStorageRepository` from the
+   * driver registry (`fs`, `s3`, `github`, ...) or construct it directly.
+   */
+  repository: StorageRepository;
+  /** Listen port. `0` picks a free port; read it back via `onListening`. */
   port: number;
   /** Listen host. Defaults to `127.0.0.1`. */
   host?: string;
-  /** Default file extension for newly-created objects. Defaults to `md`. */
-  defaultExtension?: string;
   /** If set, require `Authorization: Bearer <token>` on every request. */
   authToken?: string;
   /**
-   * Override the serializer registry. Defaults to markdown / yaml / json so the
-   * common dev cases work out of the box.
+   * Called once the socket is bound, with the base URL clients should use.
+   * This is the only way to learn the real port when `port` is `0`.
    */
-  serializerRegistry?: StorageSerializerRegistry;
+  onListening?: (url: string) => Effect.Effect<void>;
 }
-
-const DEFAULT_SERIALIZERS: StorageSerializerRegistry = {
-  md: markdownSerializer,
-  markdown: markdownSerializer,
-  yaml: yamlSerializer,
-  yml: yamlSerializer,
-  json: jsonSerializer,
-  raw: rawSerializer,
-};
 
 /**
  * Bearer-token gate baked into the catch-all route. No-op when `token` is
@@ -67,15 +55,10 @@ const checkAuth = (
  * so we convert at the boundary with `HttpServerRequest.toWeb` /
  * `HttpServerResponse.fromWeb`.
  */
-const buildRoutes = (options: LocalStorageServerOptions) => {
-  const storage = new FileSystemStorageRepository(
-    options.root,
-    options.serializerRegistry ?? DEFAULT_SERIALIZERS,
-    options.defaultExtension ?? 'md',
-  );
+const buildRoutes = (options: StorageServerOptions) => {
   // `checkAuth` below is this server's access decision — it runs on every
   // route before the handler is reached, so the handler itself allows all.
-  const api = buildJsonApi({ repo: storage, logger: console, authorize: allowAll });
+  const api = buildJsonApi({ repo: options.repository, logger: console, authorize: allowAll });
 
   return HttpRouter.add(
     '*',
@@ -97,12 +80,25 @@ const buildRoutes = (options: LocalStorageServerOptions) => {
  * depends on this layer).
  */
 export const layerStorageServer = (
-  options: LocalStorageServerOptions,
+  options: StorageServerOptions,
 ): Layer.Layer<never, HttpServerError.ServeError> => {
   const host = options.host ?? '127.0.0.1';
   const Routes = buildRoutes(options);
   const App = Layer.mergeAll(Routes, HttpRouter.cors());
-  return HttpRouter.serve(App).pipe(
+  const { onListening } = options;
+  const Ready = onListening
+    ? Layer.effectDiscard(Effect.gen(function*() {
+      const { address } = yield* HttpServer.HttpServer;
+      // `address.hostname` is what the socket reports (e.g. `::1`); the host the
+      // caller asked for is the one clients can actually dial.
+      const url = address._tag === 'TcpAddress'
+        ? `http://${host.includes(':') ? `[${host}]` : host}:${address.port}`
+        : HttpServer.formatAddress(address);
+      yield* onListening(url);
+    }))
+    : Layer.empty;
+  // `onListening` replaces the router's own "Listening on" log line.
+  return Layer.mergeAll(HttpRouter.serve(App, { disableListenLog: onListening !== undefined }), Ready).pipe(
     Layer.provide(NodeHttpServer.layer(createServer, { port: options.port, host })),
   );
 };

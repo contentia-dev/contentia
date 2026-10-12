@@ -117,10 +117,12 @@ export class GitlabDataSource {
   private readonly authHeaders: Readonly<Record<string, string>>;
 
   constructor(opts: GitlabDataSourceOptions) {
-    this.fetchImpl = opts.fetch ?? globalThis.fetch;
-    if (typeof this.fetchImpl !== 'function') {
+    if (typeof (opts.fetch ?? globalThis.fetch) !== 'function') {
       throw new InternalError('No `fetch` implementation available; pass one via GitlabDataSourceOptions.fetch');
     }
+    // Called with no receiver and resolved per request: browsers throw "Illegal invocation" when
+    // `fetch` runs as a method of another object, and late stubs/polyfills stay honoured.
+    this.fetchImpl = (input, init) => (opts.fetch ?? globalThis.fetch)(input, init);
     this.apiUrl = (opts.apiUrl ?? DEFAULT_API_URL).replace(/\/+$/, '');
     this.projectSegment = encodeURIComponent(String(opts.projectId));
     this.branch = opts.branch;

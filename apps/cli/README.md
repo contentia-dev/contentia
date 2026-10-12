@@ -19,7 +19,7 @@ Then:
 
 ```sh
 laika create                      # wizard: starter, directory, title, CMS + its backends/widgets/locales
-laika local serve                 # start the local-file JSON:API storage server
+laika local serve                 # serve a storage backend (local files by default) over JSON:API
 laika local generate              # config.yaml -> typed config.gen.ts (add --watch to keep it fresh)
 laika local migrate -s ./a -d ./b # copy a storage repository to another backend
 laika local list-backends         # show every registered storage backend
@@ -37,13 +37,13 @@ pnpm dlx laikacli local serve
 All local-file dev tooling lives under the `local` namespace; the top level is reserved for future
 non-local commands.
 
-| Command               | What it does                                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `create`              | Wizard that bootstraps a starter app and generates its `src/cms.ts` from your backend/widget/locale selection                              |
-| `local serve`         | Local-file JSON:API storage server for dev workflows (`--root`, `--port`, `--host`, `--default-extension` (default: `md`), `--auth-token`) |
-| `local generate`      | Generate a typed TypeScript module from the CMS config file (`--input/-i`, `--output/-o`, `--watch/-w`, `--cms`)                           |
-| `local migrate`       | Copy every atom from one storage repository to another (fs, webdav, s3, github, gitlab, bitbucket, …); see flags below                     |
-| `local list-backends` | List every registered storage backend and its pinned package version                                                                       |
+| Command               | What it does                                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `create`              | Wizard that bootstraps a starter app and generates its `src/cms.ts` from your backend/widget/locale selection                             |
+| `local serve`         | JSON:API storage server for dev workflows: local files (`--root`) or any backend (`--backend`, `--backend-options`); `--json` for editors |
+| `local generate`      | Generate a typed TypeScript module from the CMS config file (`--input/-i`, `--output/-o`, `--watch/-w`, `--cms`)                          |
+| `local migrate`       | Copy every atom from one storage repository to another (fs, webdav, s3, github, gitlab, bitbucket, …); see flags below                    |
+| `local list-backends` | List every registered storage backend and its pinned package version                                                                      |
 
 Run `laika local <command> --help` for the full flag reference.
 

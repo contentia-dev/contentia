@@ -1,0 +1,52 @@
+---
+import { formatDate, getPosts, postHref } from '../../data/posts';
+import Base from '../../layouts/Base.astro';
+
+const posts = await getPosts();
+---
+
+<Base
+  frontmatter={{
+    title: 'Blog | Laika CMS',
+    description: 'Release notes, design decisions and guides for the Laika content API.',
+  }}
+>
+  <section class="py-28 max-[760px]:py-[76px]">
+    <div class="site-container">
+      <div class="flex items-end justify-between gap-6 flex-wrap">
+        <h1 class="text-[clamp(32px,4.2vw,50px)] max-w-[18ch] font-display font-semibold tracking-[-0.02em] leading-[1.05]">
+          Blog
+        </h1>
+        <a
+          href="/blog/rss.xml"
+          class="text-[13px] font-mono text-ink-3 transition-colors duration-150 hover:text-indigo"
+        >
+          RSS feed
+        </a>
+      </div>
+      <p class="mt-[22px] text-[clamp(17px,1.5vw,20px)] text-ink-2 max-w-[56ch] leading-[1.55]">
+        Release notes, design decisions and guides for the Laika content API.
+      </p>
+
+      <ol class="mt-14 grid gap-4 list-none p-0 m-0">
+        {
+          posts.map(post => (
+            <li>
+              <a
+                href={postHref(post)}
+                class="block p-[26px] border border-hairline rounded-[14px] bg-surface transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-[3px] hover:border-hairline-2 hover:shadow-[0_14px_30px_-18px_rgba(31,38,95,0.4)]"
+              >
+                <time datetime={post.data.date.toISOString()} class="text-xs text-ink-3 font-mono">
+                  {formatDate(post.data.date)}
+                </time>
+                <h2 class="mt-2.5 text-[clamp(21px,2vw,26px)]">{post.data.title}</h2>
+                <p class="mt-2.5 text-ink-2 max-w-[70ch] leading-[1.55]">{post.data.description}</p>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+      {posts.length === 0 && <p class="mt-14 text-ink-3">No posts yet.</p>}
+    </div>
+  </section>
+</Base>

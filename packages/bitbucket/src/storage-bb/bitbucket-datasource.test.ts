@@ -200,3 +200,35 @@ describe('BitbucketDataSource errorForResponse (via getFileContents)', () => {
     }
   });
 });
+
+describe('BitbucketDataSource — fetch receiver', () => {
+  /** Mimics browsers: `fetch` throws "Illegal invocation" unless called with no receiver or `globalThis`. */
+  const receiverStrictFetch = (seen: unknown[]): typeof fetch =>
+    function(this: unknown) {
+      seen.push(this);
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response('body', { status: 200 }));
+    } as typeof fetch;
+
+  const options = { workspace: WORKSPACE, repo: REPO, branch: BRANCH, auth: { oauthToken: 'tok' }, apiUrl: API_URL };
+
+  it('calls an explicit `fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const ds = new BitbucketDataSource({ ...options, fetch: receiverStrictFetch(seen) });
+    expect(Result.isSuccess(await ds.getFileContents('docs/readme.md'))).toBe(true);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('calls the default `globalThis.fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = receiverStrictFetch(seen);
+    try {
+      const ds = new BitbucketDataSource(options);
+      expect(Result.isSuccess(await ds.getFileContents('docs/readme.md'))).toBe(true);
+      expect(seen).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

@@ -108,7 +108,9 @@ export class GithubCdnDataSource {
     this.cdnBaseUrl = (opts.cdnBaseUrl ?? DEFAULT_CDN_BASE).replace(/\/+$/, '');
     this.dataApiBaseUrl = (opts.dataApiBaseUrl ?? DEFAULT_DATA_API_BASE).replace(/\/+$/, '');
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.doFetch = opts.fetch ?? fetch;
+    // Called with no receiver and resolved per request: browsers throw "Illegal invocation" when
+    // `fetch` runs as a method of another object, and late stubs/polyfills stay honoured.
+    this.doFetch = (input, init) => (opts.fetch ?? globalThis.fetch)(input, init);
   }
 
   private headers(): Record<string, string> {

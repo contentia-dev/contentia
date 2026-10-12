@@ -11,15 +11,21 @@ import '../styles.css';
    React; this file is head + slot.
 
    Pages are MDX documents that compose sections; Astro hands their frontmatter
-   to the layout under `frontmatter`. */
+   to the layout under `frontmatter`. Blog pages are `.astro` routes and pass
+   the same shape themselves, adding a description and, for a post, the
+   `article` fields Open Graph wants. */
 interface Props {
-  frontmatter: { title: string };
+  frontmatter: {
+    title: string,
+    description?: string,
+    article?: { publishedTime: Date, author: string, tags: string[] },
+  };
 }
 
-const { title } = Astro.props.frontmatter;
+const { title, description, article } = Astro.props.frontmatter;
 
-const DESCRIPTION =
-  'Modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable.';
+const DESCRIPTION = description
+  ?? 'Modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable.';
 
 /* Canonical and og:url follow the page being rendered; everything else in the
    head is the same on every page. */
@@ -34,6 +40,7 @@ const NAV = {
   tabs: [
     { label: 'Features', to: '/' },
     { label: 'Docs', href: '/docs/' },
+    { label: 'Blog', to: '/blog' },
     { label: 'Community', to: '/community' },
   ],
   githubLabel: 'GitHub',
@@ -50,6 +57,7 @@ const FOOTER = {
       heading: 'Project',
       links: [
         { label: 'GitHub', href: 'https://github.com/laikacms/laikacms' },
+        { label: 'Blog', href: '/blog' },
         { label: 'Contributing', href: 'https://github.com/laikacms/laikacms/blob/develop/CONTRIBUTING.md' },
         { label: 'Releases', href: 'https://github.com/laikacms/laikacms/releases' },
         { label: 'Issues', href: 'https://github.com/laikacms/laikacms/issues' },
@@ -128,7 +136,8 @@ const STRUCTURED_DATA = {
     </script>
     <meta
       name="description"
-      content="Laika is a modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable."
+      content={description
+      ?? 'Laika is a modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable.'}
     />
     <link rel="canonical" href={canonical} />
     <meta name="robots" content="index, follow" />
@@ -136,7 +145,16 @@ const STRUCTURED_DATA = {
     <meta name="theme-color" content="#3F51B5" />
 
     <!-- Open Graph — scrapers don't run JS, so these live statically here -->
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    {
+      article && (
+        <>
+          <meta property="article:published_time" content={article.publishedTime.toISOString()} />
+          <meta property="article:author" content={article.author} />
+          {article.tags.map(tag => <meta property="article:tag" content={tag} />)}
+        </>
+      )
+    }
     <meta property="og:site_name" content="Laika" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={DESCRIPTION} />
@@ -155,6 +173,7 @@ const STRUCTURED_DATA = {
     <meta name="twitter:image" content="https://laikacms.com/assets/og-image.png" />
     <meta name="twitter:image:alt" content="Laika: one content API, 40+ swappable backends." />
 
+    <link rel="alternate" type="application/rss+xml" title="Laika blog" href="/blog/rss.xml" />
     <link rel="icon" href="/assets/laika-icon.png" />
     <link rel="apple-touch-icon" href="/assets/laika-icon.png" />
 

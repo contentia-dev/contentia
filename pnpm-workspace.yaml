@@ -9,6 +9,9 @@ packages:
   - "docs"
   - "apps/website"
   - "apps/cli"
+  - "apps/vscode"
+  # Dev workspace opened by the extension's launch config; links the local laikacli build.
+  - "apps/vscode/fixtures/playground"
 
 catalogs:
 

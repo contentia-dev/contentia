@@ -114,26 +114,47 @@ When pnpm skips dependency build scripts during install, `create` prints a warni
 
 ## `local serve`
 
-Serves a folder of content files as a JSON:API storage API, the same API a production
+Serves content as a JSON:API storage API, the same API a production
 [API server](../guides/api-server.md) exposes. Point the Decap `laika` backend, a frontend, or any
-JSON:API client at it while you develop.
+JSON:API client at it while you develop. By default it serves a folder of content files; `--backend`
+serves any storage backend `migrate` can use instead.
 
 ```sh
 laika local serve                                   # serve the current directory on 127.0.0.1:3030
 laika local serve --root ./content --port 4000
 laika local serve --auth-token "$LAIKA_DEV_TOKEN"   # require a bearer token
+laika local serve --backend webdav --backend-options '{"url":"https://dav.example.com"}'
 ```
 
-| Flag                  | Alias | Description                                                   |
-| --------------------- | ----- | ------------------------------------------------------------- |
-| `--root`              | `-r`  | Directory to serve (default: the current directory)           |
-| `--port`              | `-p`  | Port to listen on (default: `3030`)                           |
-| `--host`              | `-H`  | Host to listen on (default: `127.0.0.1`)                      |
-| `--default-extension` | —     | File extension given to newly created objects (default: `md`) |
-| `--auth-token`        | —     | Require `Authorization: Bearer <token>` on every request      |
+| Flag                  | Alias | Description                                                                           |
+| --------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `--root`              | `-r`  | Directory to serve when no `--backend` is given (default: the current directory)      |
+| `--default-extension` | —     | File extension given to newly created objects in `--root` (default: `md`)             |
+| `--backend`           | —     | Storage backend to serve instead of `--root`; see `laika local list-backends`         |
+| `--backend-options`   | —     | JSON options for `--backend`. Falls back to the `LAIKA_BACKEND_OPTIONS` env var       |
+| `--port`              | `-p`  | Port to listen on; `0` picks a free one (default: `3030`)                             |
+| `--host`              | `-H`  | Host to listen on (default: `127.0.0.1`)                                              |
+| `--auth-token`        | —     | Require `Authorization: Bearer <token>`. Falls back to the `LAIKA_AUTH_TOKEN` env var |
+| `--json`              | —     | Print machine-readable events on stdout instead of log lines (see below)              |
 
 Files ending in `.md`/`.markdown`, `.yaml`/`.yml` and `.json` are parsed into structured content.
 CORS is enabled for every origin, so a dev frontend on another port can call it directly.
+
+Backend options often hold credentials. Pass them through `LAIKA_BACKEND_OPTIONS` (and the token
+through `LAIKA_AUTH_TOKEN`) rather than as flags, so they don't show up in the process list.
+
+### `--json` output
+
+With `--json`, stdout carries one JSON object per line and logs go to stderr. Editors and scripts
+start the server with `--port 0` and wait for the `listening` event to learn the URL:
+
+```json
+{"event":"listening","url":"http://127.0.0.1:54321","backend":"fs"}
+{"event":"error","message":"laikacli: unknown storage backend \"nope\". Available: ..."}
+```
+
+`--json` also never prompts to install a missing backend package; it fails with an `error` event
+instead. The VS Code extension starts the server this way.
 
 The server has no access control beyond the optional bearer token. It is meant for local
 development: keep the default `127.0.0.1` host, and use `--auth-token` if you bind it to a network
@@ -324,7 +345,7 @@ console.log(`${result.objectsCopied} copied, ${result.errors.length} errors`);
 | Export                                     | Use it to                                                     |
 | ------------------------------------------ | ------------------------------------------------------------- |
 | `bootstrapApplication`                     | Scaffold an app, the same as `create`                         |
-| `layerStorageServer`                       | Run the `local serve` server inside your own process          |
+| `layerStorageServer`                       | Serve any storage repository the way `local serve` does       |
 | `generateConfig`, `loadConfig`             | Generate or load the typed CMS config                         |
 | `runMigrate`, `loadMigrateConfig`          | Run a migration from a config object or file                  |
 | `migrateStorage`                           | Copy between two storage repositories you already constructed |

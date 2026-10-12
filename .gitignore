@@ -116,7 +116,11 @@ site-dist/
 .pnp.*
 
 # IDE
-.vscode/
+.vscode/*
+# Shared debug setup for the VS Code extension (apps/vscode); personal settings stay ignored.
+!.vscode/launch.json
+!.vscode/tasks.json
+!apps/vscode/fixtures/playground/.vscode/
 .idea/
 *.swp
 *.swo

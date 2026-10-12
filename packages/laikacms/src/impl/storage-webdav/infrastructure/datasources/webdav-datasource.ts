@@ -137,12 +137,14 @@ export class WebDavDataSource {
     private readonly config: WebDavConfig,
     private readonly availableExtensions: readonly string[] = [],
   ) {
-    this.fetchImpl = config.fetch ?? globalThis.fetch;
-    if (typeof this.fetchImpl !== 'function') {
+    if (typeof (config.fetch ?? globalThis.fetch) !== 'function') {
       throw new InternalError('No `fetch` implementation available; pass one via WebDavConfig.fetch', {
         translation: { message: 'storage.webdav.fetchImplementationMissing' },
       });
     }
+    // Called with no receiver and resolved per request: browsers throw "Illegal invocation" when
+    // `fetch` runs as a method of another object, and late stubs/polyfills stay honoured.
+    this.fetchImpl = (input, init) => (config.fetch ?? globalThis.fetch)(input, init);
 
     const trimmed = config.baseUrl.replace(/\/+$/, '');
     const url = new URL(trimmed);

@@ -1,14 +1,17 @@
 import path from 'node:path';
 
+import * as Config from 'effect/Config';
 import * as Effect from 'effect/Effect';
+import { identity } from 'effect/Function';
 import * as Layer from 'effect/Layer';
+import * as Logger from 'effect/Logger';
 import { Command, Flag, Prompt } from 'effect/unstable/cli';
 
 import { bootstrapApplication, type PackageManager, STARTERS } from './bootstrap.js';
 import { cmsAdapters, DEFAULT_CMS_ADAPTER, findCmsAdapter } from './cms/registry.js';
 import type { CmsAdapter, CmsConfigCodegen, CmsSelection } from './cms/types.js';
-import { storageDrivers } from './drivers/registry.js';
-import type { MigrateConfig } from './drivers/types.js';
+import { buildStorageRepository, storageDrivers } from './drivers/registry.js';
+import type { BackendSpec, MigrateConfig } from './drivers/types.js';
 import { loadMigrateConfig, runMigrate } from './migrate-runner.js';
 import type { MigrateEvent } from './migrate.js';
 import { layerStorageServer } from './server.js';
@@ -267,15 +270,38 @@ export const createCommand = makeCreateCommand();
 // `serve` subcommand — the existing storage-api HTTP server.
 // ---------------------------------------------------------------------------
 
+type OptionalString = { _tag: 'Some', value: string } | { _tag: 'None' };
+
+/** Parse a JSON-object flag value; `context` and `flag` only shape the error message. */
+const parseJsonOptions = (
+  context: string,
+  flag: string,
+  raw: string,
+): Record<string, unknown> => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    throw new Error(
+      `${context}: ${flag} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
+      { cause: e },
+    );
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${context}: ${flag} must be a JSON object`);
+  }
+  return parsed as Record<string, unknown>;
+};
+
 const root = Flag.directory('root').pipe(
   Flag.withAlias('r'),
-  Flag.withDescription('Root directory served by the storage repo (default: cwd)'),
+  Flag.withDescription('FS shortcut: root directory to serve (default: cwd)'),
   Flag.withDefault(process.cwd()),
 );
 
 const port = Flag.integer('port').pipe(
   Flag.withAlias('p'),
-  Flag.withDescription('Listen port (default: 3030)'),
+  Flag.withDescription('Listen port; 0 picks a free one (default: 3030)'),
   Flag.withDefault(3030),
 );
 
@@ -286,44 +312,131 @@ const host = Flag.string('host').pipe(
 );
 
 const defaultExtension = Flag.string('default-extension').pipe(
-  Flag.withDescription('Default file extension for new objects (default: md)'),
+  Flag.withDescription('FS shortcut: default file extension for new objects (default: md)'),
   Flag.withDefault('md'),
 );
 
 const authToken = Flag.string('auth-token').pipe(
-  Flag.withDescription(`Require 'Authorization: Bearer <token>' on every request`),
+  Flag.withDescription(
+    `Require 'Authorization: Bearer <token>' on every request (or set LAIKA_AUTH_TOKEN)`,
+  ),
+  Flag.withFallbackConfig(Config.string('LAIKA_AUTH_TOKEN')),
   Flag.optional,
 );
 
+const serveBackend = Flag.string('backend').pipe(
+  Flag.withDescription('Storage backend to serve (e.g. fs, s3, github). See list-backends. Default: fs on --root'),
+  Flag.optional,
+);
+
+const serveBackendOptions = Flag.string('backend-options').pipe(
+  Flag.withDescription(
+    'JSON-encoded options for --backend (or set LAIKA_BACKEND_OPTIONS, which keeps credentials out of the process list)',
+  ),
+  Flag.withFallbackConfig(Config.string('LAIKA_BACKEND_OPTIONS')),
+  Flag.optional,
+);
+
+const serveJson = Flag.boolean('json').pipe(
+  Flag.withDescription(
+    'Print machine-readable JSON lines on stdout (for editors and scripts); never prompts to install packages',
+  ),
+  Flag.withDefault(false),
+);
+
 /**
- * The local-file JSON:API storage server command. The name and the bin label
- * used in log/error messages are parameterised so embedders can mount the
+ * One line of `serve --json` output. Editors (the VS Code extension) read
+ * stdout line by line and act on these; anything that does not parse as one
+ * of these events is ordinary log output and must be ignored.
+ */
+export type ServeEvent =
+  | { readonly event: 'listening', readonly url: string, readonly backend: string }
+  | { readonly event: 'error', readonly message: string };
+
+const writeServeEvent = (event: ServeEvent) => Effect.sync(() => process.stdout.write(`${JSON.stringify(event)}\n`));
+
+/**
+ * Which backend `serve` exposes: `--backend` (with `--backend-options`) when
+ * given, otherwise the filesystem driver rooted at `--root`.
+ */
+export const resolveServeBackend = (
+  binName: string,
+  flags: {
+    backend: OptionalString,
+    backendOptions: OptionalString,
+    root: string,
+    defaultExtension: string,
+  },
+): BackendSpec => {
+  if (flags.backend._tag === 'Some') {
+    return {
+      backend: flags.backend.value,
+      options: flags.backendOptions._tag === 'Some'
+        ? parseJsonOptions(`${binName} serve`, '--backend-options', flags.backendOptions.value)
+        : {},
+    };
+  }
+  if (flags.backendOptions._tag === 'Some') {
+    throw new Error(`${binName} serve: --backend-options needs --backend`);
+  }
+  return { backend: 'fs', options: { root: path.resolve(flags.root), defaultExtension: flags.defaultExtension } };
+};
+
+/**
+ * The JSON:API storage server command. Serves the local filesystem by default,
+ * or any backend from the driver registry via `--backend`. The name and the bin
+ * label used in log/error messages are parameterised so embedders can mount the
  * command under their own spelling (the `laika` CLI uses `laika local serve`).
  */
 export const makeServeCommand = (name = 'serve', binName = 'laika local') =>
   Command.make(
     name,
-    { root, port, host, defaultExtension, authToken },
-    ({ root, port, host, defaultExtension, authToken }) =>
+    {
+      root,
+      port,
+      host,
+      defaultExtension,
+      authToken,
+      backend: serveBackend,
+      backendOptions: serveBackendOptions,
+      json: serveJson,
+    },
+    flags =>
       Effect.gen(function*() {
-        const abs = path.resolve(root);
-        yield* Effect.logInfo(`${binName}: serving ${abs} on http://${host}:${port}`);
-        if (authToken._tag === 'Some') {
-          yield* Effect.logInfo(`${binName}: auth bearer token required`);
-        }
+        const spec = yield* Effect.try({
+          try: () => resolveServeBackend(binName, flags),
+          catch: e => e instanceof Error ? e : new Error(String(e)),
+        });
+        const repository = yield* Effect.tryPromise({
+          try: () => buildStorageRepository(spec.backend, spec.options, { noInstall: flags.json }),
+          catch: e => e instanceof Error ? e : new Error(String(e)),
+        });
+        const describe = spec.backend === 'fs' ? `fs ${String(spec.options.root)}` : spec.backend;
         yield* Layer.launch(
           layerStorageServer({
-            root: abs,
-            port,
-            host,
-            defaultExtension,
-            authToken: authToken._tag === 'Some' ? authToken.value : undefined,
+            repository,
+            port: flags.port,
+            host: flags.host,
+            authToken: flags.authToken._tag === 'Some' ? flags.authToken.value : undefined,
+            onListening: url =>
+              flags.json
+                ? writeServeEvent({ event: 'listening', url, backend: spec.backend })
+                : Effect.logInfo(
+                  `${binName}: serving ${describe} on ${url}`
+                    + (flags.authToken._tag === 'Some' ? ' (bearer token required)' : ''),
+                ),
           }),
         );
-      }),
+      }).pipe(
+        Effect.tapError(error =>
+          flags.json ? writeServeEvent({ event: 'error', message: error.message }) : Effect.void
+        ),
+        // In --json mode stdout carries only ServeEvent lines; logs go to stderr.
+        flags.json ? Effect.provide(Logger.layer([Logger.consolePretty({ stderr: true })])) : identity,
+      ),
   ).pipe(
     Command.withDescription(
-      'Start the local-file JSON:API storage server for Laika CMS dev workflows.',
+      'Serve a storage backend (the local filesystem by default) as a JSON:API storage server for Laika CMS dev workflows.',
     ),
   );
 
@@ -555,28 +668,6 @@ const migrateNoInstall = Flag.boolean('no-install').pipe(
   Flag.withDefault(false),
 );
 
-type OptionalString = { _tag: 'Some', value: string } | { _tag: 'None' };
-
-const parseJsonOptions = (
-  binName: string,
-  label: string,
-  raw: string,
-): Record<string, unknown> => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    throw new Error(
-      `${binName} migrate: --${label}-options is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
-      { cause: e },
-    );
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`${binName} migrate: --${label}-options must be a JSON object`);
-  }
-  return parsed as Record<string, unknown>;
-};
-
 const buildConfigFromFlags = (binName: string, flags: {
   configFile: OptionalString,
   sourceBackend: OptionalString,
@@ -619,7 +710,7 @@ const buildConfigFromFlags = (binName: string, flags: {
     ) => {
       if (backendFlag._tag === 'Some') {
         const opts = optionsFlag._tag === 'Some'
-          ? parseJsonOptions(binName, label, optionsFlag.value)
+          ? parseJsonOptions(`${binName} migrate`, `--${label}-options`, optionsFlag.value)
           : {};
         return { backend: backendFlag.value, options: opts };
       }

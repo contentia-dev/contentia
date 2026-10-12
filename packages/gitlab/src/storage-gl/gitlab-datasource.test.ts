@@ -225,3 +225,40 @@ describe('GitlabDataSource — mapStatus', () => {
     }
   });
 });
+
+describe('GitlabDataSource — fetch receiver', () => {
+  /** Mimics browsers: `fetch` throws "Illegal invocation" unless called with no receiver or `globalThis`. */
+  const receiverStrictFetch = (seen: unknown[]): typeof fetch =>
+    function(this: unknown) {
+      seen.push(this);
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json', 'X-Next-Page': '' } }),
+      );
+    } as typeof fetch;
+
+  it('calls an explicit `fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const ds = new GitlabDataSource({
+      projectId: '42',
+      branch: BRANCH,
+      apiUrl: API_URL,
+      fetch: receiverStrictFetch(seen),
+    });
+    expect(Result.isSuccess(await ds.listDirectory(''))).toBe(true);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('calls the default `globalThis.fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = receiverStrictFetch(seen);
+    try {
+      const ds = new GitlabDataSource({ projectId: '42', branch: BRANCH, apiUrl: API_URL });
+      expect(Result.isSuccess(await ds.listDirectory(''))).toBe(true);
+      expect(seen).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

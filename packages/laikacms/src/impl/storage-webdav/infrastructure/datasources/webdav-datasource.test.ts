@@ -384,3 +384,33 @@ describe('WebDavDataSource — basePath option', () => {
     expect(result.success[0]!.key).toBe('notes.md');
   });
 });
+
+describe('WebDavDataSource — fetch receiver', () => {
+  /** Mimics browsers: `fetch` throws "Illegal invocation" unless called with no receiver or `globalThis`. */
+  const receiverStrictFetch = (seen: unknown[]): typeof fetch =>
+    function(this: unknown) {
+      seen.push(this);
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response('', { status: 200 }));
+    } as typeof fetch;
+
+  it('calls an explicit `fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const ds = makeDatasource(receiverStrictFetch(seen));
+    expect(Result.isSuccess(await ds.deleteResource('docs/page'))).toBe(true);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('calls the default `globalThis.fetch` without binding it to the datasource', async () => {
+    const seen: unknown[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = receiverStrictFetch(seen);
+    try {
+      const ds = new WebDavDataSource({ baseUrl: BASE_URL }, ['md']);
+      expect(Result.isSuccess(await ds.deleteResource('docs/page'))).toBe(true);
+      expect(seen).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

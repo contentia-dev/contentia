@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // One-off build before launch. For the edit loop, run `pnpm dev` (or
+      // `pnpm turbo watch dev --filter laika-vscode...`) alongside the debugger.
+      "label": "laika: build extension and cli",
+      "type": "shell",
+      "command": "pnpm turbo run build --filter laika-vscode...",
+      "problemMatcher": []
+    }
+  ]
+}

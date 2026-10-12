@@ -1,0 +1,207 @@
+{
+  "name": "laika-vscode",
+  "private": true,
+  "version": "0.0.0",
+  "displayName": "Laika CMS",
+  "description": "Browse Laika CMS content (folders, objects, documents) from VS Code.",
+  "publisher": "laikacms",
+  "license": "MIT",
+  "repository": "https://github.com/laikacms/laikacms",
+  "icon": "media/laika-icon.png",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "laika",
+          "title": "Laika CMS",
+          "icon": "media/laika.svg"
+        }
+      ]
+    },
+    "views": {
+      "laika": [
+        {
+          "id": "laika.storage",
+          "name": "Storage"
+        },
+        {
+          "id": "laika.documents",
+          "name": "Documents"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "laika.storage",
+        "contents": "No Laika connections configured.\n[Add Connection](command:laika.addConnection)\nConnections live in the `laika.connections` setting."
+      },
+      {
+        "view": "laika.documents",
+        "contents": "No connection exposes a Documents API. Add a remote connection with a `documentsUrl`.\n[Add Connection](command:laika.addConnection)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "laika.refresh",
+        "title": "Refresh",
+        "category": "Laika",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "laika.addConnection",
+        "title": "Add Connection",
+        "category": "Laika",
+        "icon": "$(add)"
+      },
+      {
+        "command": "laika.restartServers",
+        "title": "Restart Local Servers",
+        "category": "Laika",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "laika.setAccessToken",
+        "title": "Set Access Token",
+        "category": "Laika",
+        "icon": "$(key)"
+      },
+      {
+        "command": "laika.copyKey",
+        "title": "Copy Key",
+        "category": "Laika"
+      },
+      {
+        "command": "laika.loadMore",
+        "title": "Load More",
+        "category": "Laika"
+      },
+      {
+        "command": "laika.open",
+        "title": "Open",
+        "category": "Laika"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "laika.refresh",
+          "when": "view == laika.storage || view == laika.documents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "laika.addConnection",
+          "when": "view == laika.storage",
+          "group": "navigation@2"
+        },
+        {
+          "command": "laika.restartServers",
+          "when": "view == laika.storage",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "laika.setAccessToken",
+          "when": "viewItem == connection-remote",
+          "group": "inline"
+        },
+        {
+          "command": "laika.copyKey",
+          "when": "viewItem == folder || viewItem == object || viewItem == record"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "laika.copyKey",
+          "when": "false"
+        },
+        {
+          "command": "laika.loadMore",
+          "when": "false"
+        },
+        {
+          "command": "laika.open",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Laika CMS",
+      "properties": {
+        "laika.connections": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "Laika content sources. A `local` connection starts `laika local serve` through the workspace's own `laikacli`; a `remote` connection talks to a deployed Laika API server.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Display name; must be unique."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              "backend": {
+                "type": "string",
+                "default": "fs",
+                "markdownDescription": "`local` only: storage backend to serve (see `laika local list-backends`)."
+              },
+              "options": {
+                "type": "object",
+                "markdownDescription": "`local` only: backend options. For `fs`, a relative `root` resolves against the workspace folder."
+              },
+              "storageUrl": {
+                "type": "string",
+                "markdownDescription": "`remote` only: base URL of the Storage API."
+              },
+              "documentsUrl": {
+                "type": "string",
+                "markdownDescription": "`remote` only: base URL of the Documents API."
+              }
+            }
+          }
+        },
+        "laika.cli.path": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the `laikacli` entry point. Empty: use the workspace's `node_modules/.bin/laika`, then `npx laikacli`. A `.js` path runs with `node`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "rimraf dist .turbo",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:types",
+    "@types/vscode": "^1.90.0",
+    "laikacli": "workspace:*",
+    "laikacms": "workspace:*",
+    "rimraf": "catalog:tools",
+    "tsup": "catalog:tools",
+    "typescript": "catalog:tools",
+    "vitest": "catalog:tools"
+  }
+}
