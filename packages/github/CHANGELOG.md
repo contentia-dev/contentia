@@ -1,5 +1,29 @@
 # @contentia/github
 
+## 3.0.0
+
+### Major Changes
+
+- da73a95: Rename the project from Laika to Contentia.
+
+  - npm packages: `laikacms` → `contentia`, `@laikacms/*` → `@contentia/*`, `laikacli` →
+    `@contentia/cli` (bin `contentia`).
+  - Identifiers: every `Laika*` / `laika*` / `LAIKA_*` name is now `Contentia*` / `contentia*` /
+    `CONTENTIA_*` (`LaikaTask` → `ContentiaTask`, `LaikaError` → `ContentiaError`, the `laika:` Vite
+    import protocol → `contentia:`, the `.laika/` folder → `.contentia/`).
+  - One-off CLI use is `npx @contentia/cli`; the core package ships no bin.
+  - Repository and site: `github.com/contentia-dev/contentia`, `contentia.dev`.
+
+  The Decap fork keeps its name: `@laikacms/decap-cms` and its `laika` backend id are unchanged.
+
+### Patch Changes
+
+- Updated dependencies [4f1d3d8]
+- Updated dependencies [d526f0a]
+- Updated dependencies [1c045ea]
+- Updated dependencies [da73a95]
+  - contentia@7.0.0
+
 ## 2.0.0
 
 ### Major Changes

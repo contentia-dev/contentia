@@ -1,6 +1,6 @@
 {
   "name": "@contentia/website",
-  "description": "contentia.dev \u2014 the marketing website for Contentia.",
+  "description": "contentia.dev — the marketing website for Contentia.",
   "version": "0.0.1",
   "private": true,
   "type": "module",

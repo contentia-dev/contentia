@@ -1,5 +1,32 @@
 # @contentia/cli
 
+## 1.0.0
+
+### Major Changes
+
+- da73a95: Rename the project from Laika to Contentia.
+
+  - npm packages: `laikacms` → `contentia`, `@laikacms/*` → `@contentia/*`, `laikacli` →
+    `@contentia/cli` (bin `contentia`).
+  - Identifiers: every `Laika*` / `laika*` / `LAIKA_*` name is now `Contentia*` / `contentia*` /
+    `CONTENTIA_*` (`LaikaTask` → `ContentiaTask`, `LaikaError` → `ContentiaError`, the `laika:` Vite
+    import protocol → `contentia:`, the `.laika/` folder → `.contentia/`).
+  - One-off CLI use is `npx @contentia/cli`; the core package ships no bin.
+  - Repository and site: `github.com/contentia-dev/contentia`, `contentia.dev`.
+
+  The Decap fork keeps its name: `@laikacms/decap-cms` and its `laika` backend id are unchanged.
+
+### Minor Changes
+
+- da73a95: `contentia local serve` can serve any storage backend from the driver registry with
+  `--backend` and `--backend-options` (or `CONTENTIA_BACKEND_OPTIONS`), not just a local folder.
+  `--port 0` picks a free port, and `--json` prints machine-readable `listening` / `error` events on
+  stdout for editors and scripts. `--auth-token` now also reads `CONTENTIA_AUTH_TOKEN`.
+
+  `layerStorageServer` now takes a ready-built `repository` instead of `root` / `defaultExtension` /
+  `serializerRegistry`, plus an optional `onListening(url)` callback. `LocalStorageServerOptions` is
+  renamed to `StorageServerOptions`.
+
 ## 0.2.1
 
 ### Patch Changes

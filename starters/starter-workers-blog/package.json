@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@contentia/server": "^6.0.0",
+    "@contentia/server": "^7.0.0",
     "@laikacms/decap-cms": "^4.1.0",
-    "contentia": "^6.0.0",
+    "contentia": "^7.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.4"
   },

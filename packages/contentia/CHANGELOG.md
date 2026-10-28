@@ -1,5 +1,41 @@
 # contentia
 
+## 7.0.0
+
+### Major Changes
+
+- da73a95: Rename the project from Laika to Contentia.
+
+  - npm packages: `laikacms` → `contentia`, `@laikacms/*` → `@contentia/*`, `laikacli` →
+    `@contentia/cli` (bin `contentia`).
+  - Identifiers: every `Laika*` / `laika*` / `LAIKA_*` name is now `Contentia*` / `contentia*` /
+    `CONTENTIA_*` (`LaikaTask` → `ContentiaTask`, `LaikaError` → `ContentiaError`, the `laika:` Vite
+    import protocol → `contentia:`, the `.laika/` folder → `.contentia/`).
+  - One-off CLI use is `npx @contentia/cli`; the core package ships no bin.
+  - Repository and site: `github.com/contentia-dev/contentia`, `contentia.dev`.
+
+  The Decap fork keeps its name: `@laikacms/decap-cms` and its `laika` backend id are unchanged.
+
+### Minor Changes
+
+- 4f1d3d8: `assets-api` gains `POST /operations`, a fail-fast batch-write endpoint mirroring
+  `documents-api`'s post-ADR-004 semantics (pre-flight validates the whole batch, `400` with zero
+  writes on any bad op, stops on first error during application). `AssetsJsonApiProxyRepository` now
+  batches multi-op writes through this endpoint the way the storage and documents proxies do
+  (LCMS-1002).
+- 1c045ea: `DocumentsJsonApiProxyRepository` gains `applyOperations()`, which batches multiple
+  document mutations (create/update-unpublished/delete/publish/unpublish) into a single
+  `POST /operations` call to the upstream `documents-api` instead of one HTTP request per op.
+  Follows the server's fail-fast contract (ADR-004, LCMS-402) and re-emits each per-op result's
+  `meta.warnings` as local `recoverableError`s (LCMS-994).
+
+### Patch Changes
+
+- d526f0a: `assets-api` `GET /resources` no longer surfaces a `not_found` recoverable error as a
+  `meta.warnings` entry when the listed folder does not exist. A missing media folder is the normal
+  first-run state for a fresh deployment; clients now receive a clean `200` with `data: []` and no
+  console noise (LCMS-1009).
+
 ## 6.0.0
 
 ### Major Changes
