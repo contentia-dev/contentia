@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 // The CLI binary (cli.js) bundles effect + @effect/platform-node inline so
-// that `npx contentia` / global installs cannot float these deps to an
+// that `npx @contentia/cli` / global installs cannot float these deps to an
 // incompatible beta via npm peer-dep auto-resolution (LCMS-534).
 //
 // The library entry (index.js) keeps effect external so programmatic

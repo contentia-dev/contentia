@@ -14,12 +14,12 @@
   ],
   "author": {
     "name": "Sem Postma",
-    "email": "sem@laikacms.com",
+    "email": "sem@contentia.dev",
     "url": "https://sem-postma.com"
   },
   "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
-    "email": "sem@laikacms.com",
+    "email": "sem@contentia.dev",
     "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",

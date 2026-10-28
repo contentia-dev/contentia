@@ -2,7 +2,7 @@
 
 ## Reporting Vulnerabilities
 
-Email [security@laikacms.com](mailto:security@laikacms.com). Do not use public issues.
+Email [security@contentia.dev](mailto:security@contentia.dev). Do not use public issues.
 
 ## Packages
 
