@@ -2,7 +2,7 @@
 
 A blog built with **[Hono](https://hono.dev/) + Node.js + Contentia**.
 
-Uses [`createEmbeddedContentia`](https://contentia.dev/docs) to spin up a `FileSystemStorageRepository` + CatalogDocuments/Assets stack in a single call. Blog routes read content directly from `contentia.documents` — no extra HTTP round-trip.
+Uses [`createEmbeddedContentia`](https://contentia.dev) to spin up a `FileSystemStorageRepository` + CatalogDocuments/Assets stack in a single call. Blog routes read content directly from `contentia.documents` — no extra HTTP round-trip.
 
 ## Run it
 

@@ -357,7 +357,7 @@ single `access` policy. It accepts the same `access` values as `mode: 'route'`.
 
 ## Documentation
 
-See the [Astro guide](https://contentia.dev/docs/guides/astro).
+See the [Astro guide](https://contentia.dev/guides/astro).
 
 ## License
 

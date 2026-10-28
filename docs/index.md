@@ -1,9 +1,33 @@
-# Welcome to <span class="contentia-accent">Contentia</span>
+---
+layout: home
 
-Contentia is a unified abstraction for accessing files, API's and other content. It takes care of
-all the complexities like pagination, batching, concurrency, streaming and discovery. Along with
-that Contentia provides easy to use integrations for common web frameworks and a ton of premade
-opinionated adapters.
+hero:
+  name: Contentia
+  text: One content API, any backend.
+  tagline: Define your content once and serve it as a JSON:API to your editors, sites and agents. The storage behind it is a configuration choice. Self-hosted, MIT licensed.
+  image:
+    light: /contentia-mark.svg
+    dark: /contentia-mark-dark.svg
+    alt: ''
+  actions:
+    - theme: brand
+      text: Get started
+      link: /guides/getting-started
+    - theme: alt
+      text: Adapters
+      link: /adapters/
+    - theme: alt
+      text: GitHub
+      link: https://github.com/contentia-dev/contentia
+
+features:
+  - title: You provide the domain, Contentia is the transport
+    details: Model your content the way your application needs it. Contentia handles pagination, batching, streaming, discovery and warnings without hiding the details.
+  - title: Swap the backend, keep the code
+    details: Filesystem, R2, S3, WebDAV, SQL through Drizzle, GitHub, the browser. Every adapter implements the same repository contracts, so changing storage is configuration.
+  - title: Built for editors and agents alike
+    details: One JSON:API with an OpenAPI description, consumed by the Decap admin, your own UI, build-time Vite and Astro integrations, and an MCP server with a single request tool.
+---
 
 ## Why Contentia
 
@@ -17,8 +41,8 @@ read more about the architecture of Contentia [here](./concepts/architecture).
 ### Built for AI
 
 Contentia is also extremely useful as a homogeneous data access layer in the age of LLMs. Contentia
-provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. Unlike EmDash
-CMS, it only has one 'request' tool.
+provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. It only has one
+'request' tool.
 
 ### What Contentia offers
 

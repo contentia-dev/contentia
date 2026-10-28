@@ -4,5 +4,5 @@ layout: page
 ---
 
 <ClientOnly>
-  <ScalarApiReference url="/docs/openapi/documents.json" />
+  <ScalarApiReference url="/openapi/documents.json" />
 </ClientOnly>

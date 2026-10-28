@@ -11,7 +11,8 @@ with any JavaScript runtime.
 
 ## Documentation
 
-Docs are in `docs/` folder (no separate website). Use relative links:
+Docs are in `docs/` and are the whole contentia.dev site (the docs index is the homepage; no
+separate marketing site). Use relative links:
 
 - To other docs: `[Architecture](./concepts/architecture.md)`
 - To packages: `[storage](./packages/domain/storage)`

@@ -29,7 +29,7 @@
 - ESLint (`eslint.config.mjs`) runs `@typescript-eslint/recommended` plus repo rules; notably
   `no-explicit-any` and `no-unused-vars` are warnings, not hard errors — still avoid `any` where a
   real type is easy to write.
-- `apps/website` additionally bans em dashes (`—`) in user-visible copy — use a colon, comma, or
+- The docs homepage additionally bans em dashes (`—`) in user-visible copy — use a colon, comma, or
   restructure the sentence.
 
 ## Layering

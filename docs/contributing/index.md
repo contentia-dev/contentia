@@ -13,8 +13,8 @@ Contentia is a monorepo carrying **two core packages**, released together:
 | `@contentia/server` | Decap CMS integrations: the Decap-compatible backend, OAuth2, widgets, server adapters.        |
 
 Alongside them, `packages/github`, `packages/gitlab`, `packages/bitbucket`, and
-`packages/vite-plugin` hold git-host storage adapters and the dev-server plugin. `docs/` and
-`apps/website` are the documentation site and marketing site, both apps in the same pnpm workspace.
+`packages/vite-plugin` hold git-host storage adapters and the dev-server plugin. `docs/` is the
+whole contentia.dev site, a VitePress app in the same pnpm workspace.
 
 Each core package follows the same layered, DDD-lite structure (see
 [Architecture](../concepts/architecture)):

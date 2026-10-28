@@ -1,7 +1,5 @@
-/* Docs theme, aligned with apps/website (src/styles.css): same typefaces, same
-   neutrals, same logo indigo — light and dark. The light/dark choice itself is
-   shared with the website through VitePress's `vitepress-theme-appearance`
-   storage key (see apps/website/src/layouts/Base.astro). */
+/* Site theme: Archivo / IBM Plex typefaces, neutral greys, the logo indigo as brand colour,
+   light and dark. */
 
 :root {
   --contentia-indigo: #3f51b5;

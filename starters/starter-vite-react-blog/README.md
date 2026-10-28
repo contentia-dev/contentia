@@ -2,7 +2,7 @@
 
 A blog built with **bare Vite SSR + React + Express + Contentia** — no meta-framework.
 
-Shows the raw primitives that Next.js and TanStack Start abstract away: Express request handling, `renderToStaticMarkup`, and the Decap API proxied through a catch-all route. Uses [`createEmbeddedContentia`](https://contentia.dev/docs) for the same one-call server setup as the Hono starter.
+Shows the raw primitives that Next.js and TanStack Start abstract away: Express request handling, `renderToStaticMarkup`, and the Decap API proxied through a catch-all route. Uses [`createEmbeddedContentia`](https://contentia.dev) for the same one-call server setup as the Hono starter.
 
 ## Run it
 

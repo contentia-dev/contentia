@@ -33,7 +33,8 @@ const apiSidebarItems = existsSync(apiSidebarFile)
 // run first. Empty when that step was skipped.
 const adapterSidebarFile = resolve(__dirname, 'adapters', 'sidebar.json');
 // Sidebar text is HTML, so the logos (light + dark; custom.css shows one) need the base path.
-const base = '/docs/';
+// The docs are the whole site: contentia.dev is served from this build's root.
+const base = '/';
 const adapterSidebarItems = existsSync(adapterSidebarFile)
   ? (JSON.parse(readFileSync(adapterSidebarFile, 'utf8')) as { key: string, text: string, link: string }[]).map(
     ({ key, text, link }) => ({
@@ -44,20 +45,19 @@ const adapterSidebarItems = existsSync(adapterSidebarFile)
   )
   : [];
 
-const websiteUrl = 'https://contentia.dev/';
+const siteUrl = 'https://contentia.dev/';
+const description = 'A modular, runtime-agnostic content API for your own custom or existing UIs.';
 
 export default defineConfig({
   title: 'Contentia',
-  description: 'A modular, runtime-agnostic content API for your own custom or existing UIs.',
-  // Served at contentia.dev/docs/ alongside the marketing site (see the
-  // laika-cloud repo, ADR-0028). `pnpm build:site` at the workspace root
-  // assembles apps/website/dist + this dist into one Cloudflare Pages deploy.
+  description,
   base,
   cleanUrls: true,
   // Keep the page-hash map and site data in one shared chunk instead of inlining it into every
   // HTML page; with the generated API reference (~800 pages) it would otherwise dominate each page.
   metaChunk: true,
   lastUpdated: true,
+  sitemap: { hostname: siteUrl },
   markdown: {
     // ```mermaid fences become the raw diagram source; theme/mermaid.ts renders them client-side.
     config: md => {
@@ -72,9 +72,14 @@ export default defineConfig({
   // The apps/ tree was moved out of the monorepo (June 2026).
   // Any lingering ../apps/ references point at external source dirs, not vitepress pages.
   ignoreDeadLinks: [/\/apps\//],
-  // Same typefaces as apps/website: Archivo (display), IBM Plex Sans (body), IBM Plex Mono (code).
+  // Typefaces: Archivo (display), IBM Plex Sans (body), IBM Plex Mono (code).
   head: [
-    ['link', { rel: 'icon', href: '/docs/contentia-icon.png' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/contentia-mark.svg' }],
+    ['link', { rel: 'apple-touch-icon', href: '/contentia-icon.png' }],
+    ['meta', { property: 'og:site_name', content: 'Contentia' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:image', content: `${siteUrl}contentia-icon.png` }],
+    ['meta', { name: 'twitter:card', content: 'summary' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     [
@@ -87,14 +92,10 @@ export default defineConfig({
     ],
   ],
   themeConfig: {
-    // The website's lockup: round icon + "Contentia".
-    logo: '/contentia-icon.png',
+    // The lockup: the Contentia mark (light and dark cuts) + "Contentia".
+    logo: { light: '/contentia-mark.svg', dark: '/contentia-mark-dark.svg', alt: '' },
     siteTitle: 'Contentia',
-    // The site title leads back to the marketing site, not the docs root. Absolute URL on purpose:
-    // root-relative links get the `/docs/` base prepended.
-    logoLink: { link: websiteUrl, target: '_self' },
     nav: [
-      { text: 'Website', link: websiteUrl, target: '_self', noIcon: true },
       { text: 'Get Started', link: '/guides/getting-started', activeMatch: '/guides/' },
       { text: 'Adapters', link: '/adapters/', activeMatch: '/adapters/' },
       { text: 'Concepts', link: '/concepts/', activeMatch: '/concepts/' },
@@ -142,6 +143,7 @@ export default defineConfig({
               { text: 'Framework Setup Notes', link: '/guides/decap/frameworks' },
             ],
           },
+          { text: 'VS Code Extension', link: '/guides/vscode' },
         ],
       },
       {
@@ -159,7 +161,7 @@ export default defineConfig({
           { text: 'Overview', link: '/reference/' },
           {
             text: 'JSON:API',
-            collapsed: false,
+            collapsed: true,
             items: [
               { text: 'Overview', link: '/reference/json-api/' },
               { text: 'Storage API', link: '/reference/json-api/storage' },

@@ -89,7 +89,7 @@ export class R2AssetsRepository extends AssetsRepository {
       throw new Error(
         'R2AssetsRepository requires either a `sanitizer` to strip privacy-sensitive metadata from files, '
           + 'or `dangerouslyAllowAllFiles: true` to explicitly bypass sanitization. '
-          + 'See https://contentia.dev/docs/security/file-sanitization for more information.',
+          + 'See https://contentia.dev/security/file-sanitization for more information.',
       );
     }
     this.datasource = new R2AssetsDataSource(options.bucket);

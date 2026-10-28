@@ -94,7 +94,6 @@ docs/public/openapi/
 !docs/adapters/git-hosts.md
 
 # Assembled apex site (website + docs) for Cloudflare Pages
-site-dist/
 
 # Rollup cache
 .rollup.cache
