@@ -1,0 +1,110 @@
+/* Ink: design tokens. One neutral scale, black ink on white (white ink on black in dark mode),
+   system sans, hairline borders, no accent colour. Every value is a VitePress token override. */
+
+:root {
+  --vp-font-family-base: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --vp-font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --vp-c-bg: oklch(1 0 0);
+  --vp-c-bg-alt: oklch(1 0 0);
+  --vp-c-bg-elv: oklch(1 0 0);
+  --vp-c-bg-soft: oklch(0.97 0 0);
+  --vp-c-text-1: oklch(0.145 0 0);
+  --vp-c-text-2: oklch(0.439 0 0);
+  --vp-c-text-3: oklch(0.556 0 0);
+  --vp-c-divider: oklch(0.922 0 0);
+  --vp-c-border: oklch(0.87 0 0);
+  --vp-c-gutter: oklch(0.922 0 0);
+
+  /* "Brand" is plain ink: links, active nav items and the primary button are black. */
+  --vp-c-brand-1: oklch(0.145 0 0);
+  --vp-c-brand-2: oklch(0.269 0 0);
+  --vp-c-brand-3: oklch(0.205 0 0);
+  --vp-c-brand-soft: oklch(0 0 0 / 6%);
+
+  --vp-button-brand-bg: oklch(0.205 0 0);
+  --vp-button-brand-text: oklch(0.985 0 0);
+  --vp-button-brand-border: transparent;
+  --vp-button-brand-hover-bg: oklch(0.269 0 0);
+  --vp-button-brand-hover-text: oklch(0.985 0 0);
+  --vp-button-brand-hover-border: transparent;
+  --vp-button-brand-active-bg: oklch(0.145 0 0);
+  --vp-button-brand-active-text: oklch(0.985 0 0);
+  --vp-button-alt-bg: oklch(1 0 0);
+  --vp-button-alt-border: var(--vp-c-divider);
+  --vp-button-alt-hover-bg: oklch(0.97 0 0);
+  --vp-button-alt-hover-border: var(--vp-c-border);
+
+  --vp-code-block-bg: oklch(0.985 0 0);
+  --vp-code-bg: oklch(0.97 0 0);
+  --vp-code-color: var(--vp-c-text-1);
+  --vp-sidebar-bg-color: oklch(1 0 0);
+  --vp-home-hero-name-color: var(--vp-c-text-1);
+  --vp-home-hero-name-background: none;
+}
+
+.dark {
+  --vp-c-bg: oklch(0.145 0 0);
+  --vp-c-bg-alt: oklch(0.145 0 0);
+  --vp-c-bg-elv: oklch(0.205 0 0);
+  --vp-c-bg-soft: oklch(0.205 0 0);
+  --vp-c-text-1: oklch(0.985 0 0);
+  --vp-c-text-2: oklch(0.708 0 0);
+  --vp-c-text-3: oklch(0.556 0 0);
+  --vp-c-divider: oklch(1 0 0 / 10%);
+  --vp-c-border: oklch(1 0 0 / 15%);
+  --vp-c-gutter: oklch(1 0 0 / 10%);
+
+  --vp-c-brand-1: oklch(0.985 0 0);
+  --vp-c-brand-2: oklch(0.87 0 0);
+  --vp-c-brand-3: oklch(0.922 0 0);
+  --vp-c-brand-soft: oklch(1 0 0 / 10%);
+
+  --vp-button-brand-bg: oklch(0.922 0 0);
+  --vp-button-brand-text: oklch(0.205 0 0);
+  --vp-button-brand-hover-bg: oklch(0.985 0 0);
+  --vp-button-brand-hover-text: oklch(0.205 0 0);
+  --vp-button-brand-active-bg: oklch(0.87 0 0);
+  --vp-button-brand-active-text: oklch(0.205 0 0);
+  --vp-button-alt-bg: oklch(0.145 0 0);
+  --vp-button-alt-hover-bg: oklch(0.205 0 0);
+
+  --vp-code-block-bg: oklch(0.205 0 0);
+  --vp-code-bg: oklch(0.269 0 0);
+  --vp-sidebar-bg-color: oklch(0.145 0 0);
+}
+
+/* Headings: heavy, tight. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.VPHero .name,
+.VPHero .text {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.VPHero .tagline {
+  color: var(--vp-c-text-2);
+}
+
+/* Links in prose are the same ink as the text, so they carry an underline. */
+.vp-doc a {
+  text-decoration: underline;
+  text-decoration-color: var(--vp-c-text-3);
+  text-underline-offset: 3px;
+}
+
+.vp-doc a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Code blocks and inline code: hairline border instead of a tinted ground. */
+.vp-doc div[class*='language-'] {
+  border: 1px solid var(--vp-c-divider);
+}
+
+.VPNavBarTitle .title {
+  font-weight: 600;
+}
+

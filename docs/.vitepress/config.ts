@@ -72,7 +72,6 @@ export default defineConfig({
   // The apps/ tree was moved out of the monorepo (June 2026).
   // Any lingering ../apps/ references point at external source dirs, not vitepress pages.
   ignoreDeadLinks: [/\/apps\//],
-  // Typefaces: Archivo (display), IBM Plex Sans (body), IBM Plex Mono (code).
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/contentia-mark.svg' }],
     ['link', { rel: 'apple-touch-icon', href: '/contentia-icon.png' }],
@@ -80,16 +79,6 @@ export default defineConfig({
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:image', content: `${siteUrl}contentia-icon.png` }],
     ['meta', { name: 'twitter:card', content: 'summary' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    [
-      'link',
-      {
-        rel: 'stylesheet',
-        href:
-          'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@400;500;600;700&display=swap',
-      },
-    ],
   ],
   themeConfig: {
     // The lockup: the Contentia mark (light and dark cuts) + "Contentia".
