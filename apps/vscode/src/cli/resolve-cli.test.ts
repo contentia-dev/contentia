@@ -40,7 +40,7 @@ describe('resolveCli', () => {
     expect(cli).toMatchObject({ command: own, shell: true });
   });
 
-  it('falls back to npx contentia', () => {
-    expect(resolveCli(input({}))).toMatchObject({ command: 'npx', args: ['--yes', 'contentia'], source: 'npx' });
+  it('falls back to npx @contentia/cli', () => {
+    expect(resolveCli(input({}))).toMatchObject({ command: 'npx', args: ['--yes', '@contentia/cli'], source: 'npx' });
   });
 });

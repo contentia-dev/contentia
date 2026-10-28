@@ -1,7 +1,7 @@
 {
   "name": "@contentia/cli",
   "version": "0.2.1",
-  "description": "The Contentia command-line interface (`contentia` bin; `npx contentia` also works via the core package): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
+  "description": "The Contentia command-line interface (bin `contentia`): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
   "keywords": [
     "headless-cms",
     "content-management",

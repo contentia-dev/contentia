@@ -3,11 +3,8 @@
 `@contentia/cli` scaffolds new projects and runs local development workflows: a dev storage server,
 typed codegen from your CMS config, and content migrations between backends.
 
-The package installs two commands that point at the same entry point:
-
-- **`@contentia/cli`**: matches the package name, so `npx contentia` and `pnpm dlx contentia` work
-  without installing anything.
-- **`contentia`**: the short name, available once the package is installed.
+The package installs one command, `contentia`. Without installing anything, run it as
+`npx @contentia/cli` or `pnpm dlx @contentia/cli`.
 
 ## Install
 
@@ -18,8 +15,8 @@ pnpm add -D @contentia/cli   # or npm i -D / yarn add -D / bun add -d
 Or run without installing:
 
 ```sh
-npx contentia create
-pnpm dlx contentia local serve
+npx @contentia/cli create
+pnpm dlx @contentia/cli local serve
 ```
 
 The CLI needs Node.js.

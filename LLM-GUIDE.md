@@ -6,7 +6,7 @@ first**, then [`docs/contributing/starters.md`](./docs/contributing/starters.md)
 docs you need.
 
 Six curated starters live in [`starters/`](./starters/README.md) in this monorepo. Create a new
-project with `npx contentia create` — see
+project with `npx @contentia/cli create` — see
 [`docs/contributing/starters.md`](./docs/contributing/starters.md).
 
 ---
@@ -195,8 +195,8 @@ export default app;
 **Don't.** Use a sidecar Node/Workers backend that exposes `/api/posts` etc. as public endpoints
 (reading the repo directly), and have the SPA `fetch('/api/posts')`. See
 [docs/contributing/starters.md](./docs/contributing/starters.md) for the canonical sidecar pattern
-(five curated starters live in [`starters/`](./starters/README.md); `npx contentia create` is the
-entry point).
+(five curated starters live in [`starters/`](./starters/README.md); `npx @contentia/cli create` is
+the entry point).
 
 Why: the Contentia HTTP API requires a Bearer token on every endpoint except `/health`. SPAs can't
 safely hold one.
@@ -450,7 +450,7 @@ These are the things that consistently bite first-time integrators:
 > "I need to build X. Which pattern should I use?"
 
 The `starter-*` names below identify the **pattern**. The six curated starters live in
-[`starters/`](./starters/README.md) and are scaffolded via `npx contentia create`. For the two
+[`starters/`](./starters/README.md) and are scaffolded via `npx @contentia/cli create`. For the two
 canonical starting points, use the in-repo quickstart guides directly:
 
 - **Minimal Node example** →

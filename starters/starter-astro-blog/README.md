@@ -14,7 +14,7 @@ Always start from the wizard — it copies this starter and generates `src/cms.t
 backend/widget/locale choices:
 
 ```bash
-npx contentia create
+npx @contentia/cli create
 ```
 
 Or, working inside this checkout directly — `starters/pnpm-workspace.yaml` only carries a `link:`

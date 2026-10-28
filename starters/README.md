@@ -7,7 +7,7 @@ workspace.
 **Always create apps through the wizard**, not by copying a folder:
 
 ```bash
-npx contentia create
+npx @contentia/cli create
 ```
 
 The wizard picks the starter, then asks which CMS **backends, widgets, and locales** to install and

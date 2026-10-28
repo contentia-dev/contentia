@@ -15,9 +15,7 @@ import {
 // Everything local-dev lives under the `local` namespace: `contentia local serve`,
 // `contentia local generate`, … — leaving the top level free for future
 // non-local commands (deploy, login, …). The package is `@contentia/cli` and
-// its bin is `contentia`. `npx contentia` resolves to the core `contentia`
-// package, whose `bin/contentia.mjs` shim delegates here (locally installed or
-// fetched via `npm exec`).
+// its bin is `contentia`; one-off use is `npx @contentia/cli`.
 const localCommand = Command.make('local').pipe(
   Command.withDescription(
     'Local-file dev tooling: storage server (`serve`), config codegen (`generate`), and repository migrations (`migrate`).',

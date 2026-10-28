@@ -30,15 +30,11 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "bin",
     "dist",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
   ],
-  "bin": {
-    "contentia": "./bin/contentia.mjs"
-  },
   "exports": {
     "./assets/api": {
       "types": "./dist/api/assets-api/index.d.ts",

@@ -6,7 +6,7 @@ repo. The canonical way to create a new project is through the wizard — **neve
 directly**:
 
 ```bash
-npx contentia create
+npx @contentia/cli create
 ```
 
 The wizard selects the starter, then asks which CMS backends, widgets, and locales to install and

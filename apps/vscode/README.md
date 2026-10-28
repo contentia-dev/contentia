@@ -20,7 +20,7 @@ Both kinds browse through the same `contentia` JSON:API proxy repositories. Reco
 CLI output go to the **Contentia** output channel.
 
 Which `@contentia/cli` runs, in order: the `contentia.cli.path` setting, the `CONTENTIA_CLI_PATH`
-env var, the first workspace folder's `node_modules/.bin/contentia`, then `npx contentia`.
+env var, the first workspace folder's `node_modules/.bin/contentia`, then `npx @contentia/cli`.
 
 ## Configuration
 

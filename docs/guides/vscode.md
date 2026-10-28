@@ -78,6 +78,6 @@ For local connections, the extension runs the project's own `@contentia/cli`. Re
 1. The `contentia.cli.path` setting (absolute path to the CLI binary).
 2. The `CONTENTIA_CLI_PATH` environment variable.
 3. `node_modules/.bin/contentia` in the first workspace folder that has one.
-4. `npx contentia` (fallback).
+4. `npx @contentia/cli` (fallback).
 
 CLI output and recoverable warnings appear in the **Contentia** output channel.

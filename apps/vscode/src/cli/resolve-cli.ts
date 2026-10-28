@@ -28,7 +28,7 @@ const fromPath = (file: string, source: CliInvocation['source'], platform: NodeJ
 /**
  * Pick the `@contentia/cli` to run, in order: the `contentia.cli.path` setting, the
  * `CONTENTIA_CLI_PATH` env var, the first workspace folder that has
- * `node_modules/.bin/contentia`, then `npx contentia`. Preferring the workspace's
+ * `node_modules/.bin/contentia`, then `npx @contentia/cli`. Preferring the workspace's
  * own install keeps the extension on the project's CLI version and backends,
  * the same way the git extension runs whatever `git` the user has.
  */
@@ -42,7 +42,7 @@ export const resolveCli = (input: ResolveCliInput): CliInvocation => {
   }
   return {
     command: input.platform === 'win32' ? 'npx.cmd' : 'npx',
-    args: ['--yes', 'contentia'],
+    args: ['--yes', '@contentia/cli'],
     source: 'npx',
     shell: input.platform === 'win32',
   };

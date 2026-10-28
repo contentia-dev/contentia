@@ -1,12 +1,7 @@
 # @contentia/cli
 
 The Contentia command-line interface. The package is `@contentia/cli` and its bin is `contentia`.
-
-`npx contentia` works without installing anything: the core `contentia` package ships a tiny
-dependency-free `contentia` bin that runs the locally installed `@contentia/cli` when present and
-otherwise downloads the matching `@contentia/cli` version with `npm exec` (it prints a one-line
-notice when it does). Install `@contentia/cli` to skip that step and get the `contentia` command
-directly in your project.
+Without installing anything, run it as `npx @contentia/cli` or `pnpm dlx @contentia/cli`.
 
 ## Install
 
@@ -27,8 +22,8 @@ contentia local list-backends         # show every registered storage backend
 Or one-off without installing:
 
 ```sh
-npx contentia local serve
-pnpm dlx contentia local serve
+npx @contentia/cli local serve
+pnpm dlx @contentia/cli local serve
 ```
 
 ## Commands

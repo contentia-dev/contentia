@@ -181,7 +181,7 @@
         "contentia.cli.path": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `@contentia/cli` entry point. Empty: use the workspace's `node_modules/.bin/contentia`, then `npx contentia`. A `.js` path runs with `node`."
+          "markdownDescription": "Path to the `@contentia/cli` entry point. Empty: use the workspace's `node_modules/.bin/contentia`, then `npx @contentia/cli`. A `.js` path runs with `node`."
         }
       }
     }
