@@ -1,6 +1,5 @@
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
-import * as Result from 'effect/Result';
 import {
   ConflictError,
   DirInsteadOfFile,
@@ -11,8 +10,9 @@ import {
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
   VersionMismatchError,
-} from 'laikacms/core';
-import type { LaikaResult } from 'laikacms/core';
+} from 'contentia/core';
+import type { ContentiaResult } from 'contentia/core';
+import * as Result from 'effect/Result';
 
 type GithubAppAuthOptions = {
   appId: string | number,
@@ -47,7 +47,7 @@ interface GithubDirEntry {
 }
 
 const DEFAULT_TOKEN_TTL_SECONDS = 50 * 60;
-const DEFAULT_USER_AGENT = '@laikacms/github';
+const DEFAULT_USER_AGENT = '@contentia/github';
 
 /**
  * Convert a base64 string to UTF-8 text. Works in both Node and Workers
@@ -82,7 +82,7 @@ const isOctokitError = (e: unknown): e is OctokitError =>
 
 /**
  * I/O against a single GitHub repository. Stateless aside from a cached
- * installation token. All errors are mapped onto laikacms error types.
+ * installation token. All errors are mapped onto contentia error types.
  */
 export class GithubDataSource {
   private readonly owner: string;
@@ -138,7 +138,9 @@ export class GithubDataSource {
   /**
    * Fetch a file's content + sha. Returns NotFound when the path is a directory or missing.
    */
-  async getFileContents(relativePath: string): Promise<LaikaResult<{ content: string, sha: string, path: string }>> {
+  async getFileContents(
+    relativePath: string,
+  ): Promise<ContentiaResult<{ content: string, sha: string, path: string }>> {
     try {
       const octokit = await this.getOctokit();
       const { data } = await octokit.repos.getContent({
@@ -169,7 +171,7 @@ export class GithubDataSource {
   /** Get just the metadata (sha, lastModified) without downloading content. */
   async getFileMeta(
     relativePath: string,
-  ): Promise<LaikaResult<{ sha: string, createdAt: Date, updatedAt: Date }>> {
+  ): Promise<ContentiaResult<{ sha: string, createdAt: Date, updatedAt: Date }>> {
     try {
       const octokit = await this.getOctokit();
       const { data } = await octokit.repos.getContent({
@@ -236,7 +238,7 @@ export class GithubDataSource {
   }
 
   /** List immediate children of a directory. Empty array when missing (mirrors storage-fs). */
-  async listDirectory(relativePath: string): Promise<LaikaResult<GithubDirEntry[]>> {
+  async listDirectory(relativePath: string): Promise<ContentiaResult<GithubDirEntry[]>> {
     try {
       const octokit = await this.getOctokit();
       const { data } = await octokit.repos.getContent({
@@ -275,7 +277,7 @@ export class GithubDataSource {
     relativePath: string,
     content: string,
     options: { expectedSha?: string, commitMessage?: string, author?: { name: string, email: string } } = {},
-  ): Promise<LaikaResult<{ sha: string, path: string }>> {
+  ): Promise<ContentiaResult<{ sha: string, path: string }>> {
     try {
       const octokit = await this.getOctokit();
       const message = options.commitMessage
@@ -316,7 +318,7 @@ export class GithubDataSource {
     relativePath: string,
     sha: string,
     options: { commitMessage?: string, author?: { name: string, email: string } } = {},
-  ): Promise<LaikaResult<{ path: string }>> {
+  ): Promise<ContentiaResult<{ path: string }>> {
     try {
       const octokit = await this.getOctokit();
       await octokit.repos.deleteFile({
@@ -361,7 +363,7 @@ export class GithubDataSource {
     }
   }
 
-  private mapError<T>(error: unknown, contextPath: string): LaikaResult<T> {
+  private mapError<T>(error: unknown, contextPath: string): ContentiaResult<T> {
     if (!isOctokitError(error)) {
       return Result.fail(
         new InternalError(`GitHub request failed: ${error instanceof Error ? error.message : String(error)}`),

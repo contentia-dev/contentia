@@ -3,7 +3,7 @@ export const blogCollections = [
     name: 'posts',
     label: 'Blog Posts',
     folder: 'posts',
-    // The laika backend supports JSON-format collections only.
+    // The contentia backend supports JSON-format collections only.
     format: 'json',
     create: true,
     slug: '{{slug}}',

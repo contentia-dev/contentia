@@ -1,16 +1,16 @@
 # Contributing
 
-Notes for people working _on_ Laika rather than _with_ it. If you're building an app that uses
-Laika, see the [Guides](../guides/) instead — this section is for changes to this repo.
+Notes for people working _on_ Contentia rather than _with_ it. If you're building an app that uses
+Contentia, see the [Guides](../guides/) instead — this section is for changes to this repo.
 
 ## Orientation
 
-Laika is a monorepo carrying **two core packages**, released together:
+Contentia is a monorepo carrying **two core packages**, released together:
 
-| Package            | What it is                                                                                     |
-| ------------------ | ---------------------------------------------------------------------------------------------- |
-| `laikacms`         | Core domain, HTTP APIs, storage/document/asset implementations, serializers, shared utilities. |
-| `@laikacms/server` | Decap CMS integrations: the Decap-compatible backend, OAuth2, widgets, server adapters.        |
+| Package             | What it is                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------- |
+| `contentia`         | Core domain, HTTP APIs, storage/document/asset implementations, serializers, shared utilities. |
+| `@contentia/server` | Decap CMS integrations: the Decap-compatible backend, OAuth2, widgets, server adapters.        |
 
 Alongside them, `packages/github`, `packages/gitlab`, `packages/bitbucket`, and
 `packages/vite-plugin` hold git-host storage adapters and the dev-server plugin. `docs/` and
@@ -28,7 +28,7 @@ shared   → no internal dependencies (core, crypto, i18n, json-api)
 
 A **domain** package (e.g. `documents`) defines an interface; an **implementation** package (e.g.
 `documents-drizzle`) implements it; an **api** package (e.g. `documents-api`) exposes it over HTTP.
-Use an existing triple under `packages/laikacms/src` (`domain/storage`, `impl/storage-fs`,
+Use an existing triple under `packages/contentia/src` (`domain/storage`, `impl/storage-fs`,
 `api/storage-api`) as the reference shape when adding a new one.
 
 ## Guide
@@ -46,5 +46,5 @@ Other pages in this section:
 Design decisions (ADRs, incident write-ups) are recorded internally, not on this public site.
 
 The full contribution workflow also lives in
-[CONTRIBUTING.md](https://github.com/laikacms/laikacms/blob/develop/CONTRIBUTING.md) at the repo
-root.
+[CONTRIBUTING.md](https://github.com/contentia-dev/contentia/blob/develop/CONTRIBUTING.md) at the
+repo root.

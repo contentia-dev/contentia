@@ -1,6 +1,6 @@
 # starter-github-blog
 
-A minimal blog powered by [Hono](https://hono.dev/) + [LaikaCMS](https://laikacms.dev/) that stores
+A minimal blog powered by [Hono](https://hono.dev/) + [Contentia](https://contentia.dev/) that stores
 all content directly in a GitHub repository via the GitHub API. Every save in the Decap CMS admin
 becomes a commit on your content branch, giving you a full audit trail and the ability to deploy
 from the same repo that powers your CMS.
@@ -12,11 +12,11 @@ from the same repo that powers your CMS.
 
 ## Quick start
 
-> **Temporarily unavailable for standalone use.** This starter requires `@laikacms/github@>=2.0.0`
+> **Temporarily unavailable for standalone use.** This starter requires `@contentia/github@>=2.0.0`
 > which is not yet published to npm (registry has 1.0.0; the `/storage-gh` subpath this starter
 > imports was added post-1.0). Running `npm install` gets the old version and the server fails at
 > runtime. Use the [Working from the monorepo](#working-from-the-monorepo) steps below until
-> `@laikacms/github@2.0.0` is released.
+> `@contentia/github@2.0.0` is released.
 
 Once the package is published:
 
@@ -36,13 +36,13 @@ Open <http://localhost:3000> for the blog and <http://localhost:3000/admin/> for
 
 ## Working from the monorepo
 
-If you cloned the `laikacms` repository and are running this starter in-place (not via the wizard),
+If you cloned the `contentia` repository and are running this starter in-place (not via the wizard),
 the `starters/pnpm-workspace.yaml` carries `link:` overrides pointing at local builds of packages
 that are ahead of npm. Build those packages first, then install and run:
 
 ```sh
 # Build the linked packages (run from this directory)
-pnpm -C ../.. --filter laikacms --filter @laikacms/server --filter @laikacms/github build
+pnpm -C ../.. --filter contentia --filter @contentia/server --filter @contentia/github build
 
 pnpm install
 pnpm dev

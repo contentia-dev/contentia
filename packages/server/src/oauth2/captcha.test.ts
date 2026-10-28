@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — must be hoisted above imports
 // ---------------------------------------------------------------------------
 
-vi.mock('laikacms/crypto', () => ({
+vi.mock('contentia/crypto', () => ({
   addTimingJitter: vi.fn().mockResolvedValue(undefined),
   constantTimeEqual: vi.fn().mockImplementation((a: string, b: string) => Promise.resolve(a === b)),
   generateSecureRandomString: vi.fn().mockImplementation((len: number) => 'x'.repeat(len)),
@@ -47,8 +47,8 @@ vi.mock('./email/email.js', () => ({
 }));
 
 // Imports after mock registration
-import { verifyPassword } from 'laikacms/crypto';
-import { handleAuthorize, laikaOauth2 } from './oauth2.js';
+import { verifyPassword } from 'contentia/crypto';
+import { contentiaOauth2, handleAuthorize } from './oauth2.js';
 import type { CaptchaConfig, OAuthCallbacks, OAuthConfig, User } from './oauth2.js';
 import { getAuthorizationPageHTML } from './templates/authorization-page.js';
 import { renderForgotPasswordPage } from './templates/password-reset-pages.js';
@@ -264,7 +264,7 @@ describe('handleAuthorize POST — CAPTCHA verification', () => {
 // Forgot-password (POST /forgot-password via router) — CAPTCHA verification
 // ===========================================================================
 
-describe('laikaOauth2() POST /forgot-password — CAPTCHA verification', () => {
+describe('contentiaOauth2() POST /forgot-password — CAPTCHA verification', () => {
   it('returns 400 with CAPTCHA error when token is absent', async () => {
     const captcha = makeCaptchaConfig();
     const callbacks = makeCallbacks();
@@ -273,7 +273,7 @@ describe('laikaOauth2() POST /forgot-password — CAPTCHA verification', () => {
       captcha,
       passwordReset: makePasswordResetConfig(prCbs),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('email', 'user@example.com');
@@ -294,7 +294,7 @@ describe('laikaOauth2() POST /forgot-password — CAPTCHA verification', () => {
       captcha,
       passwordReset: makePasswordResetConfig(prCbs),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('email', 'user@example.com');
@@ -319,7 +319,7 @@ describe('laikaOauth2() POST /forgot-password — CAPTCHA verification', () => {
       captcha,
       passwordReset: makePasswordResetConfig(prCbs),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('email', 'user@example.com');
@@ -344,7 +344,7 @@ describe('laikaOauth2() POST /forgot-password — CAPTCHA verification', () => {
       captcha,
       passwordReset: makePasswordResetConfig(prCbs),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('email', 'user@example.com');

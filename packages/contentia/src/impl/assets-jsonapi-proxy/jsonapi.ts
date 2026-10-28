@@ -1,0 +1,274 @@
+import { type Asset, type AssetCreate, type AssetUpdate, type AssetUrl, type AssetVariations } from 'contentia/assets';
+import { type Folder, type FolderCreate, type FolderSummary } from 'contentia/storage';
+
+// Re-export common JSON:API utilities
+export {
+  type AtomicOperation,
+  AtomicOperationSchema,
+  type AtomicOperationsRequest,
+  AtomicOperationsRequestSchema,
+  type AtomicOperationsResponse,
+  AtomicOperationsResponseSchema,
+  buildPaginationLinks,
+  type JsonApiCollectionResponse,
+  JsonApiCollectionResponseSchema,
+  JsonApiDeleteMultipleSchema,
+  JsonApiDeleteSchema,
+  type JsonApiError,
+  JsonApiErrorSchema,
+  type JsonApiLinks,
+  JsonApiLinksSchema,
+  type JsonApiResource,
+  parsePaginationQuery,
+} from 'contentia/json-api';
+
+// ============================================
+// JSON:API Type Definitions
+// ============================================
+
+export interface JsonApiAsset {
+  type: 'asset';
+  id: string;
+  attributes: Omit<Asset, 'key' | 'type'>;
+}
+
+export interface JsonApiAssetCreate {
+  type: 'asset';
+  id: string;
+  attributes: Omit<AssetCreate, 'key' | 'type'>;
+}
+
+export interface JsonApiAssetUpdate {
+  type: 'asset';
+  id: string;
+  attributes: Omit<AssetUpdate, 'key' | 'type'>;
+}
+
+export interface JsonApiFolder {
+  type: 'folder';
+  id: string;
+  attributes: Omit<Folder, 'key' | 'type'>;
+}
+
+export interface JsonApiFolderCreate {
+  type: 'folder';
+  id: string;
+  attributes: Omit<FolderCreate, 'key' | 'type'>;
+}
+
+export interface JsonApiFolderSummary {
+  type: 'folder-summary';
+  id: string;
+  attributes: Omit<FolderSummary, 'key' | 'type'>;
+}
+
+// `JsonApiAssetMetadata` was removed — asset metadata is now folded onto
+// `JsonApiAsset.meta` instead of being a separate JSON:API resource type.
+
+export interface JsonApiAssetUrl {
+  type: 'asset-url';
+  id: string;
+  attributes: Omit<AssetUrl, 'key'>;
+}
+
+export interface JsonApiAssetVariations {
+  type: 'asset-variants';
+  id: string;
+  attributes: Omit<AssetVariations, 'key'>;
+}
+
+// ============================================
+// To JSON:API Converters
+// ============================================
+
+export function assetToJsonApi(asset: Asset): JsonApiAsset {
+  const { key, type: _type, ...attributes } = asset;
+  return { type: 'asset', id: key, attributes };
+}
+
+export function assetCreateToJsonApi(asset: AssetCreate): JsonApiAssetCreate {
+  const { key, ...attributes } = asset;
+  return { type: 'asset', id: key, attributes };
+}
+
+export function assetUpdateToJsonApi(asset: AssetUpdate): JsonApiAssetUpdate {
+  const { key, ...attributes } = asset;
+  return { type: 'asset', id: key, attributes };
+}
+
+export function folderToJsonApi(folder: Folder): JsonApiFolder {
+  const { key, type: _type, ...attributes } = folder;
+  return { type: 'folder', id: key, attributes };
+}
+
+export function folderCreateToJsonApi(folder: FolderCreate): JsonApiFolderCreate {
+  const { key, type: _type, ...attributes } = folder;
+  return { type: 'folder', id: key, attributes };
+}
+
+export function folderSummaryToJsonApi(folder: FolderSummary): JsonApiFolderSummary {
+  const { key, type: _type, ...attributes } = folder;
+  return { type: 'folder-summary', id: key, attributes };
+}
+
+// `assetMetadataToJsonApi` removed — see top-of-file note.
+
+export function assetUrlToJsonApi(url: AssetUrl): JsonApiAssetUrl {
+  const { key, ...attributes } = url;
+  return { type: 'asset-url', id: key, attributes };
+}
+
+export function assetVariationsToJsonApi(variations: AssetVariations): JsonApiAssetVariations {
+  const { key, ...attributes } = variations;
+  return { type: 'asset-variants', id: key, attributes };
+}
+
+export function resourceToJsonApi(resource: Asset | Folder): JsonApiAsset | JsonApiFolder {
+  if (resource.type === 'asset') {
+    return assetToJsonApi(resource);
+  }
+  return folderToJsonApi(resource);
+}
+
+// ============================================
+// From JSON:API Converters
+// ============================================
+
+export function assetFromJsonApi(jsonApi: JsonApiAsset): Asset {
+  return { type: jsonApi.type, key: jsonApi.id, ...jsonApi.attributes } as Asset;
+}
+
+export function assetCreateFromJsonApi(jsonApi: JsonApiAssetCreate): AssetCreate {
+  return { type: jsonApi.type, key: jsonApi.id, ...jsonApi.attributes } as AssetCreate;
+}
+
+export function assetUpdateFromJsonApi(jsonApi: JsonApiAssetUpdate): AssetUpdate {
+  return { key: jsonApi.id, ...jsonApi.attributes } as AssetUpdate;
+}
+
+export function folderFromJsonApi(jsonApi: JsonApiFolder): Folder {
+  return { type: jsonApi.type, key: jsonApi.id, ...jsonApi.attributes } as Folder;
+}
+
+export function folderCreateFromJsonApi(jsonApi: JsonApiFolderCreate): FolderCreate {
+  return { key: jsonApi.id, ...jsonApi.attributes } as FolderCreate;
+}
+
+export function folderSummaryFromJsonApi(jsonApi: JsonApiFolderSummary): FolderSummary {
+  return { type: jsonApi.type, key: jsonApi.id, ...jsonApi.attributes } as FolderSummary;
+}
+
+// `assetMetadataFromJsonApi` removed — read `JsonApiAsset.meta` instead.
+
+export function assetUrlFromJsonApi(jsonApi: JsonApiAssetUrl): AssetUrl {
+  return { key: jsonApi.id, ...jsonApi.attributes } as AssetUrl;
+}
+
+export function assetVariationsFromJsonApi(jsonApi: JsonApiAssetVariations): AssetVariations {
+  return { key: jsonApi.id, ...jsonApi.attributes } as AssetVariations;
+}
+
+export function resourceFromJsonApi(jsonApi: JsonApiAsset | JsonApiFolder): Asset | Folder {
+  if (jsonApi.type === 'asset') {
+    return assetFromJsonApi(jsonApi);
+  }
+  return folderFromJsonApi(jsonApi);
+}
+
+export function includedFromJsonApi(
+  jsonApi: JsonApiAssetUrl | JsonApiAssetVariations,
+): AssetUrl | AssetVariations {
+  if (jsonApi.type === 'asset-url') {
+    return assetUrlFromJsonApi(jsonApi);
+  }
+  return assetVariationsFromJsonApi(jsonApi);
+}
+
+export function includedToJsonApi(
+  included: AssetUrl | AssetVariations,
+): JsonApiAssetUrl | JsonApiAssetVariations {
+  if ('url' in included) {
+    return assetUrlToJsonApi(included as AssetUrl);
+  }
+  return assetVariationsToJsonApi(included as AssetVariations);
+}
+
+// ============================================
+// Type Guards
+// ============================================
+
+export function isJsonApiAsset(
+  jsonApi: { type: string, id: string, attributes?: Record<string, unknown> },
+): jsonApi is JsonApiAsset {
+  return jsonApi.type === 'asset';
+}
+
+export function isJsonApiFolder(
+  jsonApi: { type: string, id: string, attributes?: Record<string, unknown> },
+): jsonApi is JsonApiFolder {
+  return jsonApi.type === 'folder';
+}
+
+// `isJsonApiAssetMetadata` removed — no separate resource type to guard.
+
+export function isJsonApiAssetUrl(
+  jsonApi: { type: string, id: string, attributes?: Record<string, unknown> },
+): jsonApi is JsonApiAssetUrl {
+  return jsonApi.type === 'asset-url';
+}
+
+export function isJsonApiAssetVariations(
+  jsonApi: { type: string, id: string, attributes?: Record<string, unknown> },
+): jsonApi is JsonApiAssetVariations {
+  return jsonApi.type === 'asset-variants';
+}
+
+// ============================================
+// Generic Converters (accept any JSON:API resource shape)
+// ============================================
+
+interface GenericJsonApiResource {
+  type: string;
+  id: string;
+  attributes?: Record<string, unknown>;
+}
+
+/**
+ * Parse a generic JSON:API resource into a domain Asset or Folder
+ */
+export function parseResource(jsonApi: GenericJsonApiResource): Asset | Folder {
+  if (jsonApi.type === 'asset') {
+    return { key: jsonApi.id, type: 'asset', ...jsonApi.attributes } as Asset;
+  }
+  return { key: jsonApi.id, type: 'folder', ...jsonApi.attributes } as Folder;
+}
+
+/**
+ * Parse a generic JSON:API resource into a domain Asset
+ */
+export function parseAsset(jsonApi: GenericJsonApiResource): Asset {
+  return { key: jsonApi.id, type: 'asset', ...jsonApi.attributes } as Asset;
+}
+
+/**
+ * Parse a generic JSON:API resource into a domain Folder
+ */
+export function parseFolder(jsonApi: GenericJsonApiResource): Folder {
+  return { key: jsonApi.id, type: 'folder', ...jsonApi.attributes } as Folder;
+}
+
+// `parseAssetMetadata` removed — read `JsonApiAsset.meta` instead.
+
+/**
+ * Parse a generic JSON:API resource into AssetUrl
+ */
+export function parseAssetUrl(jsonApi: GenericJsonApiResource): AssetUrl {
+  return { key: jsonApi.id, ...jsonApi.attributes } as AssetUrl;
+}
+
+/**
+ * Parse a generic JSON:API resource into AssetVariations
+ */
+export function parseAssetVariations(jsonApi: GenericJsonApiResource): AssetVariations {
+  return { key: jsonApi.id, ...jsonApi.attributes } as AssetVariations;
+}

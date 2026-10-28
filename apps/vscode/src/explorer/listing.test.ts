@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { LaikaTask } from 'laikacms/core';
-import { InMemoryDocumentsRepository } from 'laikacms/documents/testing';
-import { InMemoryStorageRepository } from 'laikacms/storage/testing';
+import { ContentiaTask } from 'contentia/core';
+import { InMemoryDocumentsRepository } from 'contentia/documents/testing';
+import { InMemoryStorageRepository } from 'contentia/storage/testing';
 
 import { labelOf, listDocumentsFolder, listStorageFolder, PAGE_SIZE } from './listing.js';
 
@@ -18,7 +18,7 @@ describe('listStorageFolder', () => {
   // the real fs backend in serve-process.test.ts.
   const seed = async (keys: string[]) => {
     const repo = new InMemoryStorageRepository();
-    for (const key of keys) await LaikaTask.runPromise(repo.createObject({ key, content: { key } }));
+    for (const key of keys) await ContentiaTask.runPromise(repo.createObject({ key, content: { key } }));
     return repo;
   };
 
@@ -49,14 +49,14 @@ describe('listStorageFolder', () => {
 describe('listDocumentsFolder', () => {
   const seed = async () => {
     const repo = new InMemoryDocumentsRepository();
-    await LaikaTask.runPromise(repo.createDocument({
+    await ContentiaTask.runPromise(repo.createDocument({
       key: 'posts/hello',
       type: 'published',
       status: 'published',
       language: 'en',
       content: { title: 'Hello' },
     }));
-    await LaikaTask.runPromise(repo.createUnpublished({
+    await ContentiaTask.runPromise(repo.createUnpublished({
       key: 'posts/draft',
       type: 'unpublished',
       status: 'draft',

@@ -1,5 +1,5 @@
 /**
- * Deriving Astro's content collections from the Laika catalog.
+ * Deriving Astro's content collections from the Contentia catalog.
  *
  * Without this you declare every collection twice: once in the CMS config that
  * tells the editor what fields a post has, and again in `src/content.config.ts`
@@ -18,20 +18,20 @@
  * stays `'convention'`, as everywhere else in this package.
  */
 
-import type { CatalogProvider, DocumentCollectionSettings } from 'laikacms/catalog';
-import { runTask } from 'laikacms/compat';
-import { BadRequestError } from 'laikacms/core/errors';
+import type { CatalogProvider, DocumentCollectionSettings } from 'contentia/catalog';
+import { runTask } from 'contentia/compat';
+import { BadRequestError } from 'contentia/core/errors';
 
 import { type DocumentSelectOptions, documentsLoader } from './documents-loader.js';
 import { jsonSchemaToZod, type ZodNamespace, type ZodTypeLike } from './json-schema-to-zod.js';
 import {
+  type ContentiaLoader,
   DEFAULT_BODY_FIELD,
   type EntryOptions,
-  type LaikaLoader,
   type RenderOptions,
   stripBodyField,
 } from './mapping.js';
-import { type LaikaRepositoryOptions, resolveCatalogProvider, resolveRepositories } from './repositories.js';
+import { type ContentiaRepositoryOptions, resolveCatalogProvider, resolveRepositories } from './repositories.js';
 import type { SyncOptions } from './sync.js';
 
 /** Per-collection overrides, keyed by collection name. */
@@ -47,7 +47,7 @@ export interface CollectionOverride {
   sync?: SyncOptions;
 }
 
-export interface LaikaCollectionsOptions extends LaikaRepositoryOptions {
+export interface ContentiaCollectionsOptions extends ContentiaRepositoryOptions {
   /**
    * The `z` from `astro:content`. Supply it to derive a schema per collection
    * from the catalog's fields. Omit it and collections are created without a
@@ -76,7 +76,7 @@ export interface LaikaCollectionsOptions extends LaikaRepositoryOptions {
 /** One entry of Astro's `collections` export. */
 export interface AstroCollection {
   type: 'content_layer';
-  loader: LaikaLoader;
+  loader: ContentiaLoader;
   schema?: unknown;
 }
 
@@ -84,16 +84,16 @@ export interface AstroCollection {
  * Build the `collections` object for `src/content.config.ts` from the catalog.
  *
  * ```ts
- * import { laikaCollections } from '@laikacms/astro/loader';
+ * import { contentiaCollections } from '@contentia/astro/loader';
  * import { z } from 'astro:content';
  *
  * // `catalog: 'decap'` reads the collections out of your Decap config.yml.
  * // Any other CatalogProvider works the same way.
- * export const collections = await laikaCollections({ dir: 'content', catalog: 'decap', z });
+ * export const collections = await contentiaCollections({ dir: 'content', catalog: 'decap', z });
  * ```
  */
-export async function laikaCollections(
-  options: LaikaCollectionsOptions = {},
+export async function contentiaCollections(
+  options: ContentiaCollectionsOptions = {},
 ): Promise<Record<string, AstroCollection>> {
   const root = options.root ?? process.cwd();
   const catalogChoice = options.catalog ?? 'convention';
@@ -103,7 +103,7 @@ export async function laikaCollections(
   const names = await documentCollectionNames(catalog, options);
   if (names.length === 0 && options.allowEmpty !== true) {
     throw new BadRequestError(
-      'laikaCollections found no document collections in the catalog. The convention catalog '
+      'contentiaCollections found no document collections in the catalog. The convention catalog '
         + 'only reports collections that have been persisted, so if your collections are '
         + "declared in a Decap config.yml, pass catalog: 'decap'. Pass allowEmpty: true if an "
         + 'empty result is expected.',
@@ -140,7 +140,7 @@ export async function laikaCollections(
 /** The document collections the catalog knows about, after include/exclude. */
 async function documentCollectionNames(
   catalog: CatalogProvider,
-  options: LaikaCollectionsOptions,
+  options: ContentiaCollectionsOptions,
 ): Promise<string[]> {
   const { collections } = await runTask(catalog.getCatalog());
   const all = Object.entries(collections ?? {})

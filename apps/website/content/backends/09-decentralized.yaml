@@ -5,14 +5,14 @@ note: >-
   contract.
 items:
   - name: IPFS / Pinata
-    sub: '@laikacms/pinata'
+    sub: '@contentia/pinata'
     icon: { si: ipfs }
   - name: Solid
-    sub: '@laikacms/solid'
+    sub: '@contentia/solid'
     icon: { si: solid }
   - name: AT Protocol
-    sub: '@laikacms/atproto'
+    sub: '@contentia/atproto'
     icon: { si: bluesky }
   - name: LDAP
-    sub: '@laikacms/ldap'
+    sub: '@contentia/ldap'
     icon: { svg: tree }

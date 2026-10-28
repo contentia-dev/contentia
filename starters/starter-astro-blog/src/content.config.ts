@@ -12,7 +12,7 @@
  * Pass your own `schema` to `defineCollection` to take a collection back under
  * manual control — an explicit schema always wins over the derived one.
  */
-import { documentsLoader } from '@laikacms/astro/loader';
+import { documentsLoader } from '@contentia/astro/loader';
 import { defineCollection, z } from 'astro:content';
 
 const posts = defineCollection({

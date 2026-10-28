@@ -4,12 +4,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 // The exact zod Astro ships, so validation is tested against what
 // `astro:content` would hand a real project.
 import * as zod from 'astro/zod';
-import type { CatalogProvider } from 'laikacms/catalog';
-import { runTask } from 'laikacms/compat';
-import { LaikaTask } from 'laikacms/core';
-import { ForbiddenError, LaikaError, NotFoundError, ValidationError } from 'laikacms/core/errors';
-import { DocumentsRepository } from 'laikacms/documents';
-import { InMemoryDocumentsRepository } from 'laikacms/documents/testing';
+import type { CatalogProvider } from 'contentia/catalog';
+import { runTask } from 'contentia/compat';
+import { ContentiaTask } from 'contentia/core';
+import { ContentiaError, ForbiddenError, NotFoundError, ValidationError } from 'contentia/core/errors';
+import { DocumentsRepository } from 'contentia/documents';
+import { InMemoryDocumentsRepository } from 'contentia/documents/testing';
 
 import type { ZodNamespace } from './json-schema-to-zod.js';
 import { liveDocumentsLoader } from './live-loader.js';
@@ -42,7 +42,7 @@ describe('loadEntry', () => {
     expect(result).toMatchObject({ id: 'hello', data: { title: 'Hello' } });
   });
 
-  it('reads by the full Laika key too', async () => {
+  it('reads by the full Contentia key too', async () => {
     const result = await loader().loadEntry({ filter: { key: 'posts/hello' }, collection: 'posts' });
 
     expect(result).toMatchObject({ id: 'hello' });
@@ -106,7 +106,7 @@ describe('loadEntry', () => {
       });
     });
 
-    it('wrap a non-Laika throw so the declared error type stays true', async () => {
+    it('wrap a non-Contentia throw so the declared error type stays true', async () => {
       class Exploding extends InMemoryDocumentsRepository {
         override getDocument(): never {
           throw new TypeError('kaboom');
@@ -153,7 +153,7 @@ describe('cache hints', () => {
     const result = await loader().loadEntry({ filter: { id: 'hello' }, collection: 'posts' });
 
     expect((result as { cacheHint: { tags: string[] } }).cacheHint.tags)
-      .toEqual(['laika', 'laika:posts', 'laika:posts/hello']);
+      .toEqual(['contentia', 'contentia:posts', 'contentia:posts/hello']);
   });
 
   it('carry lastModified so a CDN can revalidate', async () => {
@@ -220,18 +220,18 @@ describe('loadCollection', () => {
     const result = await loader().loadCollection({ collection: 'posts' });
 
     expect((result as { cacheHint: { tags: string[] } }).cacheHint.tags)
-      .toEqual(['laika', 'laika:posts']);
+      .toEqual(['contentia', 'contentia:posts']);
   });
 });
 
 describe('validate', () => {
   /** A catalog stub that answers exactly one collection. */
-  const catalogWith = (schema: JSONSchema7 | undefined, error?: LaikaError): CatalogProvider =>
+  const catalogWith = (schema: JSONSchema7 | undefined, error?: ContentiaError): CatalogProvider =>
     ({
       getCollectionSchema: (collection: string) => {
         calls.push(collection);
-        if (error !== undefined) return LaikaTask.fail(error);
-        return LaikaTask.succeed(schema!);
+        if (error !== undefined) return ContentiaTask.fail(error);
+        return ContentiaTask.succeed(schema!);
       },
     }) as unknown as CatalogProvider;
 
@@ -274,7 +274,7 @@ describe('validate', () => {
 
     // Returned, not thrown: Astro erases a thrown error's code, and a page
     // branches on `error.code`.
-    const error = (result as { error: LaikaError }).error;
+    const error = (result as { error: ContentiaError }).error;
     expect(error).toBeInstanceOf(ValidationError);
     expect(error.code).toBe(ValidationError.CODE);
   });
@@ -319,7 +319,7 @@ describe('validate', () => {
     const result = await live.loadEntry({ filter: { id: 'hello' }, collection: 'posts' });
 
     expect(result).not.toBeUndefined();
-    expect((result as { error: LaikaError }).error.message).toContain('validate is on');
+    expect((result as { error: ContentiaError }).error.message).toContain('validate is on');
   });
 
   it('retries a catalog read that failed, rather than staying unvalidated', async () => {
@@ -328,8 +328,8 @@ describe('validate', () => {
       getCollectionSchema: () => {
         attempts += 1;
         return attempts === 1
-          ? LaikaTask.fail(new NotFoundError('transient'))
-          : LaikaTask.succeed(POSTS_SCHEMA);
+          ? ContentiaTask.fail(new NotFoundError('transient'))
+          : ContentiaTask.succeed(POSTS_SCHEMA);
       },
     } as unknown as CatalogProvider;
 
@@ -337,12 +337,12 @@ describe('validate', () => {
 
     expect(
       (await live.loadEntry({ filter: { id: 'hello' }, collection: 'posts' }) as {
-        error?: LaikaError,
+        error?: ContentiaError,
       }).error,
     ).toBeDefined();
     expect(
       (await live.loadEntry({ filter: { id: 'hello' }, collection: 'posts' }) as {
-        error?: LaikaError,
+        error?: ContentiaError,
       }).error,
     ).toBeUndefined();
     expect(attempts).toBe(2);

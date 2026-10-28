@@ -1,5 +1,5 @@
+import { ForbiddenError, TooManyRequestsError, UpstreamUnAuthorizedError } from 'contentia/core';
 import * as Result from 'effect/Result';
-import { ForbiddenError, TooManyRequestsError, UpstreamUnAuthorizedError } from 'laikacms/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createAppAuthMock = vi.fn();

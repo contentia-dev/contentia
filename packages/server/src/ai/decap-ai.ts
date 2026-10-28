@@ -7,8 +7,8 @@
  */
 
 import { convertToModelMessages, generateId, streamText, type ToolSet } from 'ai';
-import { hasScope, type Scope } from 'laikacms/auth';
-import { Header } from 'laikacms/core';
+import { hasScope, type Scope } from 'contentia/auth';
+import { Header } from 'contentia/core';
 
 import en from './i18n/en.js';
 import { documentTools } from './tools/document-tools.js';

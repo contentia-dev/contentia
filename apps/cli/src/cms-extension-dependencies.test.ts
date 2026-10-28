@@ -67,7 +67,7 @@ describe('discoverOptionalPeerDependencies', () => {
 async function createProjectFixture(
   options: { declaredOl?: string, installOl?: boolean } = {},
 ): Promise<string> {
-  const projectDirectory = await mkdtemp(path.join(tmpdir(), 'laikacli-extension-peers-'));
+  const projectDirectory = await mkdtemp(path.join(tmpdir(), 'contentia-extension-peers-'));
   const packageDirectory = path.join(projectDirectory, 'node_modules', '@example', 'cms');
   await mkdir(path.join(packageDirectory, 'dist', 'widgets', 'map'), { recursive: true });
   await mkdir(path.join(packageDirectory, 'dist', 'widgets', 'icons'), { recursive: true });

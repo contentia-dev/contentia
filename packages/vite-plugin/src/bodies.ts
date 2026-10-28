@@ -4,7 +4,7 @@
  * A markdown-serialized item deserializes to `{ ...frontmatter, body }` — the
  * frontmatter fields become the module's named exports as usual, and `body` is
  * prose. With `mdx: true` that prose is written out as a real `.mdx` file under
- * `.laika/vite-generated/bodies/` and the generated module re-exports its default as `Body`.
+ * `.contentia/vite-generated/bodies/` and the generated module re-exports its default as `Body`.
  *
  * This plugin never compiles MDX and never depends on it. It emits the chunk;
  * whatever the consumer put in their Vite config (`@mdx-js/rollup`, typically)
@@ -13,14 +13,14 @@
  * The chunk has to be a real file on disk. `createFilter` from
  * `@rollup/pluginutils` — which extension-driven plugins like `@mdx-js/rollup`
  * use to pick their inputs — rejects any id containing a NUL byte, so a
- * `\0laika:…` virtual module could never reach them.
+ * `\0contentia:…` virtual module could never reach them.
  */
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { writeAtomic } from './atomic-write.js';
-import type { LaikaId } from './protocol.js';
+import type { ContentiaId } from './protocol.js';
 
 /** The content field treated as prose (matches the markdown serializer's output). */
 export const BODY_FIELD = 'body';
@@ -29,7 +29,7 @@ export const BODY_FIELD = 'body';
 export const BODY_EXPORT = 'Body';
 
 /** Where chunks live, relative to the Vite root. Already gitignored by the typegen. */
-export const BODIES_DIR = '.laika/vite-generated/bodies';
+export const BODIES_DIR = '.contentia/vite-generated/bodies';
 
 /** The item's prose, or `null` when it has none. */
 export function bodyOf(content: Record<string, unknown>): string | null {
@@ -50,7 +50,7 @@ function safeKey(key: string): string {
 }
 
 /** Absolute path of the chunk backing `id`. */
-export function chunkPath(root: string, id: LaikaId): string {
+export function chunkPath(root: string, id: ContentiaId): string {
   return path.join(root, BODIES_DIR, id.namespace, `${safeKey(id.key)}.mdx`);
 }
 
@@ -59,12 +59,12 @@ export function chunkPath(root: string, id: LaikaId): string {
  * Vite resolves against the project root in both dev and build — a virtual
  * module has no directory to resolve a relative path from.
  */
-export function chunkSpecifier(id: LaikaId): string {
+export function chunkSpecifier(id: ContentiaId): string {
   return `/${BODIES_DIR}/${id.namespace}/${safeKey(id.key)}.mdx`;
 }
 
 /** Write the chunk for `id`. Returns `true` when the file changed. */
-export function writeChunk(root: string, id: LaikaId, body: string): Promise<boolean> {
+export function writeChunk(root: string, id: ContentiaId, body: string): Promise<boolean> {
   return writeAtomic(chunkPath(root, id), body.endsWith('\n') ? body : `${body}\n`);
 }
 

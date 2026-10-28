@@ -1,8 +1,8 @@
 # starter-vite-react-blog
 
-A blog built with **bare Vite SSR + React + Express + LaikaCMS** — no meta-framework.
+A blog built with **bare Vite SSR + React + Express + Contentia** — no meta-framework.
 
-Shows the raw primitives that Next.js and TanStack Start abstract away: Express request handling, `renderToStaticMarkup`, and the Decap API proxied through a catch-all route. Uses [`createEmbeddedLaika`](https://docs.laikacms.com) for the same one-call server setup as the Hono starter.
+Shows the raw primitives that Next.js and TanStack Start abstract away: Express request handling, `renderToStaticMarkup`, and the Decap API proxied through a catch-all route. Uses [`createEmbeddedContentia`](https://contentia.dev/docs) for the same one-call server setup as the Hono starter.
 
 ## Run it
 
@@ -17,13 +17,13 @@ The admin uses **dev token auth**: no password required in development.
 
 ## Working from the monorepo
 
-If you cloned the `laikacms` repository and are running this starter in-place (not via the wizard),
+If you cloned the `contentia` repository and are running this starter in-place (not via the wizard),
 the `starters/pnpm-workspace.yaml` carries `link:` overrides pointing at local builds of packages
 that are ahead of npm. Build those packages first, then install and run:
 
 ```sh
 # Build the linked packages (run from this directory)
-pnpm -C ../.. --filter laikacms --filter @laikacms/server build
+pnpm -C ../.. --filter contentia --filter @contentia/server build
 
 pnpm install
 pnpm dev
@@ -41,9 +41,9 @@ pnpm dev
 ## How it's wired
 
 ```
-src/laika.ts          createEmbeddedLaika — FileSystem + Catalog + Decap API
+src/contentia.ts          createEmbeddedContentia — FileSystem + Catalog + Decap API
 src/decap-config.ts   Decap collection definitions (shared with admin bundle)
-src/server.tsx        Express server: /api/decap/* → laika.fetch, SSR blog routes, static files
+src/server.tsx        Express server: /api/decap/* → contentia.fetch, SSR blog routes, static files
 src/pages.tsx         React components (renderToStaticMarkup — no hydration)
 src/admin-client.ts   Admin entry point (bundled to public/admin/bundle.js)
 src/cms.ts            Decap bare-app registration (widgets, backend)
@@ -51,11 +51,11 @@ content/              Markdown post files
 public/uploads/       Media uploads
 ```
 
-Blog routes call `laika.documents.listRecordSummaries` / `getDocument` directly — no HTTP round-trip. The Express `/api/decap/*` catch-all converts the Node.js `IncomingMessage` to a Web API `Request` before forwarding to `laika.fetch`.
+Blog routes call `contentia.documents.listRecordSummaries` / `getDocument` directly — no HTTP round-trip. The Express `/api/decap/*` catch-all converts the Node.js `IncomingMessage` to a Web API `Request` before forwarding to `contentia.fetch`.
 
 ## Customise
 
 - **Collections** — edit `src/decap-config.ts`.
 - **Port** — set the `PORT` environment variable (default: `3000`).
-- **Auth** — change `auth: { mode: 'token', authenticate: async token => { if (token !== process.env.ADMIN_TOKEN) throw new Error('Unauthorized'); return { id: 'admin', email: 'admin@example.com' }; } }` in `src/laika.ts`.
+- **Auth** — change `auth: { mode: 'token', authenticate: async token => { if (token !== process.env.ADMIN_TOKEN) throw new Error('Unauthorized'); return { id: 'admin', email: 'admin@example.com' }; } }` in `src/contentia.ts`.
 - **Hydration** — swap `renderToStaticMarkup` for `renderToString` + client `hydrateRoot` and pass server data via a `<script>` tag.

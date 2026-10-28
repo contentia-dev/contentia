@@ -41,12 +41,12 @@ packages depend on domain, not on implementations.
 
 ## Effect-based repositories
 
-Repository methods return `LaikaTask<T>` (single result) or `LaikaStream<T, D>` (multiple results
-with a typed done value) — both Effect-based. Consume them via the `laikacms/compat` helpers
-(`runTask`, `collectStream`) rather than importing Effect directly in calling code.
+Repository methods return `ContentiaTask<T>` (single result) or `ContentiaStream<T, D>` (multiple
+results with a typed done value) — both Effect-based. Consume them via the `contentia/compat`
+helpers (`runTask`, `collectStream`) rather than importing Effect directly in calling code.
 
 When a higher-level repository delegates to a lower-level one, use the **forwarding** drainers
-(`LaikaTask.runValueForwarding`, `LaikaStream.runCollectForwarding`) so recoverable warnings
+(`ContentiaTask.runValueForwarding`, `ContentiaStream.runCollectForwarding`) so recoverable warnings
 propagate to the outer caller instead of being dropped at the delegation boundary. `runValue` /
 `runCollect` (non-forwarding) are correct only at a true top-level boundary — an API server draining
 a task into a `Promise`, test setup, etc.

@@ -1,12 +1,12 @@
 import {
+  ContentiaTask,
   ForbiddenError,
   InternalError,
-  LaikaTask,
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
   VersionMismatchError,
-} from 'laikacms/core';
-import { runStorageRepositoryContract } from 'laikacms/storage/testing';
+} from 'contentia/core';
+import { runStorageRepositoryContract } from 'contentia/storage/testing';
 import { describe, expect, it } from 'vitest';
 
 import { GithubStorageRepository } from './github-storage-repository.js';
@@ -79,7 +79,7 @@ describe('GithubStorageRepository mapError', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 });
@@ -92,7 +92,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
@@ -106,7 +106,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -117,7 +117,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(UpstreamUnAuthorizedError);
   });
 
@@ -131,7 +131,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
@@ -145,7 +145,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -156,7 +156,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(VersionMismatchError);
   });
 
@@ -167,7 +167,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(VersionMismatchError);
   });
 
@@ -178,7 +178,7 @@ describe('GithubStorageRepository.getAtom error propagation', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(InternalError);
   });
 });

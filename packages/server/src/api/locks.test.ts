@@ -5,21 +5,21 @@
  * Two layers:
  *   1. buildLocksApi over an InProcessLockManager-backed repository — the HTTP
  *      status/body mapping, with an injected clock for TTL control.
- *   2. Through laikaApi(...) — that /locks is auth-gated, that the owner is
+ *   2. Through contentiaApi(...) — that /locks is auth-gated, that the owner is
  *      derived from the authenticated user rather than the body, and that a
  *      backend without lock support answers 501 so the client degrades.
  */
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { LaikaTask, NotImplementedError } from 'laikacms/core';
-import type { DocumentsCapabilities } from 'laikacms/documents';
-import { DocumentsRepository } from 'laikacms/documents';
-import { InProcessLockManager } from 'laikacms/locks/in-process';
-import type { Key, Lock, LockOwner, LockToken, OwnedLock } from 'laikacms/storage';
+import { ContentiaTask, NotImplementedError } from 'contentia/core';
+import type { DocumentsCapabilities } from 'contentia/documents';
+import { DocumentsRepository } from 'contentia/documents';
+import { InProcessLockManager } from 'contentia/locks/in-process';
+import type { Key, Lock, LockOwner, LockToken, OwnedLock } from 'contentia/storage';
 
-import { laikaApi } from './index.js';
-import type { LaikaApiOptions, User } from './index.js';
+import { contentiaApi } from './index.js';
+import type { ContentiaApiOptions, User } from './index.js';
 import { buildLocksApi } from './locks.js';
 
 const ALICE: LockOwner = { id: 'alice@example.com', name: 'Alice' };
@@ -37,15 +37,15 @@ class LockingDocumentsRepository extends DocumentsRepository {
     this.manager = new InProcessLockManager({ defaultTtlMs: 60_000, now });
   }
 
-  override getCapabilities(): LaikaTask.LaikaTask<DocumentsCapabilities> {
-    return LaikaTask.fail(new NotImplementedError('not needed for lock tests'));
+  override getCapabilities(): ContentiaTask.ContentiaTask<DocumentsCapabilities> {
+    return ContentiaTask.fail(new NotImplementedError('not needed for lock tests'));
   }
 
   override acquireLock(
     key: Key,
     owner: LockOwner,
     options?: { ttlMs?: number | undefined, force?: boolean | undefined },
-  ): LaikaTask.LaikaTask<OwnedLock> {
+  ): ContentiaTask.ContentiaTask<OwnedLock> {
     return this.manager.acquireLock(key, owner, options);
   }
 
@@ -54,23 +54,23 @@ class LockingDocumentsRepository extends DocumentsRepository {
     token: LockToken,
     owner: LockOwner,
     options?: { ttlMs?: number | undefined },
-  ): LaikaTask.LaikaTask<OwnedLock> {
+  ): ContentiaTask.ContentiaTask<OwnedLock> {
     return this.manager.refreshLock(key, token, owner, options);
   }
 
-  override releaseLock(key: Key, token: LockToken): LaikaTask.LaikaTask<void> {
+  override releaseLock(key: Key, token: LockToken): ContentiaTask.ContentiaTask<void> {
     return this.manager.releaseLock(key, token);
   }
 
-  override getLock(key: Key): LaikaTask.LaikaTask<Lock | null> {
+  override getLock(key: Key): ContentiaTask.ContentiaTask<Lock | null> {
     return this.manager.getLock(key);
   }
 }
 
 /** A repository with no lock support: every lock call is NotImplementedError. */
 class PlainDocumentsRepository extends DocumentsRepository {
-  override getCapabilities(): LaikaTask.LaikaTask<DocumentsCapabilities> {
-    return LaikaTask.fail(new NotImplementedError('not needed for lock tests'));
+  override getCapabilities(): ContentiaTask.ContentiaTask<DocumentsCapabilities> {
+    return ContentiaTask.fail(new NotImplementedError('not needed for lock tests'));
   }
 }
 
@@ -292,15 +292,15 @@ describe('buildLocksApi — malformed requests', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Layer 2: through laikaApi(...)
+// Layer 2: through contentiaApi(...)
 // ---------------------------------------------------------------------------
 
 const MOCK_USER: User = { id: 'u1', email: 'alice@example.com', name: 'Alice' };
 
-function makeOptions(overrides: Partial<LaikaApiOptions> = {}): LaikaApiOptions {
+function makeOptions(overrides: Partial<ContentiaApiOptions> = {}): ContentiaApiOptions {
   return {
     documents: new LockingDocumentsRepository(() => 1_000_000),
-    storage: {} as LaikaApiOptions['storage'],
+    storage: {} as ContentiaApiOptions['storage'],
     authenticateAccessToken: vi.fn().mockResolvedValue(MOCK_USER),
     authorize: () => true,
     logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -315,9 +315,9 @@ const authed = (path: string, method = 'GET', body?: unknown) =>
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-describe('laikaApi /locks integration', () => {
+describe('contentiaApi /locks integration', () => {
   it('derives the lock owner from the authenticated user, not the request body', async () => {
-    const api = laikaApi(makeOptions());
+    const api = contentiaApi(makeOptions());
 
     const res = await api.fetch(
       authed('/locks/posts%2Fhello', 'POST', { owner: { id: 'mallory', name: 'Mallory' } }),
@@ -329,13 +329,13 @@ describe('laikaApi /locks integration', () => {
   });
 
   it('204s (no-op) when the documents repository does not support locking and no locks option', async () => {
-    const api = laikaApi(makeOptions({ documents: new PlainDocumentsRepository() }));
+    const api = contentiaApi(makeOptions({ documents: new PlainDocumentsRepository() }));
     const res = await api.fetch(authed('/locks/posts%2Fhello', 'POST'));
     expect(res.status).toBe(204);
   });
 
   it('acquires via the `locks` option when documents lacks lock support', async () => {
-    const api = laikaApi(makeOptions({
+    const api = contentiaApi(makeOptions({
       documents: new PlainDocumentsRepository(),
       locks: new InProcessLockManager({ now: () => 1_000_000 }),
     }));
@@ -346,20 +346,20 @@ describe('laikaApi /locks integration', () => {
   });
 
   it('requires authentication (401 without a token)', async () => {
-    const api = laikaApi(makeOptions());
+    const api = contentiaApi(makeOptions());
     const res = await api.fetch(new Request('https://example.com/locks/posts%2Fhello'));
     expect(res.status).toBe(401);
   });
 
   it('honours the authorize gate (403 when denied)', async () => {
-    const api = laikaApi(makeOptions({ authorize: () => false }));
+    const api = contentiaApi(makeOptions({ authorize: () => false }));
     const res = await api.fetch(authed('/locks/posts%2Fhello', 'POST'));
     expect(res.status).toBe(403);
   });
 
   it('exposes the decoded lock key to authorize as itemId/collection', async () => {
     const authorize = vi.fn().mockReturnValue(true);
-    const api = laikaApi(makeOptions({ authorize }));
+    const api = contentiaApi(makeOptions({ authorize }));
     await api.fetch(authed('/locks/posts%2Fhello', 'POST'));
     expect(authorize).toHaveBeenCalledWith(
       expect.objectContaining({ domain: 'locks', collection: 'posts', itemId: 'posts/hello' }),

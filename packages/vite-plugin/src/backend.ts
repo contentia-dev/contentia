@@ -1,17 +1,17 @@
-import type { AssetsRepository } from 'laikacms/assets';
-import { CatalogAssetsRepository } from 'laikacms/assets/catalog';
-import { ConventionCatalogProvider } from 'laikacms/catalog-convention';
-import { LaikaStream, LaikaTask } from 'laikacms/core';
-import type { DocumentsRepository } from 'laikacms/documents';
-import { CatalogDocumentsRepository } from 'laikacms/documents/catalog';
-import { jsonSerializer } from 'laikacms/serializers/json';
-import { markdownSerializer } from 'laikacms/serializers/markdown';
-import { rawSerializer } from 'laikacms/serializers/raw';
-import { yamlSerializer } from 'laikacms/serializers/yaml';
-import type { StorageRepository, StorageSerializerRegistry } from 'laikacms/storage';
-import { FileSystemStorageRepository } from 'laikacms/storage/fs';
+import type { AssetsRepository } from 'contentia/assets';
+import { CatalogAssetsRepository } from 'contentia/assets/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { ContentiaStream, ContentiaTask } from 'contentia/core';
+import type { DocumentsRepository } from 'contentia/documents';
+import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
+import { jsonSerializer } from 'contentia/serializers/json';
+import { markdownSerializer } from 'contentia/serializers/markdown';
+import { rawSerializer } from 'contentia/serializers/raw';
+import { yamlSerializer } from 'contentia/serializers/yaml';
+import type { StorageRepository, StorageSerializerRegistry } from 'contentia/storage';
+import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
-import type { LaikaId, Namespace } from './protocol.js';
+import type { ContentiaId, Namespace } from './protocol.js';
 
 /**
  * The default serializer registry for the filesystem storage repository. The
@@ -52,16 +52,16 @@ export function createFsStorage(options: FsStorageOptions): StorageRepository {
 
 /**
  * The repositories the plugin works through: `storage`/`documents` back the
- * `laika:` loader, and `assets` backs local mode's media API.
+ * `contentia:` loader, and `assets` backs local mode's media API.
  */
-export interface LaikaRepositories {
+export interface ContentiaRepositories {
   storage: StorageRepository;
   documents: DocumentsRepository;
   assets: AssetsRepository;
 }
 
 /** Derive documents and assets repositories from a storage repository via Catalog. */
-export function createRepositories(storage: StorageRepository): LaikaRepositories {
+export function createRepositories(storage: StorageRepository): ContentiaRepositories {
   const settings = new ConventionCatalogProvider({ storage });
   return {
     storage,
@@ -76,16 +76,16 @@ export interface ReadResult {
   meta: Record<string, unknown>;
 }
 
-/** Read one content item by its {@link LaikaId}, dispatching on the namespace. */
-export async function readItem(repos: LaikaRepositories, id: LaikaId): Promise<ReadResult> {
+/** Read one content item by its {@link ContentiaId}, dispatching on the namespace. */
+export async function readItem(repos: ContentiaRepositories, id: ContentiaId): Promise<ReadResult> {
   if (id.namespace === 'store') {
-    const object = await LaikaTask.runPromise(repos.storage.getObject(id.key));
+    const object = await ContentiaTask.runPromise(repos.storage.getObject(id.key));
     return {
       content: object.content ?? {},
       meta: { key: object.key, type: object.type, ...(object.metadata ?? {}) },
     };
   }
-  const document = await LaikaTask.runPromise(repos.documents.getDocument(id.key));
+  const document = await ContentiaTask.runPromise(repos.documents.getDocument(id.key));
   return {
     content: document.content ?? {},
     meta: {
@@ -99,10 +99,10 @@ export async function readItem(repos: LaikaRepositories, id: LaikaId): Promise<R
 
 /**
  * List the keys under `folder` for a namespace, up to `depth` levels deep.
- * Used to expand `import.meta.glob('laika:…')` patterns against the repository.
+ * Used to expand `import.meta.glob('contentia:…')` patterns against the repository.
  */
 export async function listKeys(
-  repos: LaikaRepositories,
+  repos: ContentiaRepositories,
   namespace: Namespace,
   folder?: string,
   depth?: number,
@@ -113,12 +113,12 @@ export async function listKeys(
   const pagination = { perPage: 10_000 };
   const listDepth = depth ?? 1;
   if (namespace === 'store') {
-    const { data } = await LaikaStream.runPromiseCollect(
+    const { data } = await ContentiaStream.runPromiseCollect(
       repos.storage.listAtomSummaries(folder, { depth: listDepth, pagination }),
     );
     return data.filter(atom => atom.type === 'object-summary').map(atom => atom.key);
   }
-  const { data } = await LaikaStream.runPromiseCollect(
+  const { data } = await ContentiaStream.runPromiseCollect(
     repos.documents.listRecordSummaries({
       ...(folder ? { folder } : {}),
       depth: listDepth,
@@ -135,18 +135,18 @@ export async function listKeys(
  * objects recursively; documents surface each collection as a folder at the
  * root, so we walk one level into every collection to reach its published docs.
  */
-async function listAllKeys(repos: LaikaRepositories, namespace: Namespace): Promise<string[]> {
+async function listAllKeys(repos: ContentiaRepositories, namespace: Namespace): Promise<string[]> {
   const pagination = { perPage: 10_000 };
   const DEEP = 64;
   if (namespace === 'store') {
-    const { data } = await LaikaStream.runPromiseCollect(
+    const { data } = await ContentiaStream.runPromiseCollect(
       repos.storage.listAtomSummaries('', { depth: DEEP, pagination }),
     );
     return data.filter(atom => atom.type === 'object-summary').map(atom => atom.key);
   }
   const seen = new Set<string>();
   const folders: string[] = [];
-  const { data: root } = await LaikaStream.runPromiseCollect(
+  const { data: root } = await ContentiaStream.runPromiseCollect(
     repos.documents.listRecordSummaries({ depth: 1, pagination }),
   );
   for (const record of root) {
@@ -154,7 +154,7 @@ async function listAllKeys(repos: LaikaRepositories, namespace: Namespace): Prom
     else if (record.type === 'folder-summary') folders.push(record.key);
   }
   for (const folder of folders) {
-    const { data } = await LaikaStream.runPromiseCollect(
+    const { data } = await ContentiaStream.runPromiseCollect(
       repos.documents.listRecordSummaries({ folder, depth: DEEP, pagination, type: 'published' }),
     );
     for (const record of data) {

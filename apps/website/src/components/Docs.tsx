@@ -7,11 +7,11 @@ const LEAD =
   'One package, subpath exports for everything else. Install it, pick a storage repository, and you have a content API you can deploy anywhere.';
 
 /* Exported for the mounting page's interactive slots (see the usage below). */
-export const INSTALL_COMMAND = 'pnpm add laikacms';
+export const INSTALL_COMMAND = 'pnpm add contentia';
 export const STARTER_FILE = 'worker.ts';
-export const STARTER_CODE = `import { buildJsonApi } from "laikacms/storage-api";
-import { allowAll } from "laikacms/json-api";
-import { FileSystemStorageRepository } from "laikacms/storage-fs";
+export const STARTER_CODE = `import { buildJsonApi } from "contentia/storage-api";
+import { allowAll } from "contentia/json-api";
+import { FileSystemStorageRepository } from "contentia/storage-fs";
 
 const repo = new FileSystemStorageRepository({ basePath: "./content" });
 const api = buildJsonApi({ repo, authorize: allowAll });

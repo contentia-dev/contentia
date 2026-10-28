@@ -1,4 +1,4 @@
-# @laikacms/bitbucket
+# @contentia/bitbucket
 
 ## 2.0.0
 
@@ -10,7 +10,7 @@
   The old name promised the wrong thing. `AuthorizationError` reads as "authorization failed", but
   the class is HTTP 401 and its actual job is narrow: it is the deserialization target for a 401
   challenge this server received from an _upstream_ — nothing to do with "authenticated but not
-  permitted". That mismatch was actively misleading people (laikacms#851 proposed routing
+  permitted". That mismatch was actively misleading people (contentia#851 proposed routing
   authorization denials through it, which would have answered 401 to callers who are in fact
   authenticated).
 
@@ -40,7 +40,7 @@
 
 ### Patch Changes
 
-- 14df4cf: Fix `npx laikacli` crashing with `ERR_MODULE_NOT_FOUND` on
+- 14df4cf: Fix `npx contentia` crashing with `ERR_MODULE_NOT_FOUND` on
   `effect/unstable/http/Multipasta/Node`.
 
   The catalog pinned `effect` and `@effect/platform-node` to `4.0.0-beta.66` while
@@ -56,7 +56,7 @@
 
   Also fixes two problems surfaced by the bump:
 
-  - `@laikacms/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
+  - `@contentia/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
     a dependency, resolving through a stale phantom symlink. It is now a declared dependency, which
     also makes the published package installable on npm.
   - `effect/Schema`'s `decodeUnknownSync` now throws a real `SchemaError` rather than a plain
@@ -72,7 +72,7 @@
 - Updated dependencies [14df4cf]
 - Updated dependencies [e8ab49b]
 - Updated dependencies [6b918c6]
-  - laikacms@6.0.0
+  - contentia@6.0.0
 
 ## 1.0.4
 
@@ -81,7 +81,7 @@
 - Updated dependencies [2f17498]
 - Updated dependencies [2f17498]
 - Updated dependencies [2f17498]
-  - laikacms@5.0.0
+  - contentia@5.0.0
 
 ## 1.0.3
 
@@ -89,13 +89,13 @@
 
 - Updated dependencies
 - Updated dependencies
-  - laikacms@3.1.0
+  - contentia@3.1.0
 
 ## 1.0.2
 
 ### Patch Changes
 
-- laikacms@3.0.1
+- contentia@3.0.1
 
 ## 1.0.1
 
@@ -107,20 +107,20 @@
   `subscribeChanges` remains unsupported.
 - Updated dependencies [68c658f]
 - Updated dependencies [d26bdfe]
-  - laikacms@3.0.0
+  - contentia@3.0.0
 
 ## 1.0.1
 
 ### Patch Changes
 
 - Updated dependencies [e488528]
-  - laikacms@1.0.1
+  - contentia@1.0.1
 
 ## 1.0.0
 
 ### Minor Changes
 
 - Initial release. Bitbucket-backed `StorageRepository` via the Cloud REST v2 API. App-password or
-  OAuth2 auth. Closes the git-platform triumvirate alongside `@laikacms/github` and
-  `@laikacms/gitlab`. All writes (creates, updates, deletes) go through Bitbucket's unified
+  OAuth2 auth. Closes the git-platform triumvirate alongside `@contentia/github` and
+  `@contentia/gitlab`. All writes (creates, updates, deletes) go through Bitbucket's unified
   `POST /src` multipart commit endpoint. Runtime-agnostic — only depends on `fetch`.

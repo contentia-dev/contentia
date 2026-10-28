@@ -7,7 +7,7 @@
  *
  * @example
  * ```typescript
- * import { type Translation, defaultMessages } from '@laikacms/server/oauth2/i18n';
+ * import { type Translation, defaultMessages } from '@contentia/server/oauth2/i18n';
  *
  * // Use default English messages
  * const config = { translations: defaultMessages };

@@ -1,8 +1,8 @@
 # starter-workers-blog
 
-A blog built with **Cloudflare Workers + R2 + LaikaCMS**.
+A blog built with **Cloudflare Workers + R2 + Contentia**.
 
-Unlike the Node.js starters (Hono, Express, Astro), the Workers runtime does not have access to `node:fs`, so `createEmbeddedLaika` is unavailable. This starter wires the lower-level `laikaApi` by hand, using `R2StorageRepository` directly with the native Cloudflare R2 binding.
+Unlike the Node.js starters (Hono, Express, Astro), the Workers runtime does not have access to `node:fs`, so `createEmbeddedContentia` is unavailable. This starter wires the lower-level `contentiaApi` by hand, using `R2StorageRepository` directly with the native Cloudflare R2 binding.
 
 ## Prerequisites
 
@@ -25,13 +25,13 @@ npm run dev
 
 ## Working from the monorepo
 
-If you cloned the `laikacms` repository and are running this starter in-place (not via the wizard),
+If you cloned the `contentia` repository and are running this starter in-place (not via the wizard),
 the `starters/pnpm-workspace.yaml` carries `link:` overrides pointing at local builds of packages
 that are ahead of npm. Build those packages first, then install and run:
 
 ```sh
 # Build the linked packages (run from this directory)
-pnpm -C ../.. --filter laikacms --filter @laikacms/server build
+pnpm -C ../.. --filter contentia --filter @contentia/server build
 
 pnpm install
 pnpm dev
@@ -39,7 +39,7 @@ pnpm dev
 
 The blog is at `/`, the Decap admin at `/admin/`.
 
-Dev authentication uses a hardcoded bearer token (`dev-local-laika-token`). Override it by setting `DEV_TOKEN` in `wrangler.toml` under `[vars]`.
+Dev authentication uses a hardcoded bearer token (`dev-local-contentia-token`). Override it by setting `DEV_TOKEN` in `wrangler.toml` under `[vars]`.
 
 ## Deploy to Cloudflare
 
@@ -61,7 +61,7 @@ This builds the admin bundle and calls `wrangler deploy`. The R2 bucket must alr
 ## How it's wired
 
 ```
-src/index.ts          Worker entry: laikaApi wired to R2 + DecapCatalogProvider,
+src/index.ts          Worker entry: contentiaApi wired to R2 + DecapCatalogProvider,
                        blog routes, /api/decap/* handler
 src/decap-config.ts   Decap collection definitions (shared with admin bundle)
 src/admin-client.ts   Admin entry point (bundled to public/admin/bundle.js)
@@ -74,4 +74,4 @@ On cold start, the Worker seeds `config.yml` into R2 (if absent) so `DecapCatalo
 
 ## Current limitation
 
-There is no `createEmbeddedLaika`-equivalent for edge runtimes — the lower-level `laikaApi` wiring shown here is currently the canonical pattern for Workers. If you need a higher-level helper, [open an issue](https://github.com/laikacms/laikacms/issues).
+There is no `createEmbeddedContentia`-equivalent for edge runtimes — the lower-level `contentiaApi` wiring shown here is currently the canonical pattern for Workers. If you need a higher-level helper, [open an issue](https://github.com/contentia-dev/contentia/issues).

@@ -1,6 +1,6 @@
-# @laikacms/github
+# @contentia/github
 
-GitHub-backed `StorageRepository` for Laika CMS. Stores content as commits in a GitHub repository;
+GitHub-backed `StorageRepository` for Contentia. Stores content as commits in a GitHub repository;
 pairs with the FS adapter for local dev so the same flow works against a real git repo with no FS
 required.
 
@@ -11,15 +11,16 @@ App credentials **or** a pre-built `Octokit` instance, not both.
 
 ### GitHub App (installation token)
 
-Use when the user editing content is **not** a GitHub user (for example: they signed in to Laika
+Use when the user editing content is **not** a GitHub user (for example: they signed in to Contentia
 Cloud with Google, but the content lives in a GitHub repo). The App's installation token lets the
 platform write to GitHub on the user's behalf; the user has no GitHub identity to act under.
 
 Practical signs that you need App mode:
 
-- Laika Cloud–style multi-tenant operator where editors don't have to have GitHub accounts.
-- A self-hosted gateway that runs its **own** user database (managed via `@laikacms/server/oauth2` +
-  `@laikacms/server/api` + `@laikacms/integrations/github`) on top of GitHub storage.
+- Contentia Cloud–style multi-tenant operator where editors don't have to have GitHub accounts.
+- A self-hosted gateway that runs its **own** user database (managed via
+  `@contentia/server/oauth2` + `@contentia/server/api` + `@contentia/integrations/github`) on top of
+  GitHub storage.
 
 ### Pre-configured Octokit (bring-your-own client)
 
@@ -37,9 +38,9 @@ API calls — no token minting, no TTL management. This is the right choice when
 ## Usage — App mode
 
 ```ts
-import { GithubStorageRepository } from '@laikacms/github/storage-gh';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
+import { GithubStorageRepository } from '@contentia/github/storage-gh';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { yamlSerializer } from 'contentia/storage-serializers-yaml';
 
 const storage = new GithubStorageRepository({
   // App-mode auth: supply all three to mint an installation token from the private key.
@@ -58,12 +59,12 @@ const storage = new GithubStorageRepository({
 });
 ```
 
-Then pass `storage` to `laikaApi({ storage, ... })`.
+Then pass `storage` to `contentiaApi({ storage, ... })`.
 
 ## Usage — Octokit mode
 
 ```ts
-import { GithubStorageRepository } from '@laikacms/github/storage-gh';
+import { GithubStorageRepository } from '@contentia/github/storage-gh';
 import { Octokit } from '@octokit/rest';
 
 // Any fully-configured Octokit instance works — PAT, OAuth, GHE, custom plugins.
@@ -90,16 +91,16 @@ const storage = new GithubStorageRepository({
 
 ## Behaviour notes
 
-- **Extension hiding.** Keys are extension-free at the boundary, exactly like `@laikacms/gitlab` and
-  `laikacms/storage-fs`. The on-disk file extension is chosen from the registered serializers and
-  looked up on read.
+- **Extension hiding.** Keys are extension-free at the boundary, exactly like `@contentia/gitlab`
+  and `contentia/storage-fs`. The on-disk file extension is chosen from the registered serializers
+  and looked up on read.
 - **Empty directories.** Git tracks files, not directories. `createFolder` writes a `.keep` file
   (filtered out of listings via the `ignoreList`).
 - **Listings on missing folders.** GitHub's API cannot distinguish an empty directory from a missing
   one — both return HTTP 404. The GitHub backend maps 404 → `Result.succeed([])`, so listing a
   missing folder returns `total: 0` with zero summaries and **no** `recoverableError`. `getFolder`
   on a missing folder similarly succeeds, returning a synthetic `Folder` with `createdAt/updatedAt`
-  set to `new Date(0)`. This differs from `@laikacms/gitlab` and `@laikacms/bitbucket`, which
+  set to `new Date(0)`. This differs from `@contentia/gitlab` and `@contentia/bitbucket`, which
   surface missing-folder 404s as `recoverableError` (`NotFoundError`).
 - **Upsert.** `createOrUpdateObject` maps to GitHub's `createOrUpdateFileContents` endpoint. Pass
   `update.metadata.revisionId` (the file's blob `sha`) for optimistic-concurrency updates.
@@ -148,7 +149,7 @@ Auth options are a **discriminated union** — supply either `octokit` **or** th
 | `commitAuthor`       | `{ name: string, email: string }` | _(none)_                    | Name and email stamped as **both** the `author` and `committer` fields on every GitHub API write call (`createOrUpdateFileContents` and `deleteFile`). Both fields are set explicitly; neither is left for GitHub to default. Omit to let GitHub fall back to the App installation's identity. |
 | `determineExtension` | `DetermineExtension`              | `defaultDetermineExtension` | Custom resolver that picks the file extension for a new object given its key and metadata. Replaces the built-in logic when provided.                                                                                                                                                          |
 | `tokenTtlSeconds`    | `number`                          | `3000` (50 min)             | App mode only. How many seconds before the cached installation token is considered stale and a fresh one is minted. GitHub installation tokens last ~1 hour; the default refreshes well before expiry.                                                                                         |
-| `userAgent`          | `string`                          | `'@laikacms/github'`        | `User-Agent` header sent on every Octokit request.                                                                                                                                                                                                                                             |
+| `userAgent`          | `string`                          | `'@contentia/github'`       | `User-Agent` header sent on every Octokit request.                                                                                                                                                                                                                                             |
 
 #### Default `ignoreList`
 
@@ -160,7 +161,7 @@ When `ignoreList` is not supplied the following patterns are excluded:
 **/Thumbs.db
 **/desktop.ini
 **/.catalog
-**/.laikacms
+**/.contentia
 ```
 
 ---
@@ -170,7 +171,7 @@ When `ignoreList` is not supplied the following patterns are excluded:
 **Current state.** The package supports two auth modes: GitHub App (installation token) and
 pre-configured Octokit (bring-your-own). The octokit mode unblocks testing, GitHub Enterprise, and
 custom auth plugins. A first-class OAuth user-token flow (where the user's GitHub identity appears
-on commits) is not yet implemented — it belongs in `@laikacms/server/oauth2` for self-hosted
+on commits) is not yet implemented — it belongs in `@contentia/server/oauth2` for self-hosted
 gateways.
 
 **Target shape.** When implemented, the constructor will accept an **async auth provider** — a
@@ -179,7 +180,7 @@ pass `new Octokit({ auth: yourToken })` to get non-App auth today.
 
 **Out of scope until the OAuth flow ships:**
 
-- Building the GitHub OAuth flow itself. That belongs in `@laikacms/server/oauth2` (and is
+- Building the GitHub OAuth flow itself. That belongs in `@contentia/server/oauth2` (and is
   documented there for self-hosted gateways managing their own users).
 - Token storage. Where the token lives between requests (cookie, KV, session, CLI keychain) is a
   consumer concern.

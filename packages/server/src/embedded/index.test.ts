@@ -1,5 +1,5 @@
 /**
- * Unit tests for embedded/index.ts — createEmbeddedLaika
+ * Unit tests for embedded/index.ts — createEmbeddedContentia
  *
  * Covers:
  *   - DEFAULT_DEV_TOKEN constant
@@ -13,7 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createEmbeddedLaika, DEFAULT_DEV_TOKEN } from './index.js';
+import { createEmbeddedContentia, DEFAULT_DEV_TOKEN } from './index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,15 +34,15 @@ const DEFAULT_DECAP_CONFIG = {
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-embedded-test-'));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-embedded-test-'));
 });
 
 afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-function makeEmbedded(overrides: Parameters<typeof createEmbeddedLaika>[0] = {} as never) {
-  return createEmbeddedLaika({
+function makeEmbedded(overrides: Parameters<typeof createEmbeddedContentia>[0] = {} as never) {
+  return createEmbeddedContentia({
     contentDir: tmpDir,
     decapConfig: DEFAULT_DECAP_CONFIG,
     ...overrides,
@@ -362,10 +362,10 @@ describe('default serializers', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Suite: returned EmbeddedLaika object
+// Suite: returned EmbeddedContentia object
 // ---------------------------------------------------------------------------
 
-describe('EmbeddedLaika shape', () => {
+describe('EmbeddedContentia shape', () => {
   it('exposes a documents repository', () => {
     const embedded = makeEmbedded({});
     expect(embedded.documents).toBeDefined();

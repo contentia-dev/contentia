@@ -2,13 +2,13 @@ import { init, parse } from 'es-module-lexer';
 import MagicString from 'magic-string';
 import { minimatch } from 'minimatch';
 
-import { type LaikaRepositories, listKeys } from './backend.js';
-import { type LaikaId, parseLaikaId, toSource } from './protocol.js';
+import { type ContentiaRepositories, listKeys } from './backend.js';
+import { type ContentiaId, parseContentiaId, toSource } from './protocol.js';
 
 /**
- * Rewrites `import.meta.glob('laika:…')` calls at transform time.
+ * Rewrites `import.meta.glob('contentia:…')` calls at transform time.
  *
- * Vite's native glob only understands filesystem paths, so a `laika:` pattern
+ * Vite's native glob only understands filesystem paths, so a `contentia:` pattern
  * would resolve to nothing. This runs as a `pre` transform: it lists the
  * repository for the keys each pattern matches and replaces the call with a
  * generated map — inlining static imports for `{ eager: true }` and dynamic
@@ -35,7 +35,7 @@ interface ParsedGlob {
  * The optional `<…>` group is the TypeScript type argument — this transform
  * runs `pre`, so a `.ts` module still has `import.meta.glob<Posts>(…)` in its
  * source. Missing it would leave the pattern for Vite's native glob plugin,
- * which rejects a `laika:` specifier.
+ * which rejects a `contentia:` specifier.
  */
 const GLOB_ACCESS = /^\s*\.\s*glob\s*(?:<[^()]*>\s*)?\(/;
 
@@ -110,7 +110,7 @@ function extractStringLiterals(src: string): string[] {
  * Blank out the contents of line comments, block comments and single/double
  * quoted strings, replacing each character with a space (newlines kept, so
  * offsets and line numbers are preserved). Used only by the fallback token
- * scanner: masking these regions is what stops a `laika:` glob that merely
+ * scanner: masking these regions is what stops a `contentia:` glob that merely
  * appears inside a string or comment from being mistaken for a real call.
  *
  * Template literals are left as-is — a real `import.meta.glob(...)` call is
@@ -167,7 +167,7 @@ interface ImportMetaToken {
  * es-module-lexer reports for a `d === -2` entry.
  *
  * The lexer is exact and fast, but it cannot parse JSX, so it throws on a
- * `.tsx`/`.jsx` module (a component that reaches for a `laika:` glob). When it
+ * `.tsx`/`.jsx` module (a component that reaches for a `contentia:` glob). When it
  * does, fall back to scanning a copy of the source with strings and comments
  * masked out, which is enough to locate `import.meta` tokens outside those
  * regions without a full parse.
@@ -190,15 +190,15 @@ function importMetaTokens(code: string): ImportMetaToken[] {
 
 /**
  * Locate and parse every `import.meta.glob(...)` call whose patterns use the
- * `laika:` protocol.
+ * `contentia:` protocol.
  *
  * `import.meta` tokens are located by {@link importMetaEnds}, which uses
  * es-module-lexer where it can and a string/comment-masked scan where it can't.
  * A balanced-paren scan, anchored on those positions, then extracts and parses
- * each call's arguments — so a `laika:` string that merely appears inside quotes
+ * each call's arguments — so a `contentia:` string that merely appears inside quotes
  * or a comment is never rewritten.
  */
-function parseLaikaGlobs(code: string): ParsedGlob[] {
+function parseContentiaGlobs(code: string): ParsedGlob[] {
   const globs: ParsedGlob[] = [];
   for (const token of importMetaTokens(code)) {
     const access = GLOB_ACCESS.exec(code.slice(token.end));
@@ -209,11 +209,11 @@ function parseLaikaGlobs(code: string): ParsedGlob[] {
     if (close === -1) continue;
 
     const argsSrc = code.slice(open + 1, close);
-    if (!argsSrc.includes('laika:')) continue;
+    if (!argsSrc.includes('contentia:')) continue;
 
     const args = splitTopLevelArgs(argsSrc);
     const patterns = extractStringLiterals(args[0] ?? '');
-    if (patterns.length === 0 || !patterns.some(p => p.startsWith('laika:') || p.startsWith('!laika:'))) {
+    if (patterns.length === 0 || !patterns.some(p => p.startsWith('contentia:') || p.startsWith('!contentia:'))) {
       continue;
     }
     const optionsSrc = args[1] ?? '';
@@ -242,24 +242,24 @@ function folderAndDepth(globKey: string): { folder: string, depth: number } {
   return { folder, depth: Math.max(1, patternSlashes - folderSlashes + 1) };
 }
 
-/** Resolve all `laika:` ids a set of include/exclude patterns matches, deduped and sorted. */
-async function resolveMatches(repos: LaikaRepositories, patterns: string[]): Promise<LaikaId[]> {
+/** Resolve all `contentia:` ids a set of include/exclude patterns matches, deduped and sorted. */
+async function resolveMatches(repos: ContentiaRepositories, patterns: string[]): Promise<ContentiaId[]> {
   const includes = patterns.filter(p => !p.startsWith('!'));
   const excludes = patterns.filter(p => p.startsWith('!')).map(p => p.slice(1));
 
-  const byKey = new Map<string, LaikaId>();
+  const byKey = new Map<string, ContentiaId>();
   for (const pattern of includes) {
-    const { namespace, key: globKey } = parseLaikaId(pattern);
+    const { namespace, key: globKey } = parseContentiaId(pattern);
     const { folder, depth } = folderAndDepth(globKey);
     const keys = await listKeys(repos, namespace, folder, depth);
     for (const key of keys) {
       if (!minimatch(key, globKey)) continue;
       const excluded = excludes.some(ex => {
-        const parsed = parseLaikaId(ex);
+        const parsed = parseContentiaId(ex);
         return parsed.namespace === namespace && minimatch(key, parsed.key);
       });
       if (excluded) continue;
-      const id: LaikaId = { namespace, key };
+      const id: ContentiaId = { namespace, key };
       byKey.set(toSource(id), id);
     }
   }
@@ -268,7 +268,7 @@ async function resolveMatches(repos: LaikaRepositories, patterns: string[]): Pro
 
 /** State threaded across all glob rewrites in one module so generated identifiers stay unique. */
 interface RewriteContext {
-  repos: LaikaRepositories;
+  repos: ContentiaRepositories;
   counter: { value: number };
   imports: string[];
 }
@@ -279,7 +279,7 @@ async function expandGlob(glob: ParsedGlob, ctx: RewriteContext): Promise<string
   const entries = ids.map(id => {
     const source = toSource(id);
     if (glob.eager) {
-      const local = `__laikaGlob${ctx.counter.value++}`;
+      const local = `__contentiaGlob${ctx.counter.value++}`;
       if (glob.importName) {
         ctx.imports.push(`import { ${glob.importName} as ${local} } from ${JSON.stringify(source)};`);
       } else {
@@ -302,18 +302,18 @@ export interface RewriteResult {
 }
 
 /**
- * Rewrite laika globs in `code`. Returns the transformed source and a
+ * Rewrite contentia globs in `code`. Returns the transformed source and a
  * sourcemap, or `null` when there is nothing to rewrite (so the caller can skip
  * a no-op transform result).
  */
-export async function rewriteLaikaGlobs(
+export async function rewriteContentiaGlobs(
   code: string,
-  repos: LaikaRepositories,
+  repos: ContentiaRepositories,
 ): Promise<RewriteResult | null> {
   // es-module-lexer must be initialized before `parse` is called.
   await init;
 
-  const globs = parseLaikaGlobs(code);
+  const globs = parseContentiaGlobs(code);
   if (globs.length === 0) return null;
 
   const ctx: RewriteContext = { repos, counter: { value: 0 }, imports: [] };

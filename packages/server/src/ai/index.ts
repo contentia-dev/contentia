@@ -1,5 +1,5 @@
 /**
- * @laikacms/server/ai
+ * @contentia/server/ai
  *
  * The chat/session HTTP surface behind Decap CMS's assistant: a
  * `fetch(Request) => Response` handler with `POST {base}/chat` plus session
@@ -15,11 +15,11 @@
  *
  * @example
  * ```typescript
- * import { decapAi, jsonSchema, tool } from '@laikacms/server/ai';
- * import { anthropic } from '@laikacms/server/ai/providers';
+ * import { decapAi, jsonSchema, tool } from '@contentia/server/ai';
+ * import { anthropic } from '@contentia/server/ai/providers';
  *
  * // authenticateAccessToken routes through the resolveBearer seam in
- * // laikacms/auth and forwards its scopes:
+ * // contentia/auth and forwards its scopes:
  * //   const ctx = await resolveBearer(token, { verifySessionToken, lookupPatByHash });
  * //   if (!ctx) throw new Error('Unauthorized');
  * //   return { ...ctx.user, scopes: ctx.scopes };

@@ -1,9 +1,9 @@
 /**
- * Bare Vite SSR server — Express + React + LaikaCMS without a meta-framework.
+ * Bare Vite SSR server — Express + React + Contentia without a meta-framework.
  *
  * Doc gap: Meta-frameworks like Next.js and TanStack Start abstract these
  * steps, but under the hood they all do something similar:
- *   1. Fetch data server-side (here: directly from laika.documents)
+ *   1. Fetch data server-side (here: directly from contentia.documents)
  *   2. Render React to a string with renderToStaticMarkup / renderToString
  *   3. Send the HTML with '<!doctype html>' prepended
  *   4. Proxy the Decap API through a catch-all route
@@ -15,10 +15,10 @@
 import path from 'node:path';
 
 import express from 'express';
-import { collectStream, runTask } from 'laikacms/compat';
+import { collectStream, runTask } from 'contentia/compat';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { laika } from './laika.js';
+import { contentia } from './contentia.js';
 import { HomePage, NotFoundPage, PostPage } from './pages.js';
 
 type PostContent = {
@@ -48,7 +48,7 @@ app.all('/api/decap/*path', async (req, res) => {
     ...(body.byteLength > 0 ? { duplex: 'half' } : {}),
   } as RequestInit);
 
-  const webRes = await laika.fetch(webReq);
+  const webRes = await contentia.fetch(webReq);
   res.status(webRes.status);
   webRes.headers.forEach((value, name) => {
     if (name.toLowerCase() !== 'transfer-encoding') res.setHeader(name, value);
@@ -58,7 +58,7 @@ app.all('/api/decap/*path', async (req, res) => {
 
 app.get('/', async (_req, res) => {
   const { items } = await collectStream(
-    laika.documents.listRecords({
+    contentia.documents.listRecords({
       pagination: { page: 1, perPage: 100 },
       folder: 'posts',
       depth: 1,
@@ -81,7 +81,7 @@ app.get('/blog/:slug', async (req, res) => {
   const { slug } = req.params;
   let post: PostContent;
   try {
-    const doc = await runTask(laika.documents.getDocument(`posts/${slug}`));
+    const doc = await runTask(contentia.documents.getDocument(`posts/${slug}`));
     post = doc.content as PostContent;
   } catch {
     res.status(404);
@@ -102,8 +102,8 @@ app.use((_req, res) => {
 
 const PORT = process.env['PORT'] ?? 3000;
 // Seed config.yml before accepting requests so direct repo access in SSR
-// routes (laika.documents.*) is safe without a prior fetch() call.
-await laika.ensureReady();
+// routes (contentia.documents.*) is safe without a prior fetch() call.
+await contentia.ensureReady();
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

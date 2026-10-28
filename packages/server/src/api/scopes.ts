@@ -3,12 +3,12 @@
  *
  * The scope primitives (open `resource:action` vocabulary, `hasScope` with
  * wildcards, `normalizeScopes`, PAT minting, `resolveBearer`) live once in
- * `laikacms/auth` and are re-exported here for convenience. This module adds
+ * `contentia/auth` and are re-exported here for convenience. This module adds
  * only the api-specific pieces: the `domain`+`operation` -> scope mapping
  * and `createScopePolicy()`, an opt-in `authorize()`.
  *
  * `authorize(ctx)` stays the single, consumer-owned access decision (see
- * {@link LaikaApiOptions.authorize}); this is a convenience so the common case is
+ * {@link ContentiaApiOptions.authorize}); this is a convenience so the common case is
  * not hand-written, while custom dashboards / non-CMS surfaces override
  * `requiredScopeFor` or write their own policy.
  */
@@ -20,13 +20,13 @@ import {
   isScope,
   normalizeScopes,
   WILDCARD_SCOPE,
-} from 'laikacms/auth';
+} from 'contentia/auth';
 
-import type { GranularScope, Scope } from 'laikacms/auth';
+import type { GranularScope, Scope } from 'contentia/auth';
 import type { AuthorizeContext, CmsDomain, CmsOperation } from './index.js';
 
 // Re-export the shared scope mechanism so api consumers reach it from one
-// import surface. Implementation lives in laikacms/auth.
+// import surface. Implementation lives in contentia/auth.
 export { ADMIN_SCOPE, ALL_SCOPES, GRANULAR_SCOPES, hasScope, isScope, normalizeScopes, WILDCARD_SCOPE };
 export type { GranularScope, Scope };
 
@@ -68,7 +68,7 @@ export interface ScopePolicyOptions {
  *
  * @example Plain CMS, scopes carried on the session's user:
  * ```ts
- * laikaApi({ ..., authorize: createScopePolicy() });
+ * contentiaApi({ ..., authorize: createScopePolicy() });
  * ```
  *
  * Fails closed: a principal with no scopes is denied everything except requests

@@ -9,17 +9,17 @@ import { writeAtomic } from '../atomic-write.js';
  * {@link writeAtomic}: temp-file-then-rename, and skipped entirely when the
  * existing file already matches (so file watchers / HMR don't churn).
  *
- * Everything this class writes lives under `.laika/vite-generated/`. The rest of
- * `.laika/` is durable state owned by the catalog (`.laika/catalog`,
- * `.laika/schemas/`, `.laika/revisions/`) and must stay committed, so only the
+ * Everything this class writes lives under `.contentia/vite-generated/`. The rest of
+ * `.contentia/` is durable state owned by the catalog (`.contentia/catalog`,
+ * `.contentia/schemas/`, `.contentia/revisions/`) and must stay committed, so only the
  * `vite-generated/` subtree is ever ignored.
  *
  * Layout under `<viteRoot>`:
- *   .laika/vite-generated/types.d.ts             aggregated ambient module declarations
- *   .laika/vite-generated/collections/<name>.ts  per-collection union aliases
- *   .laika/.gitignore                            `vite-generated/`
- *   laika-env.d.ts                               committed one-line /// reference
- *   .gitignore                                   `.laika/vite-generated/` appended idempotently
+ *   .contentia/vite-generated/types.d.ts             aggregated ambient module declarations
+ *   .contentia/vite-generated/collections/<name>.ts  per-collection union aliases
+ *   .contentia/.gitignore                            `vite-generated/`
+ *   contentia-env.d.ts                               committed one-line /// reference
+ *   .gitignore                                   `.contentia/vite-generated/` appended idempotently
  */
 export class TypegenWriter {
   private readonly root: string;
@@ -28,12 +28,12 @@ export class TypegenWriter {
     this.root = viteRoot;
   }
 
-  get laikaDir(): string {
-    return path.join(this.root, '.laika');
+  get contentiaDir(): string {
+    return path.join(this.root, '.contentia');
   }
 
   get generatedDir(): string {
-    return path.join(this.laikaDir, 'vite-generated');
+    return path.join(this.contentiaDir, 'vite-generated');
   }
 
   get typesFile(): string {
@@ -45,7 +45,7 @@ export class TypegenWriter {
   }
 
   get envFile(): string {
-    return path.join(this.root, 'laika-env.d.ts');
+    return path.join(this.root, 'contentia-env.d.ts');
   }
 
   collectionFile(name: string): string {
@@ -63,7 +63,7 @@ export class TypegenWriter {
   }
 
   /**
-   * Removes any `.laika/vite-generated/collections/*.ts` whose base name is not in `keep`.
+   * Removes any `.contentia/vite-generated/collections/*.ts` whose base name is not in `keep`.
    * Returns the names that were removed.
    */
   async pruneCollections(keep: ReadonlySet<string>): Promise<string[]> {
@@ -88,7 +88,7 @@ export class TypegenWriter {
   }
 
   /**
-   * Creates the committed `laika-env.d.ts` reference file only when it does not
+   * Creates the committed `contentia-env.d.ts` reference file only when it does not
    * already exist. Never clobbers a user-modified file. Returns `true` when it
    * was created.
    */
@@ -99,7 +99,7 @@ export class TypegenWriter {
     } catch {
       await fs.writeFile(
         this.envFile,
-        '/// <reference path="./.laika/vite-generated/types.d.ts" />\n',
+        '/// <reference path="./.contentia/vite-generated/types.d.ts" />\n',
         'utf8',
       );
       return true;
@@ -107,16 +107,16 @@ export class TypegenWriter {
   }
 
   /**
-   * Writes `.laika/.gitignore` containing `vite-generated/` (idempotent). Scoped
+   * Writes `.contentia/.gitignore` containing `vite-generated/` (idempotent). Scoped
    * to the generated subtree so the catalog alongside it stays committed.
    */
-  async ensureLaikaGitignore(): Promise<boolean> {
-    await fs.mkdir(this.laikaDir, { recursive: true });
-    return writeAtomic(path.join(this.laikaDir, '.gitignore'), 'vite-generated/\n');
+  async ensureContentiaGitignore(): Promise<boolean> {
+    await fs.mkdir(this.contentiaDir, { recursive: true });
+    return writeAtomic(path.join(this.contentiaDir, '.gitignore'), 'vite-generated/\n');
   }
 
   /**
-   * Idempotently appends `.laika/vite-generated/` to `<viteRoot>/.gitignore`,
+   * Idempotently appends `.contentia/vite-generated/` to `<viteRoot>/.gitignore`,
    * creating the file if absent. Returns `true` when the file was changed.
    */
   async ensureRootGitignore(): Promise<boolean> {
@@ -128,11 +128,11 @@ export class TypegenWriter {
       // absent
     }
     const lines = existing.split(/\r?\n/).map(l => l.trim());
-    if (lines.includes('.laika/vite-generated/') || lines.includes('.laika/vite-generated')) {
+    if (lines.includes('.contentia/vite-generated/') || lines.includes('.contentia/vite-generated')) {
       return false;
     }
     const needsNewline = existing.length > 0 && !existing.endsWith('\n');
-    const next = `${existing}${needsNewline ? '\n' : ''}.laika/vite-generated/${os.EOL === '\r\n' ? '\r\n' : '\n'}`;
+    const next = `${existing}${needsNewline ? '\n' : ''}.contentia/vite-generated/${os.EOL === '\r\n' ? '\r\n' : '\n'}`;
     await fs.writeFile(gitignore, next, 'utf8');
     return true;
   }

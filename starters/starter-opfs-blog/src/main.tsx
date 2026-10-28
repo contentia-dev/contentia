@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { LaikaStream, LaikaTask } from 'laikacms/core';
+import { ContentiaStream, ContentiaTask } from 'contentia/core';
 
 import {
   currentMode,
@@ -86,7 +86,7 @@ function PostPage({ slug }: { slug: string }) {
   const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
-    LaikaTask.runPromise(getRepositories().documents.getDocument(`${POSTS_FOLDER}/${slug}`))
+    ContentiaTask.runPromise(getRepositories().documents.getDocument(`${POSTS_FOLDER}/${slug}`))
       .then(document => setPost((document.content ?? {}) as Post))
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, [slug]);
@@ -127,7 +127,7 @@ function HomePage() {
   const [needsPermission, setNeedsPermission] = useState(false);
 
   const load = useCallback(() => {
-    LaikaStream.runPromiseCollect(getRepositories().documents.listRecords({
+    ContentiaStream.runPromiseCollect(getRepositories().documents.listRecords({
       folder: POSTS_FOLDER,
       depth: 1,
       pagination: { perPage: 1000 },

@@ -310,12 +310,13 @@ function formatRefusalMessage(codes: readonly UnsafeReason[]): string {
     return `[${code}] ${spec.title}\n  Risk:   ${spec.risk}\n  Remedy: ${spec.remedy}`;
   });
   const ignorable = codes.filter(code => (UNSAFE_REASONS[code] as UnsafeReasonSpec).ignorable);
-  let message = '@laikacms/server/oauth2 refused to start: this environment cannot uphold guarantees the package makes.'
+  let message =
+    '@contentia/server/oauth2 refused to start: this environment cannot uphold guarantees the package makes.'
     + '\n\n'
     + blocks.join('\n\n');
   if (ignorable.length > 0) {
     const list = ignorable.map(code => `'${code}'`).join(', ');
-    message += `\n\nOverride only if you accept the risk:\n  laikaOauth2({ ..., ignoreUnsafeReasons: [${list}] })`;
+    message += `\n\nOverride only if you accept the risk:\n  contentiaOauth2({ ..., ignoreUnsafeReasons: [${list}] })`;
   }
   return message;
 }

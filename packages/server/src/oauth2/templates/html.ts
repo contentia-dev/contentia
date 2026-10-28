@@ -1,4 +1,4 @@
-import { Url } from 'laikacms/core';
+import { Url } from 'contentia/core';
 import { defaultMessages, type OAuthMessages } from '../i18n/index.js';
 import { defaultLogo } from './styles.js';
 

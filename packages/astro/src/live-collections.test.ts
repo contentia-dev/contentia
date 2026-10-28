@@ -11,19 +11,19 @@
 import type { LiveLoader } from 'astro/loaders';
 import { expectTypeOf, it } from 'vitest';
 
-import type { LaikaCollectionFilter, LaikaEntryFilter } from './live-loader.js';
+import type { ContentiaCollectionFilter, ContentiaEntryFilter } from './live-loader.js';
 import { liveDocumentsLoader } from './live-loader.js';
 
 // Exactly what the integration emits into `.astro/`, against the module that
 // declares the interface — a re-export is an alias, not a declaration, so this
 // specifier is the one that merges.
 declare module './live-collections.js' {
-  interface LaikaLiveCollections {
+  interface ContentiaLiveCollections {
     posts: { title: string, draft?: boolean };
   }
 }
 
-type DataOf<L> = L extends LiveLoader<infer D, LaikaEntryFilter, LaikaCollectionFilter, infer _E> ? D
+type DataOf<L> = L extends LiveLoader<infer D, ContentiaEntryFilter, ContentiaCollectionFilter, infer _E> ? D
   : never;
 
 const documents = undefined as never;

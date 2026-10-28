@@ -1,4 +1,4 @@
-import { StorageJsonApiProxyRepository } from 'laikacms/storage-jsonapi-proxy';
+import { StorageJsonApiProxyRepository } from 'contentia/storage-jsonapi-proxy';
 
 import type { StorageDriver } from '../types.js';
 
@@ -20,7 +20,7 @@ const readOptions = (raw: Record<string, unknown>): ProxyOptions => {
 
 export const jsonApiProxyDriver: StorageDriver = {
   name: 'jsonapi-proxy',
-  packageName: 'laikacms',
+  packageName: 'contentia',
   version: '*',
   subpath: 'storage-jsonapi-proxy',
   description: 'Proxy to a remote storage-api JSON:API endpoint',

@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 // The CLI binary (cli.js) bundles effect + @effect/platform-node inline so
-// that `npx laikacli` / global installs cannot float these deps to an
+// that `npx contentia` / global installs cannot float these deps to an
 // incompatible beta via npm peer-dep auto-resolution (LCMS-534).
 //
 // The library entry (index.js) keeps effect external so programmatic
@@ -20,7 +20,7 @@ export default defineConfig([
     // they cannot be inlined into ESM without CJS shim issues. Keep them
     // external (installed as direct deps) so Node loads them natively as CJS.
     external: ['ws', 'undici'],
-    noExternal: ['laikacms', 'effect', '@effect/platform-node', '@effect/platform-node-shared'],
+    noExternal: ['contentia', 'effect', '@effect/platform-node', '@effect/platform-node-shared'],
   },
   {
     entry: { index: 'src/index.ts' },
@@ -31,6 +31,6 @@ export default defineConfig([
     sourcemap: true,
     clean: false,
     dts: { entry: { index: 'src/index.ts' } },
-    noExternal: ['laikacms'],
+    noExternal: ['contentia'],
   },
 ]);

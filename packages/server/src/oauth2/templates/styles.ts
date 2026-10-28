@@ -448,8 +448,8 @@ export const loginPageStyles = [
  * Default login-page logo.
  *
  * NOTE: this is still the upstream Decap CMS wordmark. It is the fallback when
- * no `customLogo` is configured; pass one to `laikaOauth2` to override it.
- * Replacing this with a Laika mark is a branding task, not a code one.
+ * no `customLogo` is configured; pass one to `contentiaOauth2` to override it.
+ * Replacing this with a Contentia mark is a branding task, not a code one.
  */
 export const defaultLogo =
   html`<svg width="300" height="81" viewBox="0 0 335 90" fill="none" xmlns="http://www.w3.org/2000/svg">

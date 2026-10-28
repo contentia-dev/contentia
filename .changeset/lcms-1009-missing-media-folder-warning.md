@@ -1,5 +1,5 @@
 ---
-"laikacms": patch
+"contentia": patch
 ---
 
 `assets-api` `GET /resources` no longer surfaces a `not_found` recoverable error as a

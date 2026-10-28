@@ -1,0 +1,161 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "ignoreDeprecations": "6.0",
+    "rootDir": "src",
+    "outDir": "dist",
+    "baseUrl": ".",
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "contentia/assets/api": [
+        "src/api/assets-api/index.ts"
+      ],
+      "contentia/catalog-api": [
+        "src/api/catalog-api/index.ts"
+      ],
+      "contentia/documents/api": [
+        "src/api/documents-api/index.ts"
+      ],
+      "contentia/storage/api": [
+        "src/api/storage-api/index.ts"
+      ],
+      "contentia/assets": [
+        "src/domain/assets/index.ts"
+      ],
+      "contentia/catalog": [
+        "src/domain/catalog/index.ts"
+      ],
+      "contentia/documents": [
+        "src/domain/documents/index.ts"
+      ],
+      "contentia/storage": [
+        "src/domain/storage/index.ts"
+      ],
+      "contentia/documents/testing": [
+        "src/domain/documents/testing/index.ts"
+      ],
+      "contentia/storage/testing": [
+        "src/domain/storage/testing/index.ts"
+      ],
+      "contentia/assets/catalog": [
+        "src/impl/assets-catalog/index.ts"
+      ],
+      "contentia/assets/jsonapi-proxy": [
+        "src/impl/assets-jsonapi-proxy/index.ts"
+      ],
+      "contentia/assets/obsidian": [
+        "src/impl/assets-obsidian/index.ts"
+      ],
+      "contentia/assets/r2": [
+        "src/impl/assets-r2/index.ts"
+      ],
+      "contentia/catalog-decap": [
+        "src/impl/catalog-decap/index.ts"
+      ],
+      "contentia/catalog-convention": [
+        "src/impl/catalog-convention/index.ts"
+      ],
+      "contentia/documents/catalog": [
+        "src/impl/documents-catalog/index.ts"
+      ],
+      "contentia/documents/drizzle": [
+        "src/impl/documents-drizzle/index.ts"
+      ],
+      "contentia/documents/jsonapi-proxy": [
+        "src/impl/documents-jsonapi-proxy/index.ts"
+      ],
+      "contentia/documents/obsidian": [
+        "src/impl/documents-obsidian/index.ts"
+      ],
+      "contentia/storage/drizzle": [
+        "src/impl/storage-drizzle/index.ts"
+      ],
+      "contentia/storage/fs": [
+        "src/impl/storage-fs/index.ts"
+      ],
+      "contentia/storage/jsonapi-proxy": [
+        "src/impl/storage-jsonapi-proxy/index.ts"
+      ],
+      "contentia/storage/r2": [
+        "src/impl/storage-r2/index.ts"
+      ],
+      "contentia/storage/s3": [
+        "src/impl/storage-s3/index.ts"
+      ],
+      "contentia/storage/web-fs": [
+        "src/impl/storage-web-fs/index.ts"
+      ],
+      "contentia/storage/webdav": [
+        "src/impl/storage-webdav/index.ts"
+      ],
+      "contentia/serializers/json": [
+        "src/serializers/storage-serializers-json/index.ts"
+      ],
+      "contentia/serializers/markdown": [
+        "src/serializers/storage-serializers-markdown/index.ts"
+      ],
+      "contentia/serializers/raw": [
+        "src/serializers/storage-serializers-raw/index.ts"
+      ],
+      "contentia/serializers/yaml": [
+        "src/serializers/storage-serializers-yaml/index.ts"
+      ],
+      "contentia/auth": [
+        "src/shared/auth/index.ts"
+      ],
+      "contentia/core": [
+        "src/shared/core/index.ts"
+      ],
+      "contentia/compat": [
+        "src/shared/core/compat.ts"
+      ],
+      "contentia/crypto": [
+        "src/shared/crypto/index.ts"
+      ],
+      "contentia/file-sanitizer": [
+        "src/shared/file-sanitizer/index.ts"
+      ],
+      "contentia/i18n": [
+        "src/shared/i18n/index.ts"
+      ],
+      "contentia/i18n/en": [
+        "src/shared/i18n/translations/en.ts"
+      ],
+      "contentia/i18n/nl": [
+        "src/shared/i18n/translations/nl.ts"
+      ],
+      "contentia/json-api": [
+        "src/shared/json-api/index.ts"
+      ],
+      "contentia/sanitizer": [
+        "src/shared/sanitizer/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "src/impl/assets-r2/worker-configuration.d.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "**/*.test.ts",
+    "**/__tests__/**"
+  ]
+}

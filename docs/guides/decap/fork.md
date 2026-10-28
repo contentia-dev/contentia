@@ -6,14 +6,14 @@ build of the former `decap-cms-*` monorepo: every former package is exposed as a
 the root export is the classic app bootstrap.
 
 The fork has been rebuilt from the ground up and little of the original implementation remains. It
-uses the same layered approach as Laika CMS: an agnostic core with opinionated outer layers. The
+uses the same layered approach as Contentia: an agnostic core with opinionated outer layers. The
 Decap CMS core remains, while its opinionated parts have been extracted into separate packages. That
-separation is deliberate. The fork should not work only with Laika CMS; it remains completely usable
-as a standalone CMS without any Laika packages.
+separation is deliberate. The fork should not work only with Contentia; it remains completely usable
+as a standalone CMS without any Contentia packages.
 
 Maintaining that standalone path is also a thank-you to the Decap CMS maintainers for creating a CMS
 that was already mostly backend-agnostic and headless. The fork continues that work rather than
-turning Decap CMS into a private frontend for Laika CMS.
+turning Decap CMS into a private frontend for Contentia.
 
 The fork is developed in its own repository and keeps its own documentation there. Rather than
 mirror that content here (and let it drift out of date), this page links straight to the live docs
@@ -34,6 +34,6 @@ on GitHub — they always reflect the version you get from npm.
   contributing to the fork.
 - **[Changelog](https://github.com/laikacms/decap-cms/blob/main/CHANGELOG.md)** — release history.
 
-::: tip Backend vs. admin This page covers the **admin UI** fork. For wiring the LaikaCMS-compatible
-**backend** (storage, API, OAuth2) that the admin talks to, see the rest of this [Decap CMS](./)
-section. :::
+::: tip Backend vs. admin This page covers the **admin UI** fork. For wiring the
+Contentia-compatible **backend** (storage, API, OAuth2) that the admin talks to, see the rest of
+this [Decap CMS](./) section. :::

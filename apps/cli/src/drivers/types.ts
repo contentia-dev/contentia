@@ -1,4 +1,4 @@
-import type { StorageRepository } from 'laikacms/storage';
+import type { StorageRepository } from 'contentia/storage';
 
 /**
  * A backend driver is the thin adapter between a user-facing config blob and a
@@ -12,15 +12,15 @@ import type { StorageRepository } from 'laikacms/storage';
  *
  * The `module` parameter handed to `build` is the dynamically-imported package
  * subpath — the same object you'd get from
- * `await import('@laikacms/vercel/storage-blob')`. Drivers read the constructor
+ * `await import('@contentia/vercel/storage-blob')`. Drivers read the constructor
  * (and any helpers like data sources) off this object.
  */
 export interface StorageDriver {
   /** Short identifier used in CLI flags and config files. e.g. 'fs'. */
   readonly name: string;
   /**
-   * NPM package the implementation lives in. e.g. '@laikacms/vercel'. Use
-   * `'laikacms'` for built-in implementations that ship as part of the core
+   * NPM package the implementation lives in. e.g. '@contentia/vercel'. Use
+   * `'contentia'` for built-in implementations that ship as part of the core
    * package; they always resolve and never trigger an install prompt.
    */
   readonly packageName: string;
@@ -36,7 +36,7 @@ export interface StorageDriver {
    */
   readonly subpath: string;
   /**
-   * One-line description shown by `laika local list-backends`.
+   * One-line description shown by `contentia local list-backends`.
    */
   readonly description: string;
   /**

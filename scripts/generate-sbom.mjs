@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// LCMS-886: generate CycloneDX SBOMs for the published packages (laikacms,
-// @laikacms/server, @laikacms/vite-plugin, @laikacms/astro) using pnpm's built-in `pnpm sbom` command (pnpm >=10.16,
+// LCMS-886: generate CycloneDX SBOMs for the published packages (contentia,
+// @contentia/server, @contentia/vite-plugin, @contentia/astro) using pnpm's built-in `pnpm sbom` command (pnpm >=10.16,
 // no extra dependency needed). Local/publish-time only — never wired into a
 // GitHub Actions workflow (CI billing is org-wide blocked; see RELEASING.md
 // and AGENTS.md).
@@ -13,19 +13,19 @@ const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = join(rootDir, 'sbom');
 
 const packages = [
-  'laikacms',
-  '@laikacms/server',
-  '@laikacms/vite-plugin',
-  '@laikacms/astro',
-  '@laikacms/github',
-  '@laikacms/gitlab',
-  '@laikacms/bitbucket',
+  'contentia',
+  '@contentia/server',
+  '@contentia/vite-plugin',
+  '@contentia/astro',
+  '@contentia/github',
+  '@contentia/gitlab',
+  '@contentia/bitbucket',
 ];
 
 mkdirSync(outDir, { recursive: true });
 
 for (const name of packages) {
-  const fileName = name.replace('@laikacms/', 'laikacms-');
+  const fileName = name.replace('@contentia/', 'contentia-');
   const outFile = join(outDir, `${fileName}.cdx.json`);
   console.log(`[sbom] generating ${outFile}`);
   const result = spawnSync(

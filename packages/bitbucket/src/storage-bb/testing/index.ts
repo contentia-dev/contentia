@@ -1,4 +1,4 @@
-import type { StorageContractCase } from 'laikacms/storage/testing';
+import type { StorageContractCase } from 'contentia/storage/testing';
 
 import { BitbucketStorageRepository } from '../bitbucket-storage-repository.js';
 

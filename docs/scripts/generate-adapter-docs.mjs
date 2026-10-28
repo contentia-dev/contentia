@@ -2,7 +2,7 @@
 /**
  * Prebuild step: compiles the root `adapters.yaml` into the docs' Adapters section.
  *
- * `adapters.yaml` lists every backend Laika ships an adapter for — a unique key, a display name, the
+ * `adapters.yaml` lists every backend Contentia ships an adapter for — a unique key, a display name, the
  * path to its SVG, and the folder of each repository it provides (storage / documents / assets).
  * Each of those folders carries a README.md, which is the page content: the docs never restate
  * what the adapter's own README says.
@@ -28,7 +28,7 @@ export const REPOSITORY_TYPES = [
   { field: 'assets', title: 'Assets' },
 ];
 
-const SOURCE_URL = 'https://github.com/laikacms/laikacms/blob/develop';
+const SOURCE_URL = 'https://github.com/contentia-dev/contentia/blob/develop';
 const KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LINK_RE = /(!?\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g;
 

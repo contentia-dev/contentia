@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-import type { StorageRepository } from 'laikacms/storage';
+import type { StorageRepository } from 'contentia/storage';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -90,7 +90,7 @@ const readOptions = (raw: Record<string, unknown>): GithubOptions => {
 
 export const githubDriver: StorageDriver = {
   name: 'github',
-  packageName: '@laikacms/github',
+  packageName: '@contentia/github',
   version: '2.0.0',
   subpath: 'storage-gh',
   description: 'GitHub repository (commits per write; PAT or GitHub App auth)',

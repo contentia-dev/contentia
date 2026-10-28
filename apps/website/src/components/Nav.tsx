@@ -48,7 +48,7 @@ export function Nav({ path, tabs, githubLabel, githubHref, cta }: NavProps) {
       className="sticky top-0 z-50 transition-[background,border-color,backdrop-filter] duration-[250ms] border-b border-transparent"
     >
       <div className="site-container h-16 flex items-center justify-between">
-        <a href="/" aria-label="Laika" className="bg-none border-0 p-0 cursor-pointer inline-flex">
+        <a href="/" aria-label="Contentia" className="bg-none border-0 p-0 cursor-pointer inline-flex">
           <Logo height={30} />
         </a>
 

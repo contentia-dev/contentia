@@ -1,0 +1,12 @@
+import { AtomBaseSchema } from 'contentia/storage';
+import * as S from 'effect/Schema';
+import { DocumentLanguage } from '../record/record-language.js';
+
+export const RevisionSummarySchema = S.toStandardSchemaV1(S.Struct({
+  ...AtomBaseSchema.fields,
+  type: S.Literal('revision-summary'),
+  language: DocumentLanguage,
+  revision: S.String,
+}));
+
+export type RevisionSummary = S.Schema.Type<typeof RevisionSummarySchema>;

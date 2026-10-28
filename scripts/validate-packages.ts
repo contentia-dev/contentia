@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * Package Validation Script for Laika CMS
+ * Package Validation Script for Contentia
  *
  * Validates that all packages follow consistent naming conventions and metadata rules.
  *
@@ -425,7 +425,7 @@ function validateDirectoryPlacement(
   // Validate folder name matches package name
   const folderName = folderPath.split('/').pop();
   if (folderName) {
-    // Handle special case: core-lib folder -> laikacms/core
+    // Handle special case: core-lib folder -> contentia/core
     const expectedFolderNames = [name, `${name}-lib`];
     if (!expectedFolderNames.includes(folderName)) {
       // Only warn if significantly different

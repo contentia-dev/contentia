@@ -1,27 +1,27 @@
 /**
  * Node.js-only helper that wires a complete Decap CMS backend from a single
- * options object. Not compatible with edge runtimes — use `laikaApi` directly
- * from `@laikacms/server/api` for Cloudflare Workers / Deno Deploy.
+ * options object. Not compatible with edge runtimes — use `contentiaApi` directly
+ * from `@contentia/server/api` for Cloudflare Workers / Deno Deploy.
  */
-import { CatalogAssetsRepository } from 'laikacms/assets-catalog';
-import { DecapCatalogProvider } from 'laikacms/catalog-decap';
-import { runTask } from 'laikacms/compat';
-import { CatalogDocumentsRepository } from 'laikacms/documents-catalog';
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
-import { jsonSerializer } from 'laikacms/storage-serializers-json';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
+import { CatalogAssetsRepository } from 'contentia/assets-catalog';
+import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { runTask } from 'contentia/compat';
+import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { FileSystemStorageRepository } from 'contentia/storage-fs';
+import { jsonSerializer } from 'contentia/storage-serializers-json';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { rawSerializer } from 'contentia/storage-serializers-raw';
+import { yamlSerializer } from 'contentia/storage-serializers-yaml';
 
-import { laikaApi } from '../api/index.js';
-import type { LaikaApi, User } from '../api/index.js';
+import { contentiaApi } from '../api/index.js';
+import type { ContentiaApi, User } from '../api/index.js';
 
-export { LaikaApi };
+export { ContentiaApi };
 
 /** Bearer token used in dev mode when no `devToken` override is supplied. */
-export const DEFAULT_DEV_TOKEN = 'dev-local-laika-token';
+export const DEFAULT_DEV_TOKEN = 'dev-local-contentia-token';
 
-/** Auth mode for `createEmbeddedLaika`. */
+/** Auth mode for `createEmbeddedContentia`. */
 export type EmbeddedAuth =
   | {
     mode: 'dev',
@@ -34,7 +34,7 @@ export type EmbeddedAuth =
     authenticate: (token: string) => Promise<User>,
   };
 
-export interface EmbeddedLaikaOptions {
+export interface EmbeddedContentiaOptions {
   /** Absolute path to the content directory (roots `FileSystemStorageRepository`). */
   contentDir: string;
   /** URL prefix for all Decap JSON:API endpoints. Defaults to `'/api/decap'`. */
@@ -48,7 +48,7 @@ export interface EmbeddedLaikaOptions {
   decapConfig: Record<string, unknown>;
 }
 
-export interface EmbeddedLaika {
+export interface EmbeddedContentia {
   /** Documents repository — use this in SSR routes to read/write content. */
   documents: CatalogDocumentsRepository;
   /** Raw storage repository (FileSystem). */
@@ -82,9 +82,9 @@ const defaultSerializers = {
  * @example
  * ```ts
  * import { resolve } from 'node:path';
- * import { createEmbeddedLaika } from '@laikacms/server/embedded';
+ * import { createEmbeddedContentia } from '@contentia/server/embedded';
  *
- * const laika = createEmbeddedLaika({
+ * const contentia = createEmbeddedContentia({
  *   contentDir: resolve(process.cwd(), 'content'),
  *   basePath: '/api/decap',
  *   auth: { mode: 'dev' },
@@ -97,11 +97,11 @@ const defaultSerializers = {
  * });
  *
  * // Await before starting the server so direct repo access (SSR routes) is safe:
- * await laika.ensureReady();
+ * await contentia.ensureReady();
  * server.listen(3000);
  * ```
  */
-export function createEmbeddedLaika(options: EmbeddedLaikaOptions): EmbeddedLaika {
+export function createEmbeddedContentia(options: EmbeddedContentiaOptions): EmbeddedContentia {
   const {
     contentDir,
     basePath = '/api/decap',
@@ -122,7 +122,7 @@ export function createEmbeddedLaika(options: EmbeddedLaikaOptions): EmbeddedLaik
     })
     : auth.authenticate;
 
-  const api: LaikaApi = laikaApi({
+  const api: ContentiaApi = contentiaApi({
     documents,
     storage,
     assets,
@@ -148,7 +148,7 @@ export function createEmbeddedLaika(options: EmbeddedLaikaOptions): EmbeddedLaik
           }),
         );
       } catch (err) {
-        console.error('[createEmbeddedLaika] failed to seed config.yml:', err);
+        console.error('[createEmbeddedContentia] failed to seed config.yml:', err);
       }
     }
   })();

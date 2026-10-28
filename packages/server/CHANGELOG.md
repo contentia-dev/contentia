@@ -1,4 +1,4 @@
-# @laikacms/server
+# @contentia/server
 
 ## 6.0.0
 
@@ -11,8 +11,8 @@
   omitting it meant "allow every caller everything". A security-critical default that you get by
   _not_ typing something is the wrong shape: the handler that reads, mutates, and deletes all your
   content was one forgotten option away from being wide open, and nothing in the type system said
-  so. `@laikacms/server`'s `laikaApi` already required its policy — the four raw handlers were the
-  inconsistency.
+  so. `@contentia/server`'s `contentiaApi` already required its policy — the four raw handlers were
+  the inconsistency.
 
   `authorize` is now a **required** option on all four:
 
@@ -29,10 +29,10 @@
 
   For a surface that is deliberately open — a dev server on loopback, a test harness, or a handler
   already behind an authenticating proxy — state that explicitly with the new `allowAll` export from
-  `laikacms/json-api`:
+  `contentia/json-api`:
 
   ```typescript
-  import { allowAll } from 'laikacms/json-api';
+  import { allowAll } from 'contentia/json-api';
 
   const api = buildJsonApi({ repo, authorize: allowAll });
   ```
@@ -49,13 +49,13 @@
   authorize: ({ action }) => action === 'readOpenApi' ? true : checkToken(...)
   ```
 
-  `AuthorizeDecision` and `resolveAuthorization` moved to `laikacms/json-api` and are now publicly
+  `AuthorizeDecision` and `resolveAuthorization` moved to `contentia/json-api` and are now publicly
   exported — `AuthorizeDecision` appears in the signature of every `*Authorize` callback type but
   was previously unnameable by consumers.
 
-  `@laikacms/vite-plugin`'s local dev API and `@laikacms/server`'s inner handlers pass `allowAll`
-  (the vite dev server is loopback-guarded; `laikaApi` authenticates and applies its own `authorize`
-  gate before dispatching), so neither changes behaviour.
+  `@contentia/vite-plugin`'s local dev API and `@contentia/server`'s inner handlers pass `allowAll`
+  (the vite dev server is loopback-guarded; `contentiaApi` authenticates and applies its own
+  `authorize` gate before dispatching), so neither changes behaviour.
 
 ### Minor Changes
 
@@ -83,12 +83,12 @@
   get security fixes, and no probe can detect that from inside the process. It stays `ignorable`.
   Raise the floor when the floor line reaches EOL, not when a new LTS ships.
 
-  Consumers pinned to Node 24 are unaffected. The full `@laikacms/server` (502) and `laikacms`
+  Consumers pinned to Node 24 are unaffected. The full `@contentia/server` (502) and `contentia`
   (2014) suites pass on Node 22.
 
 ### Patch Changes
 
-- 14df4cf: Fix `npx laikacli` crashing with `ERR_MODULE_NOT_FOUND` on
+- 14df4cf: Fix `npx contentia` crashing with `ERR_MODULE_NOT_FOUND` on
   `effect/unstable/http/Multipasta/Node`.
 
   The catalog pinned `effect` and `@effect/platform-node` to `4.0.0-beta.66` while
@@ -104,7 +104,7 @@
 
   Also fixes two problems surfaced by the bump:
 
-  - `@laikacms/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
+  - `@contentia/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
     a dependency, resolving through a stale phantom symlink. It is now a declared dependency, which
     also makes the published package installable on npm.
   - `effect/Schema`'s `decodeUnknownSync` now throws a real `SchemaError` rather than a plain
@@ -120,11 +120,11 @@
 - Updated dependencies [14df4cf]
 - Updated dependencies [e8ab49b]
 - Updated dependencies [6b918c6]
-  - laikacms@6.0.0
+  - contentia@6.0.0
 
 ### Minor Changes
 
-- 524a8b5: Add `@laikacms/server/ai` subpath — chat + session endpoints for AI-assisted editing via
+- 524a8b5: Add `@contentia/server/ai` subpath — chat + session endpoints for AI-assisted editing via
   `decapAi(config)`. Exports `./ai`, `./ai/providers`, `./ai/tools`, `./ai/i18n/en`, `./ai/i18n/nl`,
   `./ai/i18n/types`.
 
@@ -139,12 +139,12 @@
   locks between tabs of one browser, plus a `LockStore` KV in the server package whose
   read-check-write acquire could let two callers both win.
 
-  **`laikacms`**
+  **`contentia`**
 
   - `Lock`, `LockToken` (an opaque bearer capability), `LockOwner`, `OwnedLock`,
-    `DEFAULT_LOCK_TTL_MS` and `LocksCapabilitySchema` from `laikacms/storage`.
-  - `LockConflictError` (code `lock_conflict`, **423 Locked**) from `laikacms/core`. 423 rather than
-    409 so a client distinguishes "someone else holds this" from `VersionMismatchError`'s "the
+    `DEFAULT_LOCK_TTL_MS` and `LocksCapabilitySchema` from `contentia/storage`.
+  - `LockConflictError` (code `lock_conflict`, **423 Locked**) from `contentia/core`. 423 rather
+    than 409 so a client distinguishes "someone else holds this" from `VersionMismatchError`'s "the
     record moved under you" on status alone.
   - `DocumentsCapabilities.locks`, **optional**: a repository that does not lock omits it entirely
     and needs no changes. When present it carries `scope: 'in-process' | 'shared'` and
@@ -153,7 +153,7 @@
   - Five capability-gated methods on `DocumentsRepository` (`acquireLock`, `refreshLock`,
     `releaseLock`, `getLock`, `withDocumentLock`), each defaulting to `NotImplementedError`, so
     existing subclasses stay source-compatible.
-  - `InProcessLockManager` at the new `laikacms/locks/in-process` subpath: an Effect-transaction
+  - `InProcessLockManager` at the new `contentia/locks/in-process` subpath: an Effect-transaction
     (`TxHashMap`) implementation whose acquire is genuinely atomic within a node. Reports
     `scope: 'in-process'`, `transactional: false`.
   - `documents-api` gains `GET/POST/DELETE /locks/{key}` and `POST /locks/{key}/refresh`. A conflict
@@ -161,19 +161,19 @@
   - `documents-jsonapi-proxy` forwards all four over HTTP; 501 re-hydrates as `NotImplementedError`,
     so a caller sees one behaviour whether the gap is local or remote.
 
-  **`@laikacms/server`** (breaking)
+  **`@contentia/server`** (breaking)
 
-  `LaikaApiOptions.locks` and `LaikaApiOptions.locksTtlMs` are **removed**, along with `LockStore`,
-  `createInMemoryLockStore` and `DEFAULT_ENTRY_LOCK_TTL_MS`. `/locks` is now a thin adapter over the
-  documents repository and needs no wiring: it is mounted always, and answers 501 when the
-  repository does not support locking.
+  `ContentiaApiOptions.locks` and `ContentiaApiOptions.locksTtlMs` are **removed**, along with
+  `LockStore`, `createInMemoryLockStore` and `DEFAULT_ENTRY_LOCK_TTL_MS`. `/locks` is now a thin
+  adapter over the documents repository and needs no wiring: it is mounted always, and answers 501
+  when the repository does not support locking.
 
   ```ts
   // Before
-  laikaApi({ documents, storage, locks: createInMemoryLockStore(), locksTtlMs: 300_000, ... })
+  contentiaApi({ documents, storage, locks: createInMemoryLockStore(), locksTtlMs: 300_000, ... })
 
   // After: locking follows the repository's capability
-  laikaApi({ documents, storage, ... })
+  contentiaApi({ documents, storage, ... })
   ```
 
   To keep single-node locking, delegate the five methods on your documents repository to an
@@ -186,45 +186,45 @@
   **Deferred:** the write-precondition ladder (`ifVersion` / `ifLockHeldBy`, enforcement-on-write).
   Locks inform; nothing blocks a write yet.
 
-- 2f17498: Rename `@laikacms/decap` to `@laikacms/server` and drop the `decap-` prefix from its
+- 2f17498: Rename `@contentia/decap` to `@contentia/server` and drop the `decap-` prefix from its
   modules.
 
-  Neither module was ever Decap-specific: `decap-api` is a composition router over the `laikacms`
+  Neither module was ever Decap-specific: `decap-api` is a composition router over the `contentia`
   JSON:API sub-APIs behind one auth boundary, and `decap-oauth2` is a self-contained OAuth 2.0
   authorization server that does not need the CMS API to exist. Only the naming implied otherwise.
 
   **Subpaths**
 
-  | Before                                      | After                                  |
-  | ------------------------------------------- | -------------------------------------- |
-  | `@laikacms/decap/decap-api`                 | `@laikacms/server/api`                 |
-  | `@laikacms/decap/decap-oauth2`              | `@laikacms/server/oauth2`              |
-  | `@laikacms/decap/decap-oauth2/i18n`         | `@laikacms/server/oauth2/i18n`         |
-  | `@laikacms/decap/decap-oauth2/i18n/{en,nl}` | `@laikacms/server/oauth2/i18n/{en,nl}` |
-  | `@laikacms/decap/decap-cms-backend-laika`   | `@laikacms/decap-cms/backends/laika`   |
+  | Before                                         | After                                   |
+  | ---------------------------------------------- | --------------------------------------- |
+  | `@contentia/decap/decap-api`                   | `@contentia/server/api`                 |
+  | `@contentia/decap/decap-oauth2`                | `@contentia/server/oauth2`              |
+  | `@contentia/decap/decap-oauth2/i18n`           | `@contentia/server/oauth2/i18n`         |
+  | `@contentia/decap/decap-oauth2/i18n/{en,nl}`   | `@contentia/server/oauth2/i18n/{en,nl}` |
+  | `@contentia/decap/decap-cms-backend-contentia` | `@laikacms/decap-cms/backends/laika`    |
 
-  **Symbols**: `decapApi` -> `laikaApi`, `DecapApi` -> `LaikaApi`, `DecapOptions` ->
-  `LaikaApiOptions`, `decapOauth2` -> `laikaOauth2`, `DecapOauth2` -> `LaikaOauth2`. The
-  module-augmentation targets moved with the subpaths (`declare module '@laikacms/server/api'`).
+  **Symbols**: `decapApi` -> `contentiaApi`, `DecapApi` -> `ContentiaApi`, `DecapOptions` ->
+  `ContentiaApiOptions`, `decapOauth2` -> `contentiaOauth2`, `DecapOauth2` -> `ContentiaOauth2`. The
+  module-augmentation targets moved with the subpaths (`declare module '@contentia/server/api'`).
 
-  There are no compatibility aliases; `@laikacms/decap` is deprecated on npm.
+  There are no compatibility aliases; `@contentia/decap` is deprecated on npm.
 
   **The Decap CMS backend left this package entirely.** `createLaikaBackend()` /
   `resolveLaikaBackend()` now ship only with the fork, as `@laikacms/decap-cms/backends/laika`. The
   copy here had drifted behind the fork's, so it was deleted rather than merged. As a result
-  `@laikacms/server` no longer has `react` or `@laikacms/decap-cms` peer dependencies, and its only
-  runtime dependency is `laikacms`.
+  `@contentia/server` no longer has `react` or `@laikacms/decap-cms` peer dependencies, and its only
+  runtime dependency is `contentia`.
 
-  **User-visible defaults rebranded from "Decap CMS" to "Laika CMS":** login page titles
+  **User-visible defaults rebranded from "Decap CMS" to "Contentia":** login page titles
   (`oauth2/i18n` en + nl), the transactional-email `appName`, and the TOTP `issuer`
-  (`DEFAULT_TOTP_ISSUER`, now exported from `@laikacms/server/oauth2`).
+  (`DEFAULT_TOTP_ISSUER`, now exported from `@contentia/server/oauth2`).
 
   The TOTP change needs action if you have enrolled users. The issuer is the label in the
   authenticator app and is baked into every already-minted `otpauth://` URI, so a deployment that
   relied on the old default must now set it explicitly to keep existing enrollments matching:
 
   ```ts
-  laikaOauth2({
+  contentiaOauth2({
     // …
     totp: { enabled: true, issuer: 'Decap CMS', callbacks },
   });
@@ -237,15 +237,15 @@
 - Updated dependencies [2f17498]
 - Updated dependencies [2f17498]
 - Updated dependencies [2f17498]
-  - laikacms@5.0.0
+  - contentia@5.0.0
 
 ## 3.1.0
 
 ### Minor Changes
 
-- Add the `laikacms/auth` core subpath and an opt-in scope authorization policy in decap-api.
+- Add the `contentia/auth` core subpath and an opt-in scope authorization policy in decap-api.
 
-  `laikacms/auth` consolidates the PAT + scope mechanism as the lowest auth layer: an open
+  `contentia/auth` consolidates the PAT + scope mechanism as the lowest auth layer: an open
   `resource:action` scope vocabulary with wildcards (`hasScope`, `normalizeScopes`), PAT
   mint/hash/verify (`lk_pat_` prefix, sha256 at rest, timing-safe compare), and `resolveBearer` —
   one seam turning a bearer token into `{ user, scopes }` — plus `requireScope` enforcement.
@@ -261,10 +261,10 @@
 
 ### Patch Changes
 
-- decap-cms-backend-laika: stop the dev authentication page from repeatedly re-attempting login.
+- decap-cms-backend-contentia: stop the dev authentication page from repeatedly re-attempting login.
 - Updated dependencies
 - Updated dependencies
-  - laikacms@3.1.0
+  - contentia@3.1.0
 
 ## 3.0.1
 
@@ -272,7 +272,7 @@
 
 - Bump the `@laikacms/decap-cms` peer dependency to `4.1.0` (and the dev dependency used for
   type-checking/tests to match). The supported minimum is now `>=4.1.0`.
-  - laikacms@3.0.1
+  - contentia@3.0.1
 
 ## 3.0.0
 
@@ -307,14 +307,14 @@
 
 ### Minor Changes
 
-- e4c987a: Add `@laikacms/decap/decap-cms-backend-laika` subpath export shipping
+- e4c987a: Add `@contentia/decap/decap-cms-backend-contentia` subpath export shipping
   `createLaikaBackend()` (PR #820, LCMS-507).
 
 ### Patch Changes
 
 - Updated dependencies [68c658f]
 - Updated dependencies [d26bdfe]
-  - laikacms@3.0.0
+  - contentia@3.0.0
 
 ## 2.2.0
 
@@ -328,7 +328,7 @@
 
 ### Patch Changes
 
-- laikacms@2.2.0
+- contentia@2.2.0
 
 ## 2.1.1
 
@@ -342,14 +342,14 @@
   The published package now includes an MIT `LICENSE` file.
 
 - Updated dependencies [cc4d315]
-  - laikacms@2.1.1
+  - contentia@2.1.1
 
 ## 2.1.0
 
 ### Patch Changes
 
 - Updated dependencies
-  - laikacms@2.1.0
+  - contentia@2.1.0
 
 ## 2.0.0
 
@@ -360,7 +360,7 @@
 
   Removed exports: `decap-cms-widget-lucide-icon`, `decap-cms-widget-radix-icon`,
   `decap-cms-locale-nl`, `decap-config-types`, and `decap-cms-editor-component-embedded-entry`. The
-  `@laikacms/decap-ai` package has been removed from the workspace entirely and will no longer
+  `@contentia/decap-ai` package has been removed from the workspace entirely and will no longer
   receive releases.
 
 ### Patch Changes
@@ -368,14 +368,14 @@
 - Updated dependencies
 - Updated dependencies
 - Updated dependencies
-  - laikacms@2.0.0
+  - contentia@2.0.0
 
 ## 1.3.0
 
 ### Patch Changes
 
 - Updated dependencies [42363a1]
-  - laikacms@1.3.0
+  - contentia@1.3.0
 
 ## 1.2.0
 
@@ -383,7 +383,7 @@
 
 - **BREAKING (alpha): version tracking and change-signal capabilities, required everywhere**
 
-  `laikacms`:
+  `contentia`:
 
   - Documents and assets repositories can now advertise per-record `version` tokens
     (`versionTracking`) and a change-signal surface (`changes`: `getSyncToken` / `listChanges`).
@@ -394,12 +394,12 @@
   - The deprecated `draftDirectory`, `archiveDirectory`, and `trashDirectory` document-collection
     settings have been removed. Use `unpublishedStatuses` instead.
 
-  `@laikacms/decap`:
+  `@contentia/decap`:
 
   - `OAuthTotpCallbacks.deletePendingTotpSession`, `getLastTotpStep`, and `setLastTotpStep` are now
     required. RFC 6238 §5.2 replay protection and single-use pending TOTP sessions are always
     enforced; implementations can no longer opt out by omitting the callbacks.
-  - The unused `decap-cms-backend-laika` backend has been removed from the package.
+  - The unused `decap-cms-backend-contentia` backend has been removed from the package.
 
   **Migration:**
 
@@ -415,7 +415,7 @@ description: '...' }` if unsupported.
 
 - Updated dependencies [827ffe2]
 - Updated dependencies
-  - laikacms@1.2.0
+  - contentia@1.2.0
 
 ## 1.1.0
 
@@ -423,14 +423,14 @@ description: '...' }` if unsupported.
 
 - Updated dependencies [96f8692]
 - Updated dependencies [96f8692]
-  - laikacms@1.1.0
+  - contentia@1.1.0
 
 ## 1.0.1
 
 ### Patch Changes
 
 - Updated dependencies [e488528]
-  - laikacms@1.0.1
+  - contentia@1.0.1
 
 ## 1.0.0
 
@@ -443,7 +443,7 @@ description: '...' }` if unsupported.
 ### Patch Changes
 
 - Updated dependencies
-  - laikacms@1.0.0
+  - contentia@1.0.0
 
 ## 0.1.2
 
@@ -451,4 +451,4 @@ description: '...' }` if unsupported.
 
 - Moved to hybrid monorepo structure
 - Updated dependencies
-  - laikacms@0.1.2
+  - contentia@0.1.2

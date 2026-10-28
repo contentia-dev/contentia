@@ -1,8 +1,8 @@
-# @laikacms/server/oauth2
+# @contentia/server/oauth2
 
-[![npm](https://img.shields.io/npm/v/@laikacms/server)](https://www.npmjs.com/package/@laikacms/server)
-[![npm](https://img.shields.io/npm/dm/@laikacms/server)](https://www.npmjs.com/package/@laikacms/server)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@laikacms/server)](https://bundlephobia.com/result?p=@laikacms/server)
+[![npm](https://img.shields.io/npm/v/@contentia/server)](https://www.npmjs.com/package/@contentia/server)
+[![npm](https://img.shields.io/npm/dm/@contentia/server)](https://www.npmjs.com/package/@contentia/server)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@contentia/server)](https://bundlephobia.com/result?p=@contentia/server)
 
 OAuth2 authentication server for Decap CMS with PKCE support.
 
@@ -16,15 +16,15 @@ OAuth2 authentication server for Decap CMS with PKCE support.
 ## Installation
 
 ```bash
-pnpm add @laikacms/server
+pnpm add @contentia/server
 ```
 
 ## Usage
 
 ```typescript
-import { laikaOauth2 } from '@laikacms/server/oauth2';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   basePath: '/oauth2',
   clientId: process.env.DECAP_CLIENT_ID!,
   // Required: only these URIs may receive an authorization code (RFC 6749 §3.1.2.2).
@@ -58,9 +58,9 @@ Adds passwordless FIDO2/WebAuthn login. Users can register a passkey after first
 their password and may optionally be required to do so.
 
 ```typescript
-import { laikaOauth2 } from '@laikacms/server/oauth2';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   passkey: {
     /** Enable passkey authentication */
@@ -103,7 +103,7 @@ const oauth2 = laikaOauth2({
 });
 ```
 
-`StoredCredential` and `StoredChallenge` are exported from `@laikacms/server/oauth2`.
+`StoredCredential` and `StoredChallenge` are exported from `@contentia/server/oauth2`.
 
 ### TOTP 2FA
 
@@ -111,7 +111,7 @@ Adds time-based one-time password (RFC 6238) second factor, compatible with Goog
 Authy, and any standard TOTP app.
 
 ```typescript
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   totp: {
     /** Enable TOTP 2FA */
@@ -120,7 +120,7 @@ const oauth2 = laikaOauth2({
     required: false,
     /**
      * Issuer name shown in authenticator apps. Defaults to `DEFAULT_TOTP_ISSUER`
-     * ('Laika CMS'). BREAKING in v4: this default was 'Decap CMS'. It is baked
+     * ('Contentia'). BREAKING in v4: this default was 'Decap CMS'. It is baked
      * into every already-minted `otpauth://` URI, so an existing deployment that
      * never set this must now pass `issuer: 'Decap CMS'` to keep enrolled users
      * matching.
@@ -150,7 +150,7 @@ const oauth2 = laikaOauth2({
 Adds a "Forgot password?" link to the login page and a full email-based reset flow.
 
 ```typescript
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   passwordReset: {
     /** Email provider (see EmailProvider interface) */
@@ -183,7 +183,7 @@ const oauth2 = laikaOauth2({
 });
 ```
 
-`EmailProvider` and `PasswordResetToken` are exported from `@laikacms/server/oauth2`.
+`EmailProvider` and `PasswordResetToken` are exported from `@contentia/server/oauth2`.
 
 #### EmailProvider interface
 
@@ -202,7 +202,7 @@ via HTML and exposes a form field token is supported (reCAPTCHA v2, hCaptcha, Cl
 etc.).
 
 ```typescript
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   captcha: {
     /** Enable CAPTCHA on login and forgot-password forms */
@@ -252,13 +252,14 @@ const oauth2 = laikaOauth2({
 ### Translations / i18n
 
 All user-facing strings can be localized via the `translations` field. The package ships English
-(`en`) and Dutch (`nl`) out of the box; import them from the `@laikacms/server/oauth2/i18n` subpath.
+(`en`) and Dutch (`nl`) out of the box; import them from the `@contentia/server/oauth2/i18n`
+subpath.
 
 ```typescript
-import { laikaOauth2 } from '@laikacms/server/oauth2';
-import { nl } from '@laikacms/server/oauth2/i18n';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
+import { nl } from '@contentia/server/oauth2/i18n';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   translations: nl,
 });
@@ -267,7 +268,7 @@ const oauth2 = laikaOauth2({
 To provide fully custom translations, implement the `OAuthMessages` (alias of `Translation`) type:
 
 ```typescript
-import type { OAuthMessages } from '@laikacms/server/oauth2';
+import type { OAuthMessages } from '@contentia/server/oauth2';
 
 const myTranslations: OAuthMessages = {
   auth: {/* login/logout strings */},
@@ -280,13 +281,13 @@ const myTranslations: OAuthMessages = {
   common: {/* shared strings like button labels */},
 };
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   // ... required options
   translations: myTranslations,
 });
 ```
 
-Both `OAuthMessages` and `Translation` are exported from `@laikacms/server/oauth2/i18n`.
+Both `OAuthMessages` and `Translation` are exported from `@contentia/server/oauth2/i18n`.
 
 ## Additional options
 
@@ -310,9 +311,9 @@ These top-level `OAuthConfig` fields are independent of any optional feature.
 Example with token timing and a logger:
 
 ```typescript
-import { laikaOauth2 } from '@laikacms/server/oauth2';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   basePath: '/oauth2',
   clientId: process.env.DECAP_CLIENT_ID!,
   allowedRedirectUris: ['https://cms.example.com/admin/'],

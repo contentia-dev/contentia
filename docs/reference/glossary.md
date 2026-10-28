@@ -1,35 +1,35 @@
 # Glossary
 
-Shared vocabulary for the `laikacms` bounded context. Terms here are load-bearing: code and docs use
-them with exactly these meanings. Background for the first three entries is in
+Shared vocabulary for the `contentia` bounded context. Terms here are load-bearing: code and docs
+use them with exactly these meanings. Background for the first three entries is in
 [Architecture](../concepts/architecture).
 
 ## local mode
 
-The `@laikacms/vite-plugin` is running under `vite dev` **and** `localApi: true` is set. In local
-mode the plugin mounts LaikaCMS's own JSON:API under `/__laika` on the Vite dev server so a JSON:API
-client (e.g. the Decap admin) can read and write content without a remote backend. The API is
-unauthenticated by design and only ever live while the dev server is running — a production build
+The `@contentia/vite-plugin` is running under `vite dev` **and** `localApi: true` is set. In local
+mode the plugin mounts Contentia's own JSON:API under `/__contentia` on the Vite dev server so a
+JSON:API client (e.g. the Decap admin) can read and write content without a remote backend. The API
+is unauthenticated by design and only ever live while the dev server is running — a production build
 has no route to it.
 
 See [Local Mode Dev Editing](../guides/decap/local-mode) and [Vite plugin](../guides/vite).
 
 ## remote mode
 
-The opposite of local mode: the admin communicates with a deployed LaikaCMS API (e.g. a Hono server
+The opposite of local mode: the admin communicates with a deployed Contentia API (e.g. a Hono server
 or a Cloudflare Worker). The Vite dev server may or may not be running; the distinguishing factor is
-that content reads and writes go to a remote HTTP endpoint, not to `/__laika` on localhost.
+that content reads and writes go to a remote HTTP endpoint, not to `/__contentia` on localhost.
 `resolveLaikaBackend` selects remote mode whenever `import.meta.env.DEV` is not truthy.
 
 ## protocol
 
-The entire `laikacms` bounded context: the repository contracts
-([`DocumentsRepository`](./api/laikacms/documents/classes/DocumentsRepository),
-[`AssetsRepository`](./api/laikacms/assets/classes/AssetsRepository),
-[`StorageRepository`](./api/laikacms/storage/classes/StorageRepository)) plus the default
+The entire `contentia` bounded context: the repository contracts
+([`DocumentsRepository`](./api/contentia/documents/classes/DocumentsRepository),
+[`AssetsRepository`](./api/contentia/assets/classes/AssetsRepository),
+[`StorageRepository`](./api/contentia/storage/classes/StorageRepository)) plus the default
 implementations built on top of other repositories. It knows only atoms, folders, keys, metadata,
-and summaries; the `content` field is the user's own arbitrary JSON and is never interpreted. Laika
-minus the CMS is "basically a protocol".
+and summaries; the `content` field is the user's own arbitrary JSON and is never interpreted.
+Contentia minus the CMS is "basically a protocol".
 
 ## repository
 
@@ -42,16 +42,17 @@ repositories (catalog, JSON:API proxy).
 The opinionated layer of the protocol: the named collections — document folders and media folders —
 that a store's content is organised into, each with a directory, an optional JSON Schema, and (for
 media) accepted content types. The contract is
-[`CatalogProvider`](./api/laikacms/catalog/classes/CatalogProvider); `laikacms/documents/catalog`
-and `laikacms/assets/catalog` are the repositories that project those collections onto generic
+[`CatalogProvider`](./api/contentia/catalog/classes/CatalogProvider); `contentia/documents/catalog`
+and `contentia/assets/catalog` are the repositories that project those collections onto generic
 [atoms and folders](#atom--folder). A catalog is optional: a backend can implement
 `DocumentsRepository` directly and never expose one.
 
 Where a catalog is persisted is the provider's business, not the contract's.
-`laikacms/catalog-convention` keeps it in storage under `.laika/` (`.laika/catalog`,
-`.laika/schemas/<collection>`, `.laika/revisions/<collection>`); `laikacms/catalog-decap` derives it
-from a Decap config object; a DynamoDB provider has no path at all. Those keys are deliberately
-extensionless so the storage repository's configured serializers decide the on-disk format.
+`contentia/catalog-convention` keeps it in storage under `.contentia/` (`.contentia/catalog`,
+`.contentia/schemas/<collection>`, `.contentia/revisions/<collection>`); `contentia/catalog-decap`
+derives it from a Decap config object; a DynamoDB provider has no path at all. Those keys are
+deliberately extensionless so the storage repository's configured serializers decide the on-disk
+format.
 
 Not to be confused with pnpm's `catalog:` dependency protocol, which this repo also uses — that one
 is a package-manager concern and never appears in library code.
@@ -66,7 +67,7 @@ one is plugged in. See [Adapters](../adapters/) for the full list.
 ## CMS integration
 
 The CMS-specific layer built on repositories. It owns every opinionated choice its CMS needs (entry
-shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is the laika
+shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is the contentia
 backend in the decap-cms repo. CMS features never move from a CMS integration into the protocol;
 swapping one CMS's integration for another's is a migration by design. ADR-006 predates this term
 and calls it an "adapter".
@@ -99,34 +100,34 @@ value carries the new sync token to resume from. Capability-gated via
 The storage domain's generic vocabulary: an atom is either a storage object or a folder. These are
 wrappers around the user's content, not a data model imposed on it.
 
-## LaikaTask / LaikaStream
+## ContentiaTask / ContentiaStream
 
-The two return types every repository method uses: `LaikaTask<T>` for a single result and
-`LaikaStream<T, D>` for many results with a typed done value. Both are thin, Effect-based
+The two return types every repository method uses: `ContentiaTask<T>` for a single result and
+`ContentiaStream<T, D>` for many results with a typed done value. Both are thin, Effect-based
 abstractions — internally they are Effects, so they carry the typed error channel, tracing, and
 interruption semantics Effect provides, and an Effect consumer can `yield*` them directly inside an
 `Effect.gen`.
 
 They are deliberately **not** raw `Effect` values. Wrapping Effect behind
-[`LaikaTask`](./api/laikacms/core/namespaces/LaikaTask/)/[`LaikaStream`](./api/laikacms/core/namespaces/LaikaStream/)
+[`ContentiaTask`](./api/contentia/core/namespaces/ContentiaTask/)/[`ContentiaStream`](./api/contentia/core/namespaces/ContentiaStream/)
 keeps Effect an implementation detail of the protocol rather than a hard requirement on the caller:
 the library can be consumed with or without adopting Effect. See [dual API](#dual-api).
 
-API reference: [`LaikaTask`](./api/laikacms/core/namespaces/LaikaTask/) and
-[`LaikaStream`](./api/laikacms/core/namespaces/LaikaStream/).
+API reference: [`ContentiaTask`](./api/contentia/core/namespaces/ContentiaTask/) and
+[`ContentiaStream`](./api/contentia/core/namespaces/ContentiaStream/).
 
 ## dual API
 
-A design rule: `laikacms` is built on Effect internally, but must be usable by consumers who do not
-use Effect. Repository methods therefore return [LaikaTask / LaikaStream](#laikatask--laikastream)
-(Effect-based, for Effect consumers) while `laikacms/compat` exposes Promise-friendly wrappers for
-everyone else:
+A design rule: `contentia` is built on Effect internally, but must be usable by consumers who do not
+use Effect. Repository methods therefore return
+[ContentiaTask / ContentiaStream](#contentiatask--contentiastream) (Effect-based, for Effect
+consumers) while `contentia/compat` exposes Promise-friendly wrappers for everyone else:
 
-- **`runTask(task, options?)`** runs a `LaikaTask` and resolves with its value.
-- **`collectStream(stream, options?)`** drains a `LaikaStream` and resolves with its items and done
-  value.
+- **`runTask(task, options?)`** runs a `ContentiaTask` and resolves with its value.
+- **`collectStream(stream, options?)`** drains a `ContentiaStream` and resolves with its items and
+  done value.
 
 Neither wrapper requires the caller to import Effect. This is intentional and load-bearing: new code
 must preserve it. Do not expose a raw `Effect` type across a public repository boundary, and do not
-force callers into an Effect runtime to use a repository — anything reachable via `LaikaTask` /
-`LaikaStream` must stay consumable through `laikacms/compat`.
+force callers into an Effect runtime to use a repository — anything reachable via `ContentiaTask` /
+`ContentiaStream` must stay consumable through `contentia/compat`.

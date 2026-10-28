@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Regression guard for the laikacli published tarball.
+ * Regression guard for the contentia published tarball.
  *
  * Packs apps/cli, installs the tarball into a clean npm-only tree, and verifies
- * that `laikacli --version` boots without an ERR_MODULE_NOT_FOUND. This catches
+ * that `contentia --version` boots without an ERR_MODULE_NOT_FOUND. This catches
  * Effect v4-beta reshuffles where two packages in the tree are pinned against
  * different snapshots of the module layout (the failure mode behind #926 / 0.1.1).
  *
@@ -66,7 +66,7 @@ try {
   }
 
   // 3. Create a clean temp dir and install the tarball via npm (mirrors npx behaviour).
-  tmpDir = mkdtempSync(join(tmpdir(), 'laikacli-smoke-'));
+  tmpDir = mkdtempSync(join(tmpdir(), 'contentia-smoke-'));
   console.log(`Smoke install dir: ${tmpDir}`);
 
   run(`npm init -y`, { cwd: tmpDir });
@@ -74,9 +74,9 @@ try {
   run(`npm install --save "${tgzPath}"`, { cwd: tmpDir, stdio: 'inherit' });
 
   // 4. Boot the CLI — any ERR_MODULE_NOT_FOUND fails here.
-  console.log('Running laikacli --version…');
-  const versionOut = run(`node node_modules/.bin/laikacli --version`, { cwd: tmpDir });
-  console.log(`laikacli --version → ${versionOut.trim()}`);
+  console.log('Running contentia --version…');
+  const versionOut = run(`node node_modules/.bin/contentia --version`, { cwd: tmpDir });
+  console.log(`contentia --version → ${versionOut.trim()}`);
 
   // 5. Sanity: the binary must print something containing a semver string.
   if (!/\d+\.\d+\.\d+/.test(versionOut.trim())) {

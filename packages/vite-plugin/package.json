@@ -1,15 +1,15 @@
 {
-  "name": "@laikacms/vite-plugin",
+  "name": "@contentia/vite-plugin",
   "version": "6.0.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "Vite plugin for Laika CMS: mounts the storage, documents, and assets JSON:API in the dev/preview server, backed by a repository of your choice (a filesystem repository by default).",
+  "description": "Vite plugin for Contentia: mounts the storage, documents, and assets JSON:API in the dev/preview server, backed by a repository of your choice (a filesystem repository by default).",
   "keywords": [
     "vite",
     "vite-plugin",
     "headless-cms",
-    "laikacms",
+    "contentia",
     "content-management"
   ],
   "author": {
@@ -17,13 +17,13 @@
     "email": "sem@laikacms.com",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
     "email": "sem@laikacms.com",
-    "url": "https://github.com/laikacms/laikacms/issues"
+    "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -50,7 +50,7 @@
   },
   "dependencies": {
     "es-module-lexer": "catalog:",
-    "laikacms": "workspace:*",
+    "contentia": "workspace:*",
     "magic-string": "catalog:",
     "minimatch": "catalog:"
   },

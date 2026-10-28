@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /* The pledge exists so adopters know the went-commercial-then-disappeared
-   failure mode is designed out of Laika. The wording is content, passed in from
+   failure mode is designed out of Contentia. The wording is content, passed in from
    the page that renders it. */
 interface PledgeProps {
   heading: string;

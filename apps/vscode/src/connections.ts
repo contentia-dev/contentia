@@ -2,10 +2,10 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import * as vscode from 'vscode';
 
-import type { DocumentsRepository } from 'laikacms/documents';
-import { DocumentsJsonApiProxyRepository } from 'laikacms/documents/jsonapi-proxy';
-import type { StorageRepository } from 'laikacms/storage';
-import { StorageJsonApiProxyRepository } from 'laikacms/storage/jsonapi-proxy';
+import type { DocumentsRepository } from 'contentia/documents';
+import { DocumentsJsonApiProxyRepository } from 'contentia/documents/jsonapi-proxy';
+import type { StorageRepository } from 'contentia/storage';
+import { StorageJsonApiProxyRepository } from 'contentia/storage/jsonapi-proxy';
 
 import { resolveCli } from './cli/resolve-cli.js';
 import { type RunningServer, startServe } from './cli/serve-process.js';
@@ -27,8 +27,8 @@ export interface RemoteConnectionConfig {
 export type ConnectionConfig = LocalConnectionConfig | RemoteConnectionConfig;
 
 /**
- * One configured content source. A local connection runs `laika local serve`
- * through the workspace's laikacli on first use; a remote one talks to a
+ * One configured content source. A local connection runs `contentia local serve`
+ * through the workspace's contentia on first use; a remote one talks to a
  * deployed API server. Either way the trees only ever see JSON:API proxy
  * repositories, so local and remote browse through the same code.
  */
@@ -50,7 +50,7 @@ export class Connection {
     return this.config.type === 'local' || Boolean(this.config.storageUrl);
   }
 
-  /** `laika local serve` only exposes the Storage API today. */
+  /** `contentia local serve` only exposes the Storage API today. */
   get hasDocuments(): boolean {
     return this.config.type === 'remote' && Boolean(this.config.documentsUrl);
   }
@@ -141,13 +141,13 @@ export class Connection {
 interface ConnectionHost {
   cli(): ReturnType<typeof resolveCli>;
   workspaceFolder(): string | undefined;
-  /** The stored bearer token, if one was set with "Laika: Set Access Token". */
+  /** The stored bearer token, if one was set with "Contentia: Set Access Token". */
   token(connectionName: string): Promise<string | undefined>;
   log(line: string): void;
   changed(): void;
 }
 
-const tokenKey = (name: string) => `laika.token.${name}`;
+const tokenKey = (name: string) => `contentia.token.${name}`;
 
 export class ConnectionManager implements vscode.Disposable {
   private connections: Connection[] = [];
@@ -163,7 +163,7 @@ export class ConnectionManager implements vscode.Disposable {
   ) {
     this.reload();
     this.disposables.push(vscode.workspace.onDidChangeConfiguration(e => {
-      if (e.affectsConfiguration('laika')) {
+      if (e.affectsConfiguration('contentia')) {
         this.reload();
         this.emitter.fire();
       }
@@ -190,7 +190,7 @@ export class ConnectionManager implements vscode.Disposable {
   }
 
   async addConnection(config: ConnectionConfig): Promise<void> {
-    const settings = vscode.workspace.getConfiguration('laika');
+    const settings = vscode.workspace.getConfiguration('contentia');
     const existing = settings.get<ConnectionConfig[]>('connections') ?? [];
     await settings.update(
       'connections',
@@ -201,12 +201,12 @@ export class ConnectionManager implements vscode.Disposable {
 
   private reload(): void {
     for (const c of this.connections) c.dispose();
-    const configs = vscode.workspace.getConfiguration('laika').get<ConnectionConfig[]>('connections') ?? [];
+    const configs = vscode.workspace.getConfiguration('contentia').get<ConnectionConfig[]>('connections') ?? [];
     const host: ConnectionHost = {
       cli: () =>
         resolveCli({
-          settingPath: vscode.workspace.getConfiguration('laika').get<string>('cli.path') ?? '',
-          envPath: process.env.LAIKA_CLI_PATH,
+          settingPath: vscode.workspace.getConfiguration('contentia').get<string>('cli.path') ?? '',
+          envPath: process.env.CONTENTIA_CLI_PATH,
           workspaceFolders: (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath),
           platform: process.platform,
           exists: existsSync,

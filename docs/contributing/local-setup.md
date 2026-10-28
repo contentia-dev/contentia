@@ -9,8 +9,8 @@
 ## Clone and install
 
 ```bash
-git clone https://github.com/laikacms/laikacms.git
-cd laikacms
+git clone https://github.com/contentia-dev/contentia.git
+cd contentia
 pnpm install
 ```
 

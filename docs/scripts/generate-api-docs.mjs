@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /**
  * Prebuild step: generates the TypeScript API reference for every published package under
- * `packages/` (`laikacms`, `@laikacms/github`, ...) from source with TypeDoc
+ * `packages/` (`contentia`, `@contentia/github`, ...) from source with TypeDoc
  * (typedoc-plugin-markdown + typedoc-vitepress-theme).
  *
  * Entry points are derived from each package's `package.json` `exports`, so every public
  * subpath gets a page and nothing private does. Each module is named after its import
- * specifier (`laikacms/storage/fs`, `@laikacms/github/storage-gh`, ...) rather than its
+ * specifier (`contentia/storage/fs`, `@contentia/github/storage-gh`, ...) rather than its
  * source path.
  *
  * All packages go through one TypeDoc run on a tsconfig that extends the core package's, so
- * its `paths` resolve `laikacms/*` imports in the other packages to core source and their
+ * its `paths` resolve `contentia/*` imports in the other packages to core source and their
  * signatures link to the core pages instead of to `dist` declarations.
  *
  * Output is fully generated and gitignored — never hand-edit it:
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { Application, Converter, ReflectionKind } from 'typedoc';
 
 /** The core package: its tsconfig is the base for the combined program. */
-const CORE_PACKAGE = 'laikacms';
+const CORE_PACKAGE = 'contentia';
 
 /**
  * Maps each `exports` subpath to its TypeScript source file, using the `types` target
@@ -73,7 +73,7 @@ export function entryPointsFromPackages(packagesDir) {
  * source. Returns its path and a cleanup function.
  */
 function writeCombinedTsconfig(packagesDir) {
-  const dir = mkdtempSync(join(tmpdir(), 'laika-api-docs-'));
+  const dir = mkdtempSync(join(tmpdir(), 'contentia-api-docs-'));
   const file = join(dir, 'tsconfig.json');
   writeFileSync(
     file,

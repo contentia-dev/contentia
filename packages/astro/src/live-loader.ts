@@ -12,25 +12,25 @@
  */
 
 import type { LiveLoader } from 'astro/loaders';
-import type { CatalogProvider } from 'laikacms/catalog';
-import { collectStream, runTask } from 'laikacms/compat';
-import { BadRequestError, InternalError, LaikaError, NotFoundError, ValidationError } from 'laikacms/core/errors';
-import type { DocumentsRepository } from 'laikacms/documents';
+import type { CatalogProvider } from 'contentia/catalog';
+import { collectStream, runTask } from 'contentia/compat';
+import { BadRequestError, ContentiaError, InternalError, NotFoundError, ValidationError } from 'contentia/core/errors';
+import type { DocumentsRepository } from 'contentia/documents';
 
 import type { LoaderPagination } from './documents-loader.js';
 import { jsonSchemaToZod, type ZodNamespace } from './json-schema-to-zod.js';
 import type { LiveCollectionData, LiveCollectionKey } from './live-collections.js';
 import { DEFAULT_BODY_FIELD, entryIdOf, type EntryOptions, keyOf, splitContent, stripBodyField } from './mapping.js';
 
-/** Identifies one document. Supply either the Astro entry id or the full Laika key. */
-export interface LaikaEntryFilter {
+/** Identifies one document. Supply either the Astro entry id or the full Contentia key. */
+export interface ContentiaEntryFilter {
   /**
-   * The Astro entry id — the Laika key with the collection prefix removed.
+   * The Astro entry id — the Contentia key with the collection prefix removed.
    * `getLiveEntry(collection, 'some-id')` is normalised to this field, so it is
    * the one that makes the string shorthand work.
    */
   id?: string;
-  /** The full Laika key. Takes precedence over {@link id}. */
+  /** The full Contentia key. Takes precedence over {@link id}. */
   key?: string;
   /** Which publication state to read. Defaults to `'published'`. */
   type?: 'published' | 'unpublished';
@@ -38,7 +38,7 @@ export interface LaikaEntryFilter {
   status?: string;
 }
 
-export interface LaikaCollectionFilter {
+export interface ContentiaCollectionFilter {
   folder?: string;
   depth?: number;
   type?: 'published' | 'unpublished';
@@ -63,7 +63,7 @@ export interface LiveRenderOptions {
 }
 
 export interface LiveCacheOptions {
-  /** Cache tags for an entry. Defaults to `['laika', 'laika:<collection>', 'laika:<key>']`. */
+  /** Cache tags for an entry. Defaults to `['contentia', 'contentia:<collection>', 'contentia:<key>']`. */
   tags?: (context: { key: string, collection: string }) => string[];
   /** Send `updatedAt` as the cache hint's `lastModified`. Defaults to `true`. */
   lastModified?: boolean;
@@ -94,10 +94,10 @@ export interface LiveDocumentsLoaderOptions {
    * has no filesystem.
    */
   documents: DocumentsRepository;
-  /** The Laika collection key. Defaults to the Astro collection name. */
+  /** The Contentia collection key. Defaults to the Astro collection name. */
   collection?: string;
   /** Defaults merged under the per-call filter. */
-  select?: LaikaCollectionFilter;
+  select?: ContentiaCollectionFilter;
   entry?: EntryOptions;
   render?: LiveRenderOptions;
   cache?: LiveCacheOptions;
@@ -124,7 +124,7 @@ type LiveEntry = {
 };
 
 /**
- * A live loader over a Laika {@link DocumentsRepository}.
+ * A live loader over a Contentia {@link DocumentsRepository}.
  *
  * When `collection` names a collection the integration has typed (see
  * `live-collections.ts`), `entry.data` comes back as that collection's shape.
@@ -133,13 +133,13 @@ type LiveEntry = {
  */
 export function liveDocumentsLoader<K extends LiveCollectionKey>(
   options: LiveDocumentsLoaderOptions & { collection: K },
-): LiveLoader<LiveCollectionData<K>, LaikaEntryFilter, LaikaCollectionFilter, LaikaError>;
+): LiveLoader<LiveCollectionData<K>, ContentiaEntryFilter, ContentiaCollectionFilter, ContentiaError>;
 export function liveDocumentsLoader(
   options: LiveDocumentsLoaderOptions,
-): LiveLoader<Record<string, unknown>, LaikaEntryFilter, LaikaCollectionFilter, LaikaError>;
+): LiveLoader<Record<string, unknown>, ContentiaEntryFilter, ContentiaCollectionFilter, ContentiaError>;
 export function liveDocumentsLoader(
   options: LiveDocumentsLoaderOptions,
-): LiveLoader<Record<string, unknown>, LaikaEntryFilter, LaikaCollectionFilter, LaikaError> {
+): LiveLoader<Record<string, unknown>, ContentiaEntryFilter, ContentiaCollectionFilter, ContentiaError> {
   const entryOptions = options.entry ?? {};
   const renderOptions = options.render ?? {};
   const cacheOptions = options.cache ?? {};
@@ -169,7 +169,7 @@ export function liveDocumentsLoader(
     }
 
     const tags = cacheOptions.tags?.({ key: record.key, collection })
-      ?? ['laika', `laika:${collection}`, `laika:${record.key}`];
+      ?? ['contentia', `contentia:${collection}`, `contentia:${record.key}`];
     const cacheHint: { tags?: string[], lastModified?: Date } = { tags };
     if (cacheOptions.lastModified !== false && record.updatedAt !== undefined) {
       const lastModified = new Date(record.updatedAt);
@@ -181,7 +181,7 @@ export function liveDocumentsLoader(
   };
 
   return {
-    name: options.name ?? 'laikacms:live',
+    name: options.name ?? 'contentia:live',
 
     loadEntry: async ({ filter, collection: astroCollection }) => {
       const collection = options.collection ?? astroCollection;
@@ -215,7 +215,7 @@ export function liveDocumentsLoader(
         // Returning `undefined` lets Astro raise its own LiveEntryNotFoundError,
         // which is the shape callers already branch on.
         if (error instanceof NotFoundError) return undefined;
-        return { error: toLaikaError(error) };
+        return { error: toContentiaError(error) };
       }
     },
 
@@ -232,10 +232,10 @@ export function liveDocumentsLoader(
         }
         return {
           entries,
-          cacheHint: { tags: ['laika', `laika:${collection}`] },
+          cacheHint: { tags: ['contentia', `contentia:${collection}`] },
         };
       } catch (error) {
-        return { error: toLaikaError(error) };
+        return { error: toContentiaError(error) };
       }
     },
   };
@@ -244,7 +244,7 @@ export function liveDocumentsLoader(
 async function collectRecords(
   documents: DocumentsRepository,
   collection: string,
-  filter: LaikaCollectionFilter,
+  filter: ContentiaCollectionFilter,
   type: 'published' | 'unpublished',
 ): Promise<{ items: Array<{ key: string, content: Record<string, unknown>, updatedAt?: string }> }> {
   const folder = filter.folder ? `${collection}/${filter.folder}` : collection;
@@ -339,12 +339,12 @@ function createValidator(
 
 /**
  * Astro wraps a *thrown* error in an opaque `LiveCollectionError`, which erases
- * the code, status and translation a `LaikaError` carries. Returning the error
+ * the code, status and translation a `ContentiaError` carries. Returning the error
  * instead keeps all of that reachable from the page, so a caller can branch on
  * `error.code` rather than parse a message.
  */
-function toLaikaError(error: unknown): LaikaError {
-  if (error instanceof LaikaError) return error;
+function toContentiaError(error: unknown): ContentiaError {
+  if (error instanceof ContentiaError) return error;
   return new InternalError('The live loader failed to read from the repository.', {
     cause: error,
   });

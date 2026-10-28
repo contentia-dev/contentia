@@ -300,12 +300,12 @@ importers:
       '@types/node':
         specifier: catalog:types
         version: 24.13.3
+      contentia:
+        specifier: workspace:*
+        version: link:../../packages/contentia
       hono:
         specifier: catalog:server
         version: 4.12.31
-      laikacms:
-        specifier: workspace:*
-        version: link:../../packages/laikacms
       rimraf:
         specifier: catalog:tools
         version: 6.1.3
@@ -321,18 +321,18 @@ importers:
 
   apps/vscode:
     devDependencies:
+      '@contentia/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@types/node':
         specifier: catalog:types
         version: 24.13.3
       '@types/vscode':
         specifier: ^1.90.0
         version: 1.140.0
-      laikacli:
+      contentia:
         specifier: workspace:*
-        version: link:../cli
-      laikacms:
-        specifier: workspace:*
-        version: link:../../packages/laikacms
+        version: link:../../packages/contentia
       rimraf:
         specifier: catalog:tools
         version: 6.1.3
@@ -348,7 +348,7 @@ importers:
 
   apps/vscode/fixtures/playground:
     devDependencies:
-      laikacli:
+      '@contentia/cli':
         specifier: workspace:*
         version: link:../../../cli
 
@@ -370,7 +370,7 @@ importers:
       '@astrojs/react':
         specifier: catalog:astro
         version: 6.0.2(@types/node@24.13.3)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(esbuild@0.28.0)(jiti@2.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.97.3)(supports-color@7.2.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0)
-      '@laikacms/astro':
+      '@contentia/astro':
         specifier: workspace:*
         version: link:../../packages/astro
       '@tailwindcss/vite':
@@ -403,12 +403,12 @@ importers:
       '@scalar/api-reference':
         specifier: catalog:docs
         version: 1.73.1(axios@1.16.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0))(jwt-decode@4.0.0)(nprogress@0.2.0)(supports-color@7.2.0)(tailwindcss@4.3.3)(typescript@6.0.3)(zod@4.4.3)
+      contentia:
+        specifier: workspace:*
+        version: link:../packages/contentia
       js-yaml:
         specifier: 'catalog:'
         version: 5.2.1
-      laikacms:
-        specifier: workspace:*
-        version: link:../packages/laikacms
       mermaid:
         specifier: catalog:docs
         version: 12.1.0
@@ -433,15 +433,15 @@ importers:
 
   packages/astro:
     dependencies:
-      '@laikacms/vite-plugin':
+      '@contentia/vite-plugin':
         specifier: workspace:*
         version: link:../vite-plugin
       '@types/json-schema':
         specifier: catalog:types
         version: 7.0.15
-      laikacms:
+      contentia:
         specifier: workspace:*
-        version: link:../laikacms
+        version: link:../contentia
     devDependencies:
       '@types/node':
         specifier: catalog:types
@@ -461,12 +461,12 @@ importers:
 
   packages/bitbucket:
     dependencies:
+      contentia:
+        specifier: workspace:*
+        version: link:../contentia
       effect:
         specifier: catalog:default
         version: 4.0.0-beta.104
-      laikacms:
-        specifier: workspace:*
-        version: link:../laikacms
       minimatch:
         specifier: 'catalog:'
         version: 10.2.5
@@ -484,63 +484,7 @@ importers:
         specifier: catalog:tools
         version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/github:
-    dependencies:
-      '@octokit/auth-app':
-        specifier: catalog:octokit
-        version: 7.2.2
-      '@octokit/rest':
-        specifier: catalog:octokit
-        version: 22.0.1
-      effect:
-        specifier: catalog:default
-        version: 4.0.0-beta.104
-      laikacms:
-        specifier: workspace:*
-        version: link:../laikacms
-      minimatch:
-        specifier: 'catalog:'
-        version: 10.2.5
-    devDependencies:
-      '@types/node':
-        specifier: catalog:types
-        version: 24.13.3
-      rimraf:
-        specifier: catalog:tools
-        version: 6.1.3
-      typescript:
-        specifier: catalog:tools
-        version: 6.0.3
-      vitest:
-        specifier: catalog:tools
-        version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/gitlab:
-    dependencies:
-      effect:
-        specifier: catalog:default
-        version: 4.0.0-beta.104
-      laikacms:
-        specifier: workspace:*
-        version: link:../laikacms
-      minimatch:
-        specifier: 'catalog:'
-        version: 10.2.5
-    devDependencies:
-      '@types/node':
-        specifier: catalog:types
-        version: 24.13.3
-      rimraf:
-        specifier: catalog:tools
-        version: 6.1.3
-      typescript:
-        specifier: catalog:tools
-        version: 6.0.3
-      vitest:
-        specifier: catalog:tools
-        version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
-
-  packages/laikacms:
+  packages/contentia:
     dependencies:
       '@standard-schema/spec':
         specifier: catalog:schema
@@ -592,14 +536,70 @@ importers:
         specifier: catalog:tools
         version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
 
-  packages/server:
+  packages/github:
     dependencies:
+      '@octokit/auth-app':
+        specifier: catalog:octokit
+        version: 7.2.2
+      '@octokit/rest':
+        specifier: catalog:octokit
+        version: 22.0.1
+      contentia:
+        specifier: workspace:*
+        version: link:../contentia
       effect:
         specifier: catalog:default
         version: 4.0.0-beta.104
-      laikacms:
+      minimatch:
+        specifier: 'catalog:'
+        version: 10.2.5
+    devDependencies:
+      '@types/node':
+        specifier: catalog:types
+        version: 24.13.3
+      rimraf:
+        specifier: catalog:tools
+        version: 6.1.3
+      typescript:
+        specifier: catalog:tools
+        version: 6.0.3
+      vitest:
+        specifier: catalog:tools
+        version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/gitlab:
+    dependencies:
+      contentia:
         specifier: workspace:*
-        version: link:../laikacms
+        version: link:../contentia
+      effect:
+        specifier: catalog:default
+        version: 4.0.0-beta.104
+      minimatch:
+        specifier: 'catalog:'
+        version: 10.2.5
+    devDependencies:
+      '@types/node':
+        specifier: catalog:types
+        version: 24.13.3
+      rimraf:
+        specifier: catalog:tools
+        version: 6.1.3
+      typescript:
+        specifier: catalog:tools
+        version: 6.0.3
+      vitest:
+        specifier: catalog:tools
+        version: 4.1.10(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(@vitest/coverage-v8@4.1.10)(happy-dom@20.9.0)(vite@8.2.0(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.97.3)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  packages/server:
+    dependencies:
+      contentia:
+        specifier: workspace:*
+        version: link:../contentia
+      effect:
+        specifier: catalog:default
+        version: 4.0.0-beta.104
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: catalog:ai
@@ -628,12 +628,12 @@ importers:
 
   packages/vite-plugin:
     dependencies:
+      contentia:
+        specifier: workspace:*
+        version: link:../contentia
       es-module-lexer:
         specifier: 'catalog:'
         version: 2.3.1
-      laikacms:
-        specifier: workspace:*
-        version: link:../laikacms
       magic-string:
         specifier: 'catalog:'
         version: 1.1.0

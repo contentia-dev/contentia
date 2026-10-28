@@ -1,14 +1,14 @@
 /**
- * Email module for Laika CMS
+ * Email module for Contentia
  *
  * Provides a simple, provider-agnostic email interface that works in both
  * Cloudflare Workers and Node.js environments.
  *
- * @module @laikacms/server/oauth2
+ * @module @contentia/server/oauth2
  */
 
-import { TemplateLiteral as TL } from 'laikacms/core';
-import { addTimingJitter, generateSecureRandomString, hashPassword } from 'laikacms/crypto';
+import { TemplateLiteral as TL } from 'contentia/core';
+import { addTimingJitter, generateSecureRandomString, hashPassword } from 'contentia/crypto';
 import {
   type PasswordResetEmailVars,
   renderPasswordResetEmail,
@@ -210,7 +210,7 @@ export async function requestPasswordReset(
     callbacks,
     resetBaseUrl,
     fromEmail,
-    appName = 'Laika CMS',
+    appName = 'Contentia',
     supportEmail = fromEmail,
     tokenExpiration = 3600,
     messages = defaultMessages,
@@ -278,8 +278,8 @@ export async function requestPasswordReset(
  *
  * @example
  * ```typescript
- * import { resetPassword } from '@laikacms/server/oauth2';
- * import { hashPassword } from '@laikacms/server/oauth2';
+ * import { resetPassword } from '@contentia/server/oauth2';
+ * import { hashPassword } from '@contentia/server/oauth2';
  *
  * const result = await resetPassword(
  *   'abc123token',

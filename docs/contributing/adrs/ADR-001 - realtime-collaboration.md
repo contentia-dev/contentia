@@ -9,19 +9,19 @@ status: accepted
 
 ## Context
 
-LaikaCMS is a headless CMS whose storage layer is modelled around `StorageRepository` — an abstract
-class whose read operations return `LaikaTask<T>` (a single-value async stream) and whose listing
-operations return `LaikaStream<Atom, Done>` (a multi-value async generator). Every implementation —
-Cloudflare R2, Node.js filesystem, libSQL/SQLite via Drizzle — conforms to the same interface. The
-on-wire format is JSON:API, served by `storage-api/server.ts`, which currently has no ETag or
-`If-Match` headers, no versioning field in `AtomBase`, and no concept of a document session.
+Contentia is a headless CMS whose storage layer is modelled around `StorageRepository` — an abstract
+class whose read operations return `ContentiaTask<T>` (a single-value async stream) and whose
+listing operations return `ContentiaStream<Atom, Done>` (a multi-value async generator). Every
+implementation — Cloudflare R2, Node.js filesystem, libSQL/SQLite via Drizzle — conforms to the same
+interface. The on-wire format is JSON:API, served by `storage-api/server.ts`, which currently has no
+ETag or `If-Match` headers, no versioning field in `AtomBase`, and no concept of a document session.
 
-The editorial frontend is a lightly patched fork of Decap CMS. The `laika-backend.ts` adapter
+The editorial frontend is a lightly patched fork of Decap CMS. The `contentia-backend.ts` adapter
 translates Decap's `Implementation` interface (originally designed for Git-backed single-editor
-workflows) into LaikaCMS JSON:API calls. Decap has no built-in awareness of concurrent edits: two
+workflows) into Contentia JSON:API calls. Decap has no built-in awareness of concurrent edits: two
 editors opening the same entry both receive independent copies; whichever saves last silently wins.
 
-The LaikaCMS roadmap lists "Real-time collaboration" as a **planned** feature — it is not in scope
+The Contentia roadmap lists "Real-time collaboration" as a **planned** feature — it is not in scope
 for v1.0. Before the v1.0 API shapes freeze, the team should record a chosen direction so that
 future implementation work does not require breaking changes to the storage interface.
 
@@ -43,8 +43,9 @@ Under this model:
   record.
 - A lightweight sync server (e.g. `y-websocket` or a custom WebSocket handler at `/sync/:key`)
   brokers update messages between connected clients and persists the document state.
-- The `laika-backend.ts` adapter would need a second code path: instead of `persistEntry` calling
-  `PUT /objects/:key`, it would push a Yjs update and let the sync server handle persistence.
+- The `contentia-backend.ts` adapter would need a second code path: instead of `persistEntry`
+  calling `PUT /objects/:key`, it would push a Yjs update and let the sync server handle
+  persistence.
 - Decap's rich-text widget (currently CodeMirror-based) would be replaced with a Tiptap editor bound
   to a shared Yjs document, giving live cursors and tracked changes for free.
 
@@ -55,17 +56,18 @@ Under this model:
 - Offline-capable: clients accumulate updates locally and sync on reconnect.
 - Live cursors and presence come essentially for free through `y-protocols/awareness`.
 - Tiptap + Yjs is a well-documented, production-proven stack. Migrating Decap's rich-text widget to
-  Tiptap is a planned LaikaCMS goal anyway (for the `decap-widget-color` / `decap-widget-slug`
+  Tiptap is a planned Contentia goal anyway (for the `decap-widget-color` / `decap-widget-slug`
   trajectory).
 - The sync server can be stateless in terms of durable storage — it rehydrates from the `yjsState`
   blob stored in the `StorageObject` and keeps in-memory state only while a document has active
   connections.
 
-**Cons relative to LaikaCMS's architecture**
+**Cons relative to Contentia's architecture**
 
 - **`StorageRepository` must be extended.** `AtomBase` has no version field. The sync server needs
-  either a dedicated persistence call (e.g. `persistYjsState(key, state): LaikaTask<void>`) or an
-  out-of-band store. Neither fits the current `StorageObjectUpdate` shape without a breaking change.
+  either a dedicated persistence call (e.g. `persistYjsState(key, state): ContentiaTask<void>`) or
+  an out-of-band store. Neither fits the current `StorageObjectUpdate` shape without a breaking
+  change.
 - **WebSocket infrastructure required on every deployment target.** Cloudflare Workers only support
   WebSockets via Durable Objects (a paid add-on); R2 alone cannot host a stateful WebSocket room.
   Node.js filesystem deployments need a WebSocket layer in front of the existing HTTP handler. This
@@ -73,10 +75,10 @@ Under this model:
   static/edge-deployable CMS.
 - **Binary CRDT state grows indefinitely** unless compacted (Yjs calls this "snapshotting"). A
   compaction strategy must be implemented and tested for each storage backend.
-- **`LaikaStream<Atom, Done>` does not compose well with continuous push.** The current
+- **`ContentiaStream<Atom, Done>` does not compose well with continuous push.** The current
   `StorageRepository` interface is pull-based (you ask for items and they stream to you). Real-time
   push requires a separate WebSocket/SSE channel that sits outside the existing
-  `LaikaTask`/`LaikaStream` model — meaning a new abstraction is needed in `laikacms/core`.
+  `ContentiaTask`/`ContentiaStream` model — meaning a new abstraction is needed in `contentia/core`.
 - **Decap is a large, legacy React codebase.** Replacing its rich-text widget with Tiptap+Yjs is
   non-trivial and might require maintaining a parallel Decap build for the transition period.
 
@@ -90,7 +92,7 @@ Under this model:
 4. Implement a WebSocket sync endpoint in `storage-api/server.ts` (or a sidecar service).
 5. Implement `y-websocket`-compatible room persistence against each `StorageRepository` backend (R2,
    filesystem, libSQL).
-6. Update `laika-backend.ts` to detect CRDT capability and use the Yjs path instead of
+6. Update `contentia-backend.ts` to detect CRDT capability and use the Yjs path instead of
    `persistEntry`.
 
 ---
@@ -104,21 +106,21 @@ Before a user opens an entry for editing, the frontend acquires a short-lived ex
 warning). The editing client must refresh the lock periodically; it is released on save or explicit
 close. If the network drops and the lock expires, another editor may acquire it.
 
-**Pros relative to LaikaCMS's architecture**
+**Pros relative to Contentia's architecture**
 
 - **Minimal storage layer changes.** A lock is just a `StorageObject` at a well-known key (e.g.
   `_locks/:key`) or a new `locks` table in the libSQL backend. `StorageRepository` can model lock
   acquire/release as `createObject` / `removeAtoms` calls against a dedicated namespace — no new
   abstract methods required.
-- **Preserves existing JSON:API surface.** `laika-backend.ts` calls `GET /_locks/:key` before
+- **Preserves existing JSON:API surface.** `contentia-backend.ts` calls `GET /_locks/:key` before
   opening the edit form and `DELETE /_locks/:key` on close. No WebSocket or SSE infrastructure is
   needed.
 - **Simple to reason about.** Editors either have the lock or they do not. There is no merge logic,
   no binary state to compact, no CRDT library to learn.
 - **Works on every current deployment target** — filesystem, R2, libSQL — without new
   infrastructure. Lock objects are just ordinary `StorageObject`s.
-- **Composable with `LaikaTask`/`LaikaStream`.** Lock operations map cleanly onto single-value
-  `LaikaTask` calls. No new core abstractions needed.
+- **Composable with `ContentiaTask`/`ContentiaStream`.** Lock operations map cleanly onto
+  single-value `ContentiaTask` calls. No new core abstractions needed.
 
 **Cons**
 
@@ -145,7 +147,7 @@ close. If the network drops and the lock expires, another editor may acquire it.
 2. Implement lock-sweep background task or delegate to Cloudflare Durable Object alarms (R2
    deployments).
 3. Update `Capabilities` to advertise `pessimisticLocking: { supported: boolean }`.
-4. Add lock-check calls to `laika-backend.ts` in the `getEntry` and `persistEntry` methods.
+4. Add lock-check calls to `contentia-backend.ts` in the `getEntry` and `persistEntry` methods.
 5. Add UI in the Decap fork to show lock status and "steal lock" affordance.
 
 ---
@@ -183,7 +185,7 @@ schema change later:
 **Cons**
 
 - **Two simultaneous editors will silently lose each other's work.** For anything beyond a
-  one-person editorial workflow this is a data-integrity risk. Teams using LaikaCMS with more than
+  one-person editorial workflow this is a data-integrity risk. Teams using Contentia with more than
   one editor must establish out-of-band coordination (e.g. "ping in Slack before editing").
 - **Deferred decisions tend to stay deferred.** Without a concrete follow-up issue and milestone,
   real-time collaboration may never ship.
@@ -206,7 +208,7 @@ schema change later:
 
 **Rationale:**
 
-- LaikaCMS v1.0 is explicitly scoped to establishing a stable, deployable headless CMS core.
+- Contentia v1.0 is explicitly scoped to establishing a stable, deployable headless CMS core.
   Real-time collaboration is a "Planned" roadmap item, not a "v1.0" item. Introducing WebSocket
   infrastructure or a locking protocol now would delay shipping and risk destabilising the storage
   interface before it has stabilised.
@@ -217,7 +219,7 @@ schema change later:
   multi-editor team), the **lowest-complexity path is pessimistic locking (Option 2)**. It requires
   no new core abstractions, no new infrastructure on any current deployment target, and can be added
   as an optional capability layer on top of the existing `StorageRepository` interface without
-  touching `LaikaTask` or `LaikaStream`.
+  touching `ContentiaTask` or `ContentiaStream`.
 - For the **long-term v2.0+ horizon**, CRDTs via Yjs are the best fit for rich-text editing: the
   Tiptap+Yjs ecosystem is mature, the Decap-to-Tiptap migration is already directionally desired,
   and the offline-first / no-conflict semantics are superior to locking for distributed editorial
@@ -239,7 +241,7 @@ schema change later:
 - The storage API surface (`AtomBase`, `Capabilities`, `StorageRepository`) gains two small reserved
   fields but is otherwise unchanged. All existing backend implementations continue to compile and
   pass tests without modification.
-- `laika-backend.ts` and the Decap frontend are unchanged. Last-write-wins behaviour continues.
+- `contentia-backend.ts` and the Decap frontend are unchanged. Last-write-wins behaviour continues.
 - A future implementer of pessimistic locking (Option 2) can add it as an optional
   `StorageRepository` capability without a major version bump because the `Capabilities` schema
   already reserves the `collaborationCapability` key.
@@ -253,7 +255,7 @@ schema change later:
 - A new `StorageObjectLock` type and `_locks/` namespace convention must be defined.
 - `Capabilities` gains
   `collaborationCapability: { supported: true, strategy: 'pessimistic-locking', ttlSeconds: number }`.
-- `laika-backend.ts` must call lock-acquire before rendering the edit form and lock-release on
+- `contentia-backend.ts` must call lock-acquire before rendering the edit form and lock-release on
   save/close.
 - All deployment target implementations must handle lock TTL cleanup.
 
@@ -264,7 +266,7 @@ schema change later:
 - `storage-api/server.ts` gains a WebSocket upgrade handler (or a sidecar `y-websocket` process).
 - Each backend implementation (R2, filesystem, libSQL) must implement CRDT state storage and
   compaction.
-- `laika-backend.ts` gains a Yjs provider initialization path.
+- `contentia-backend.ts` gains a Yjs provider initialization path.
 - Decap's rich-text widget is migrated from CodeMirror to Tiptap + Yjs.
 - The `Capabilities.collaborationCapability` field changes to
   `{ supported: true, strategy: 'crdt-yjs', syncEndpoint: string }`.

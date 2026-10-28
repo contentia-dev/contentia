@@ -3,10 +3,10 @@
   "tasks": [
     {
       // One-off build before launch. For the edit loop, run `pnpm dev` (or
-      // `pnpm turbo watch dev --filter laika-vscode...`) alongside the debugger.
-      "label": "laika: build extension and cli",
+      // `pnpm turbo watch dev --filter contentia-vscode...`) alongside the debugger.
+      "label": "contentia: build extension and cli",
       "type": "shell",
-      "command": "pnpm turbo run build --filter laika-vscode...",
+      "command": "pnpm turbo run build --filter contentia-vscode...",
       "problemMatcher": []
     }
   ]

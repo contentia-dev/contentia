@@ -24,16 +24,16 @@ import { renderPasswordResetEmail, renderPasswordResetText } from './templates/p
 import type { PasswordResetEmailVars } from './templates/password-reset-email.js';
 
 // ---------------------------------------------------------------------------
-// Mock laikacms/crypto so tests don't run bcrypt (slow) or timing delays
+// Mock contentia/crypto so tests don't run bcrypt (slow) or timing delays
 // ---------------------------------------------------------------------------
 
-vi.mock('laikacms/crypto', () => ({
+vi.mock('contentia/crypto', () => ({
   addTimingJitter: vi.fn().mockResolvedValue(undefined),
   generateSecureRandomString: vi.fn().mockImplementation((len: number) => 'x'.repeat(len)),
   hashPassword: vi.fn().mockImplementation(async (pw: string) => `hashed:${pw}`),
 }));
 
-import { addTimingJitter, hashPassword } from 'laikacms/crypto';
+import { addTimingJitter, hashPassword } from 'contentia/crypto';
 
 // ---------------------------------------------------------------------------
 // Shared test fixtures

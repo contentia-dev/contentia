@@ -13,5 +13,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   dts: false,
-  noExternal: ['laikacms'],
+  noExternal: ['contentia'],
 });

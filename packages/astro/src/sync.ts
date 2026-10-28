@@ -1,13 +1,13 @@
 /**
- * Keeping Astro's content store in step with a Laika repository.
+ * Keeping Astro's content store in step with a Contentia repository.
  *
  * Astro's Content Layer persists its store between builds and hands the loader
- * a `meta` KV store "designed for things like sync tokens". Laika repositories
+ * a `meta` KV store "designed for things like sync tokens". Contentia repositories
  * expose a matching pull feed — `getSyncToken` / `listChanges` — plus per-record
  * `version` tokens. Wiring the two together is most of this package's value:
  * without it, every build re-reads, re-parses and re-renders every document.
  *
- * The catch is that both Laika features are capability-gated and most backends
+ * The catch is that both Contentia features are capability-gated and most backends
  * advertise neither. So rather than one strategy this module implements four,
  * ordered by how much the repository is willing to tell us, and picks the best
  * available. The bottom tier needs no capabilities at all, which means the
@@ -48,10 +48,10 @@ export interface SyncOptions {
  */
 export const MAPPING_VERSION = '1';
 
-const META_SYNC_TOKEN = 'laika:syncToken';
-const META_COLLECTION = 'laika:collection';
-const META_STRATEGY = 'laika:strategy';
-const META_MAPPING_VERSION = 'laika:mappingVersion';
+const META_SYNC_TOKEN = 'contentia:syncToken';
+const META_COLLECTION = 'contentia:collection';
+const META_STRATEGY = 'contentia:strategy';
+const META_MAPPING_VERSION = 'contentia:mappingVersion';
 
 /** What a change feed reports, from either the pull feed or a push subscription. */
 export interface KeyChange {
@@ -168,9 +168,9 @@ function invalidateStaleStore(context: SyncContext): boolean {
 
 /** Read the change batch the integration pushed through `refreshContent`. */
 function pushedChanges(data: Record<string, unknown> | undefined): KeyChange[] | undefined {
-  const laika = data?.['laika'];
-  if (typeof laika !== 'object' || laika === null) return undefined;
-  const changes = (laika as { changes?: unknown }).changes;
+  const contentia = data?.['contentia'];
+  if (typeof contentia !== 'object' || contentia === null) return undefined;
+  const changes = (contentia as { changes?: unknown }).changes;
   if (!Array.isArray(changes) || changes.length === 0) return undefined;
   return changes.every(isKeyChange) ? changes : undefined;
 }

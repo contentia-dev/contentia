@@ -4,25 +4,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { StorageJsonApiProxyRepository } from 'laikacms/storage/jsonapi-proxy';
+import { StorageJsonApiProxyRepository } from 'contentia/storage/jsonapi-proxy';
 
 import { listStorageFolder } from '../explorer/listing.js';
 import type { CliInvocation } from './resolve-cli.js';
 import { type RunningServer, startServe } from './serve-process.js';
 
-// The contract between the extension and laikacli: the real, locally built CLI
+// The contract between the extension and contentia: the real, locally built CLI
 // started the way the extension starts it, browsed the way the trees browse it.
 // A change to `serve --json` output that the extension can't read fails here.
 const cliEntry = fileURLToPath(new URL('../../../cli/dist/cli.js', import.meta.url));
 const cli: CliInvocation = { command: 'node', args: [cliEntry], source: 'env', shell: false };
 
-describe('startServe against the local laikacli build', () => {
+describe('startServe against the local contentia build', () => {
   let root: string;
   let server: RunningServer | undefined;
   const logs: string[] = [];
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'laika-vscode-'));
+    root = await mkdtemp(path.join(tmpdir(), 'contentia-vscode-'));
     await mkdir(path.join(root, 'posts'));
     await writeFile(path.join(root, 'posts', 'hello.md'), '---\ntitle: Hello\n---\n# Hello\n');
     await writeFile(path.join(root, 'settings.json'), '{"title":"Site"}');

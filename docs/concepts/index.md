@@ -1,10 +1,10 @@
 # Concepts
 
-The mental model behind Laika. Read this section once and the guides and API reference will make
+The mental model behind Contentia. Read this section once and the guides and API reference will make
 sense on their own.
 
-Laika is, at its core, a **CMS-agnostic protocol**: a small set of repository contracts over content
-that knows nothing about any particular editing UI. CMS-specific behaviour lives in _CMS
+Contentia is, at its core, a **CMS-agnostic protocol**: a small set of repository contracts over
+content that knows nothing about any particular editing UI. CMS-specific behaviour lives in _CMS
 integrations_ built on top. These pages explain how that fits together.
 
 - **[Architecture](./architecture)** — the four layers (API, domain, implementation, shared), the

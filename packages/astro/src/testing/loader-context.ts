@@ -8,7 +8,7 @@
  * lets the loader tests assert on *store traffic* (`set` / `delete` counts),
  * which is the property that actually distinguishes the sync tiers.
  *
- * Exported from `@laikacms/astro/testing` so a future framework adapter with the
+ * Exported from `@contentia/astro/testing` so a future framework adapter with the
  * same loader shape can reuse it rather than growing a second copy.
  */
 

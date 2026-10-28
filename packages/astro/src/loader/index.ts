@@ -1,8 +1,8 @@
 export {
   type AstroCollection,
   type CollectionOverride,
-  laikaCollections,
-  type LaikaCollectionsOptions,
+  contentiaCollections,
+  type ContentiaCollectionsOptions,
 } from '../collections.js';
 export {
   createDocumentsSyncSource,
@@ -14,11 +14,11 @@ export {
 } from '../documents-loader.js';
 export { jsonSchemaToZod, type ZodNamespace, type ZodTypeLike } from '../json-schema-to-zod.js';
 export {
+  type ContentiaLoader,
   DEFAULT_BODY_FIELD,
   entryIdOf,
   type EntryOptions,
   keyOf,
-  type LaikaLoader,
   type RenderOptions,
   type SourceRecord,
 } from '../mapping.js';
@@ -29,5 +29,5 @@ export {
   type ObjectsLoaderOptions,
   type ObjectsSyncOptions,
 } from '../objects-loader.js';
-export { type CatalogChoice, DEFAULT_CONFIG_KEY, type LaikaRepositoryOptions } from '../repositories.js';
+export { type CatalogChoice, type ContentiaRepositoryOptions, DEFAULT_CONFIG_KEY } from '../repositories.js';
 export { MAPPING_VERSION, type SyncOptions, type SyncStrategy } from '../sync.js';

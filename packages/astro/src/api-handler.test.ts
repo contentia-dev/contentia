@@ -12,18 +12,18 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { runTask } from 'laikacms/compat';
+import { runTask } from 'contentia/compat';
 
 import { createApiHandler } from './api-handler.js';
-import { type LaikaRepositories, resolveRepositories } from './repositories.js';
+import { type ContentiaRepositories, resolveRepositories } from './repositories.js';
 
-const BASE = '/api/laika';
+const BASE = '/api/contentia';
 const tempDirs: string[] = [];
 
-let repositories: LaikaRepositories;
+let repositories: ContentiaRepositories;
 
 beforeEach(async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-api-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-api-'));
   tempDirs.push(dir);
   await fs.mkdir(path.join(dir, 'posts'), { recursive: true });
   repositories = resolveRepositories({ dir: '.', defaultExtension: 'md' }, dir);

@@ -5,14 +5,14 @@ note: >-
   origin.
 items:
   - name: AWS S3
-    sub: '@laikacms/aws'
+    sub: '@contentia/aws'
     icon: { img: aws }
   - name: Azure Blob
-    sub: '@laikacms/azure'
+    sub: '@contentia/azure'
     icon: { img: azure }
   - name: Backblaze B2
-    sub: '@laikacms/backblaze'
+    sub: '@contentia/backblaze'
     icon: { si: backblaze }
   - name: Vercel Blob
-    sub: '@laikacms/vercel'
+    sub: '@contentia/vercel'
     icon: { si: vercel }

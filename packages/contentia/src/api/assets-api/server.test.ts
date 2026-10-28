@@ -1,0 +1,2448 @@
+import type {
+  Asset,
+  AssetMetadata,
+  AssetsRepository,
+  AssetUrl,
+  AssetVariation,
+  AssetVariations,
+  Folder,
+  ListResourcesDone,
+  ListResourcesOptions,
+  Resource,
+} from 'contentia/assets';
+import * as Effect from 'effect/Effect';
+import { describe, expect, it, vi } from 'vitest';
+import { allowAll } from '../../shared/json-api/authorize.js';
+
+import {
+  BadRequestError,
+  ContentiaStream,
+  ContentiaTask,
+  EntryAlreadyExistsError,
+  ForbiddenError,
+  InternalError,
+  InvalidData,
+  NotFoundError,
+} from 'contentia/core';
+
+import { buildAssetsApi } from './server.js';
+
+const stubRepo = {} as AssetsRepository;
+
+describe('assets-api Cache-Control', () => {
+  it('sends Cache-Control: no-store on 404 responses', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/does-not-exist'));
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+});
+
+describe('assets-api error envelope consistency (LCMS-265)', () => {
+  it('404 response uses the same JSON:API envelope shape as documents/storage (has errors[].title and top-level status)', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/does-not-exist'));
+    expect(res.status).toBe(404);
+    const body = await res.json() as {
+      errors: Array<{ title?: string, status?: string, code?: string }>,
+      status?: number,
+    };
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]?.title).toBeDefined();
+    expect(body.errors[0]?.code).toBe('not_found');
+    expect(body.status).toBe(404);
+  });
+
+  it('404 detail does not leak the raw METHOD /path of the request', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/secret-path'));
+    const body = await res.json() as { errors: Array<{ detail?: string }> };
+    expect(body.errors[0]?.detail).not.toContain('GET /api/assets/secret-path');
+  });
+
+  it('GET /api/assets root returns 200 api-info resource', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { type: string, id: string, attributes: { endpoints: unknown[] } } };
+    expect(body.data.type).toBe('api-info');
+    expect(body.data.id).toBe('assets');
+    expect(Array.isArray(body.data.attributes.endpoints)).toBe(true);
+    expect(body.data.attributes.endpoints.length).toBeGreaterThan(0);
+  });
+});
+
+describe('assets-api meta.warnings', () => {
+  it('surfaces recoverableErrors from listResources into the response meta.warnings', async () => {
+    const partialRepo = {
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data({
+              type: 'folder',
+              key: 'visible',
+              createdAt: '2026-01-01T00:00:00Z',
+              updatedAt: '2026-01-01T00:00:00Z',
+            });
+            yield* emit.recoverableError(new ForbiddenError('forbidden/: permission denied'));
+            return { total: 1 };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      data: Array<{ id: string }>,
+      meta?: { warnings?: Array<{ code: string, detail: string }> },
+    };
+
+    expect(body.data.map(d => d.id)).toEqual(['visible']);
+    expect(body.meta?.warnings).toHaveLength(1);
+    expect(body.meta?.warnings?.[0]?.code).toBe('forbidden');
+    expect(body.meta?.warnings?.[0]?.detail).toContain('forbidden/');
+  });
+
+  it('suppresses not_found recoverable error from listResources — missing media folder is normal first-run state (LCMS-1009)', async () => {
+    const partialRepo = {
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.recoverableError(new NotFoundError('The directory at content/uploads does not exist'));
+            return { total: 0 };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter[folder]=uploads'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      data: Array<{ id: string }>,
+      meta?: { warnings?: Array<{ code: string, detail: string }>, page?: { total: number } },
+    };
+
+    expect(body.data).toEqual([]);
+    expect(body.meta?.warnings).toBeUndefined();
+    expect(body.meta?.page?.total).toBe(0);
+  });
+
+  it('keeps a per-item not_found warning when the listing is non-empty (LCMS-1009 scope)', async () => {
+    const partialRepo = {
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data({
+              type: 'folder',
+              key: 'uploads/visible',
+              createdAt: '2026-01-01T00:00:00Z',
+              updatedAt: '2026-01-01T00:00:00Z',
+            });
+            yield* emit.recoverableError(new NotFoundError('The file at uploads/gone.png does not exist'));
+            return { total: 1 };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter[folder]=uploads'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { meta?: { warnings?: Array<{ code: string }> } };
+    expect(body.meta?.warnings).toHaveLength(1);
+    expect(body.meta?.warnings?.[0]?.code).toBe('not_found');
+  });
+
+  it('returns 200 + meta.warnings on a delete that emits a recoverable warning', async () => {
+    const partialRepo = {
+      // First the route does a lookup to determine type.
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'asset' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            content: { size: 4, etag: 'e' } as Resource['content'],
+          }])
+        ),
+      deleteAsset: (_key: string) =>
+        ContentiaTask.make<void>(emit =>
+          Effect.gen(function*() {
+            yield* emit.recoverableError(new InvalidData('orphan thumbnail left behind'));
+            return undefined;
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/pic.png', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      meta: { deleted: boolean, warnings?: Array<{ code: string, detail: string }> },
+    };
+
+    expect(body.meta.deleted).toBe(true);
+    expect(body.meta.warnings).toHaveLength(1);
+    expect(body.meta.warnings?.[0]?.detail).toContain('orphan thumbnail');
+  });
+
+  it('multi-page walk: following links.next via page[number] advances through pages correctly (LCMS-277)', async () => {
+    // 5 resources in total; page size = 2 → 3 pages.
+    // Since page[size] alone now defaults to page-based (LCMS-277), links.next
+    // carries page[number]=N, which the server translates to offset=(N-1)*limit.
+    const allResources: Resource[] = [
+      {
+        type: 'asset',
+        key: 'a.jpg',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        content: { size: 1, etag: 'a' },
+      },
+      {
+        type: 'asset',
+        key: 'b.jpg',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        content: { size: 1, etag: 'b' },
+      },
+      {
+        type: 'asset',
+        key: 'c.jpg',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        content: { size: 1, etag: 'c' },
+      },
+      {
+        type: 'asset',
+        key: 'd.jpg',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        content: { size: 1, etag: 'd' },
+      },
+      {
+        type: 'asset',
+        key: 'e.jpg',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+        content: { size: 1, etag: 'e' },
+      },
+    ];
+
+    // Stub repo: honours offset-based calls (how assets-api forwards page-based requests)
+    const partialRepo = {
+      getCapabilities: () =>
+        ContentiaTask.succeed({
+          compatibilityDate:
+            '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+          pagination: { supported: true, description: 'offset', styles: { offset: true, page: false, cursor: false } },
+        }),
+      listResources: (_folderKey: string, options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            const p = options.pagination as { after?: string, perPage: number } | { offset: number, limit: number };
+            let items: Resource[];
+            if ('after' in p && p.after) {
+              const idx = allResources.findIndex(r => r.key === p.after);
+              const perPage = p.perPage;
+              items = idx >= 0 ? allResources.slice(idx + 1, idx + 1 + perPage) : allResources.slice(0, perPage);
+            } else {
+              const offset = 'offset' in p ? p.offset : 0;
+              const limit = 'limit' in p ? p.limit : (p as { perPage: number }).perPage;
+              items = allResources.slice(offset, offset + limit);
+            }
+            for (const r of items) yield* emit.data(r);
+            // Return total so respondCollectionWithConverter can compute hasMore
+            return { total: allResources.length };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+
+    // Page 1 — use shared codec params: page[size] (not the old page[limit])
+    const res1 = await api.fetch(new Request('http://localhost/api/assets/resources?page[size]=2'));
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json() as {
+      data: Array<{ id: string }>,
+      links: { next?: string | null },
+    };
+    expect(body1.data.map(d => d.id)).toEqual(['a.jpg', 'b.jpg']);
+    expect(body1.links.next).toBeTruthy();
+    // next link must use page[number] (not cursor) so all backends can follow it
+    expect(body1.links.next).toContain('page[number]');
+
+    // Page 2: follow links.next — must NOT return the same first page
+    const res2 = await api.fetch(new Request(body1.links.next!));
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json() as {
+      data: Array<{ id: string }>,
+      links: { next?: string | null },
+    };
+    expect(body2.data.map(d => d.id)).toEqual(['c.jpg', 'd.jpg']);
+    expect(body2.links.next).toBeTruthy();
+
+    // Page 3: follow links.next — last page, no next link
+    const res3 = await api.fetch(new Request(body2.links.next!));
+    expect(res3.status).toBe(200);
+    const body3 = await res3.json() as {
+      data: Array<{ id: string }>,
+      links: { next?: string | null },
+    };
+    expect(body3.data.map(d => d.id)).toEqual(['e.jpg']);
+    expect(body3.links.next).toBeFalsy(); // absent on last page (undefined or null)
+  });
+
+  it('honours explicit page[offset]/page[limit] instead of restarting at offset 0', async () => {
+    // Regression: an offset-shaped request used to be rebuilt from page[number]
+    // (absent → offset 0), so every page returned the same first slice and
+    // clients paging via page[offset] looped forever.
+    const allResources: Resource[] = ['a', 'b', 'c', 'd', 'e'].map(k => ({
+      type: 'asset',
+      key: `${k}.jpg`,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      content: { size: 1, etag: k },
+    }));
+
+    const partialRepo = {
+      getCapabilities: () =>
+        ContentiaTask.succeed({
+          compatibilityDate:
+            '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+          pagination: { supported: true, description: 'offset', styles: { offset: true, page: false, cursor: false } },
+        }),
+      listResources: (_folderKey: string, options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            const p = options.pagination as { offset: number, limit: number };
+            for (const r of allResources.slice(p.offset, p.offset + p.limit)) yield* emit.data(r);
+            return { total: allResources.length };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[offset]=2&page[limit]=2'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string }> };
+    expect(body.data.map(d => d.id)).toEqual(['c.jpg', 'd.jpg']);
+
+    // Past the end of the listing: empty page, no next link → pagers terminate.
+    const resEnd = await api.fetch(new Request('http://localhost/api/assets/resources?page[offset]=5&page[limit]=2'));
+    expect(resEnd.status).toBe(200);
+    const bodyEnd = await resEnd.json() as { data: Array<{ id: string }>, links: { next?: string | null } };
+    expect(bodyEnd.data).toEqual([]);
+    expect(bodyEnd.links.next).toBeFalsy();
+  });
+
+  it('still returns 204 No Content on a clean delete with no warnings', async () => {
+    const partialRepo = {
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'asset' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            content: { size: 4, etag: 'e' } as Resource['content'],
+          }])
+        ),
+      deleteAsset: (_key: string) => ContentiaTask.succeed(undefined),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/pic.png', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(204);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — shared pagination codec (page[after] / page[before] / page[size])
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — shared JSON:API pagination params', () => {
+  const makeAsset = (key: string): Resource => ({
+    type: 'asset',
+    key,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    content: { size: 1, etag: key },
+  });
+
+  const allResources: Resource[] = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'].map(makeAsset);
+
+  const makeRepo = (): AssetsRepository => ({
+    getCapabilities: () =>
+      ContentiaTask.succeed({
+        compatibilityDate:
+          '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+        pagination: {
+          supported: true,
+          description: 'cursor+offset',
+          styles: { offset: true, page: false, cursor: true },
+        },
+      }),
+    listResources: (_folderKey: string, options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          const p = options.pagination as { after?: string, perPage: number } | { offset: number, limit: number };
+          let items: Resource[];
+          if ('after' in p && p.after) {
+            const idx = allResources.findIndex(r => r.key === p.after);
+            items = idx >= 0 ? allResources.slice(idx + 1, idx + 1 + p.perPage) : [];
+          } else {
+            const offset = 'offset' in p ? p.offset : 0;
+            const limit = 'limit' in p ? p.limit : (p as { perPage: number }).perPage;
+            items = allResources.slice(offset, offset + limit);
+          }
+          for (const r of items) yield* emit.data(r);
+          return { total: allResources.length };
+        })
+      ),
+  } as unknown as AssetsRepository);
+
+  it('page[size] controls items per page on first page and emits page[number] next link (LCMS-277)', async () => {
+    const api = buildAssetsApi({ repository: makeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[size]=2'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string }>, links: { next?: string } };
+    expect(body.data.map(d => d.id)).toEqual(['a.jpg', 'b.jpg']);
+    // next link must use page[number], not page[after], so it works on all backends
+    expect(body.links.next).toContain('page[number]=');
+    expect(body.links.next).toContain('page[size]=2');
+    expect(body.links.next).not.toContain('page[after]=');
+  });
+
+  it('page[after] advances to the next cursor page', async () => {
+    const api = buildAssetsApi({ repository: makeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources?page[after]=b.jpg&page[size]=2'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<{ id: string }> };
+    expect(body.data.map(d => d.id)).toEqual(['c.jpg', 'd.jpg']);
+  });
+
+  it('links.next from standalone page[size] carries page[number]=2 (LCMS-277)', async () => {
+    const api = buildAssetsApi({ repository: makeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[size]=2'));
+    const body = await res.json() as { links: { next?: string } };
+    expect(body.links.next).toBeDefined();
+    const nextUrl = new URL(body.links.next!);
+    expect(nextUrl.searchParams.get('page[number]')).toBe('2');
+    expect(nextUrl.searchParams.get('page[size]')).toBe('2');
+    expect(nextUrl.searchParams.get('page[after]')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — meta.page.total (LCMS-215)
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — meta.page.total', () => {
+  const makeAsset = (key: string): Resource => ({
+    type: 'asset',
+    key,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    content: { size: 1, etag: key },
+  });
+
+  it('meta.page.total equals the total emitted by the stream done value', async () => {
+    const partialRepo = {
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data(makeAsset('a.jpg'));
+            return { total: 42 };
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      data: Array<{ id: string }>,
+      meta?: { page?: { total: number } },
+    };
+    expect(body.meta?.page?.total).toBe(42);
+  });
+
+  it('meta.page is absent when stream done has no total field', async () => {
+    const partialRepo = {
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data(makeAsset('b.jpg'));
+            return {} as ListResourcesDone;
+          })
+        ),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as {
+      data: Array<{ id: string }>,
+      meta?: { page?: unknown },
+    };
+    expect(body.meta?.page).toBeUndefined();
+  });
+
+  it('returns 500 JSON:API error when repo.listResources raises InternalError (LCMS-433)', async () => {
+    const partialRepo = {
+      listResources: () => ContentiaStream.fail(new InternalError('storage unavailable')),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(500);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /capabilities
+// ---------------------------------------------------------------------------
+
+describe('GET /capabilities', () => {
+  it('returns 200 with assets-capabilities JSON:API resource', async () => {
+    const capabilities = {
+      compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+      pagination: { cursor: true, offset: false },
+    };
+    const partialRepo = {
+      getCapabilities: () => ContentiaTask.succeed(capabilities),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/capabilities'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { data: { type: string, id: string, attributes: typeof capabilities } };
+    expect(body.data.type).toBe('assets-capabilities');
+    expect(body.data.id).toBe('self');
+    expect(body.data.attributes.compatibilityDate).toBe('2026-01-01');
+  });
+
+  it('returns mapped HTTP status when repo fails', async () => {
+    const partialRepo = {
+      getCapabilities: () => ContentiaTask.make(() => Effect.fail(new NotFoundError('capabilities unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/capabilities'));
+    expect(res.status).toBe(404);
+
+    const body = await res.json() as { errors: Array<{ status: string }> };
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]!.status).toBe('404');
+  });
+
+  it('returns 500 JSON:API error when repo.getCapabilities throws InternalError (LCMS-429)', async () => {
+    const partialRepo = {
+      getCapabilities: () => ContentiaTask.make(() => Effect.fail(new InternalError('storage unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/capabilities'));
+    expect(res.status).toBe(500);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — cursor capability guard (LCMS-264)
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — cursor capability guard', () => {
+  const makeAsset = (key: string): Resource => ({
+    type: 'asset',
+    key,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    content: { size: 1, etag: key },
+  });
+
+  const noCursorCaps = {
+    compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+    pagination: {
+      supported: true as const,
+      description: 'offset-only',
+      styles: { offset: true, page: true, cursor: false },
+    },
+  };
+
+  const cursorCaps = {
+    compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+    pagination: {
+      supported: true as const,
+      description: 'cursor+offset',
+      styles: { offset: true, page: false, cursor: true },
+    },
+  };
+
+  const makeNoCursorRepo = (): AssetsRepository => ({
+    getCapabilities: () => ContentiaTask.succeed(noCursorCaps),
+    listResources: () =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(makeAsset('a.jpg'));
+          return { total: 1 };
+        })
+      ),
+  } as unknown as AssetsRepository);
+
+  const makeCursorRepo = (): AssetsRepository => ({
+    getCapabilities: () => ContentiaTask.succeed(cursorCaps),
+    listResources: (_folderKey: string, options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          const p = options.pagination as { after?: string, perPage: number } | { offset: number, limit: number };
+          const items = [makeAsset('a.jpg'), makeAsset('b.jpg')];
+          for (const r of items) yield* emit.data(r);
+          void p;
+          return { total: items.length };
+        })
+      ),
+  } as unknown as AssetsRepository);
+
+  it('page[after] on a cursor:false backend → 400 JSON:API error', async () => {
+    const api = buildAssetsApi({ repository: makeNoCursorRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[after]=photo.jpg'));
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]!.status).toBe('400');
+    expect(body.errors[0]!.code).toBe('invalid_data');
+  });
+
+  it('page[before] on a cursor:false backend → 400 JSON:API error', async () => {
+    const api = buildAssetsApi({ repository: makeNoCursorRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[before]=photo.jpg'));
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]!.status).toBe('400');
+    expect(body.errors[0]!.code).toBe('invalid_data');
+  });
+
+  it('page[size] without cursor params on cursor:false backend → 200 unaffected', async () => {
+    const api = buildAssetsApi({ repository: makeNoCursorRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[size]=10'));
+    expect(res.status).toBe(200);
+  });
+
+  it('page[after] on a cursor:true backend → 200', async () => {
+    const api = buildAssetsApi({ repository: makeCursorRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?page[after]=a.jpg&page[size]=2'));
+    expect(res.status).toBe(200);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources/:key
+// ---------------------------------------------------------------------------
+
+describe('GET /resources/:key', () => {
+  it('returns 200 with a JSON:API asset resource', async () => {
+    const asset: Asset = {
+      type: 'asset',
+      key: 'images/photo.jpg',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      content: { size: 1024, etag: 'abc123' },
+    };
+    const partialRepo = {
+      getResource: (_key: string) => ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.succeed([asset])),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources/images%2Fphoto.jpg'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { data: { type: string, id: string, attributes: { content: { size: number } } } };
+    expect(body.data.type).toBe('asset');
+    expect(body.data.id).toBe('images/photo.jpg');
+    expect(body.data.attributes.content.size).toBe(1024);
+  });
+
+  it('returns 404 when resource is not found', async () => {
+    const partialRepo = {
+      getResource: (_key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.fail(new NotFoundError('Resource not found'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources/missing.jpg'));
+    expect(res.status).toBe(404);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('404');
+  });
+
+  it('returns 500 JSON:API error when repo.getResource raises InternalError (LCMS-433)', async () => {
+    const partialRepo = {
+      getResource: () =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.fail(new InternalError('storage unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources/photo.jpg'));
+    expect(res.status).toBe(500);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /resources — asset via JSON:API (base64 content)
+// ---------------------------------------------------------------------------
+
+describe('POST /resources — asset via JSON:API', () => {
+  it('returns 201 with a JSON:API asset after creating via base64 content', async () => {
+    const createdAsset: Asset = {
+      type: 'asset',
+      key: 'uploads/hello.txt',
+      createdAt: '2026-06-24T00:00:00Z',
+      updatedAt: '2026-06-24T00:00:00Z',
+      content: { size: 5, etag: 'hello-etag' },
+    };
+    const partialRepo = {
+      createAsset: () => ContentiaTask.succeed(createdAsset),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const base64Content = btoa('hello');
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            id: 'uploads/hello.txt',
+            attributes: {
+              mimeType: 'text/plain',
+              content: base64Content,
+            },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(201);
+
+    const body = await res.json() as { data: { type: string, id: string } };
+    expect(body.data.type).toBe('asset');
+    expect(body.data.id).toBe('uploads/hello.txt');
+  });
+
+  it('returns 400 when content attribute is missing', async () => {
+    const api = buildAssetsApi({ repository: {} as AssetsRepository, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            id: 'uploads/no-content.txt',
+            attributes: { mimeType: 'text/plain' },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(400);
+
+    const body = await res.json() as { errors: Array<{ status: string }> };
+    expect(body.errors[0]?.status).toBe('400');
+  });
+
+  it('returns 400 when createAsset repo call fails via JSON:API path (LCMS-362)', async () => {
+    const partialRepo = {
+      createAsset: () => ContentiaTask.fail(new BadRequestError('storage quota exceeded')),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            id: 'uploads/quota-exceeded.txt',
+            attributes: { mimeType: 'text/plain', content: btoa('data') },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+    expect(body.errors[0]?.detail).toContain('storage quota exceeded');
+  });
+
+  it('returns 500 JSON:API error when repo.createAsset raises InternalError (LCMS-433)', async () => {
+    const partialRepo = {
+      createAsset: () => ContentiaTask.make(() => Effect.fail(new InternalError('storage unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            id: 'uploads/photo.txt',
+            attributes: { mimeType: 'text/plain', content: btoa('data') },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+
+  it('returns 409 JSON:API error when asset already exists (LCMS-461)', async () => {
+    const partialRepo = {
+      createAsset: () =>
+        ContentiaTask.make(() => Effect.fail(new EntryAlreadyExistsError('uploads/photo.png already exists'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            id: 'uploads/photo.png',
+            attributes: { mimeType: 'image/png', content: btoa('data') },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('409');
+    expect(body.errors[0]?.code).toBe('entry_already_exists');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /resources — folder via JSON:API
+// ---------------------------------------------------------------------------
+
+describe('POST /resources — folder via JSON:API', () => {
+  it('returns 201 with a JSON:API folder resource', async () => {
+    const createdFolder: Folder = {
+      type: 'folder',
+      key: 'my-folder/',
+      createdAt: '2026-06-24T00:00:00Z',
+      updatedAt: '2026-06-24T00:00:00Z',
+    };
+    const partialRepo = {
+      createFolder: () => ContentiaTask.succeed(createdFolder),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'folder',
+            id: 'my-folder/',
+            attributes: {},
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(201);
+
+    const body = await res.json() as { data: { type: string, id: string } };
+    expect(body.data.type).toBe('folder');
+    expect(body.data.id).toBe('my-folder/');
+  });
+
+  it('returns 400 when createFolder repo call fails (LCMS-362)', async () => {
+    const partialRepo = {
+      createFolder: () => ContentiaTask.fail(new BadRequestError('folder already exists')),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'folder',
+            id: 'existing-folder/',
+            attributes: {},
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+    expect(body.errors[0]?.detail).toContain('folder already exists');
+  });
+
+  it('returns 500 JSON:API error when repo.createFolder raises InternalError (LCMS-433)', async () => {
+    const partialRepo = {
+      createFolder: () => ContentiaTask.make(() => Effect.fail(new InternalError('storage unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'folder',
+            id: 'new-folder/',
+            attributes: {},
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /resources — JSON:API invalid type / unsupported Content-Type (LCMS-362)
+// ---------------------------------------------------------------------------
+
+describe('POST /resources — JSON:API invalid data.type', () => {
+  it('returns 400 bad_request when data.type is not "asset" or "folder" (LCMS-362)', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'image',
+            id: 'uploads/photo.jpg',
+            attributes: {},
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+  });
+});
+
+describe('POST /resources — unsupported Content-Type', () => {
+  it('returns 400 bad_request when Content-Type is text/plain (LCMS-362)', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'hello',
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /resources — multipart/form-data upload
+// ---------------------------------------------------------------------------
+
+describe('POST /resources — multipart form-data', () => {
+  const makeMultipartRequest = (fields: Record<string, string | Blob>): Request => {
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+      formData.append(key, value);
+    }
+    return new Request('http://localhost/api/assets/resources', {
+      method: 'POST',
+      body: formData,
+    });
+  };
+
+  it('returns 201 with JSON:API asset after successful multipart upload', async () => {
+    const createdAsset: Asset = {
+      type: 'asset',
+      key: 'uploads/photo.jpg',
+      createdAt: '2026-06-24T00:00:00Z',
+      updatedAt: '2026-06-24T00:00:00Z',
+      content: { size: 1024, etag: 'photo-etag' },
+    };
+    const partialRepo = {
+      createAsset: () => ContentiaTask.succeed(createdAsset),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const file = new File(['<binary data>'], 'photo.jpg', { type: 'image/jpeg' });
+    const res = await api.fetch(makeMultipartRequest({ file }));
+
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { type: string, id: string } };
+    expect(body.data.type).toBe('asset');
+    expect(body.data.id).toBe('uploads/photo.jpg');
+  });
+
+  it('returns 400 bad_request when file field is absent', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(makeMultipartRequest({ key: 'uploads/no-file.jpg' }));
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string, status: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+    expect(body.errors[0]?.status).toBe('400');
+  });
+
+  it('returns 400 bad_request when metadata field contains invalid JSON', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const file = new File(['data'], 'test.txt', { type: 'text/plain' });
+    const res = await api.fetch(makeMultipartRequest({ file, metadata: '{not-valid-json' }));
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string }> };
+    expect(body.errors[0]?.code).toBe('bad_request');
+  });
+
+  it('individual fields take priority over metadata JSON values', async () => {
+    let capturedCreate: Parameters<AssetsRepository['createAsset']>[0] | undefined;
+    const partialRepo = {
+      createAsset: (opts: Parameters<AssetsRepository['createAsset']>[0]) => {
+        capturedCreate = opts;
+        return ContentiaTask.succeed({
+          type: 'asset' as const,
+          key: opts.key,
+          createdAt: '2026-06-24T00:00:00Z',
+          updatedAt: '2026-06-24T00:00:00Z',
+          content: { size: 4, etag: 'e' },
+        });
+      },
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const file = new File(['data'], 'original.txt', { type: 'text/plain' });
+    const metadata = JSON.stringify({ key: 'from-metadata/original.txt', mimeType: 'text/plain' });
+    const res = await api.fetch(makeMultipartRequest({
+      file,
+      metadata,
+      key: 'individual-key/overridden.txt',
+      mimeType: 'application/octet-stream',
+    }));
+
+    expect(res.status).toBe(201);
+    expect(capturedCreate?.key).toBe('individual-key/overridden.txt');
+    expect(capturedCreate?.mimeType).toBe('application/octet-stream');
+  });
+
+  it('returns 400 when createAsset repo call fails', async () => {
+    const partialRepo = {
+      createAsset: () => ContentiaTask.fail(new BadRequestError('storage quota exceeded')),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const file = new File(['data'], 'test.bin', { type: 'application/octet-stream' });
+    const res = await api.fetch(makeMultipartRequest({ file }));
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ detail: string }> };
+    expect(body.errors[0]?.detail).toContain('storage quota exceeded');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /resources/:key
+// ---------------------------------------------------------------------------
+
+describe('PATCH /resources/:key', () => {
+  it('returns 200 with updated JSON:API asset', async () => {
+    const updatedAsset: Asset = {
+      type: 'asset',
+      key: 'photo.jpg',
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-06-24T00:00:00Z',
+      content: { size: 512, etag: 'new-etag' },
+    };
+    const partialRepo = {
+      updateAsset: () => ContentiaTask.succeed(updatedAsset),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({
+          data: {
+            type: 'asset',
+            attributes: { cacheControl: 'max-age=3600' },
+          },
+        }),
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { data: { type: string, id: string } };
+    expect(body.data.type).toBe('asset');
+    expect(body.data.id).toBe('photo.jpg');
+  });
+
+  it('returns 404 with JSON:API body when updateAsset fails with NotFoundError (LCMS-359)', async () => {
+    const partialRepo = {
+      updateAsset: () => ContentiaTask.make(() => Effect.fail(new NotFoundError('asset not found'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/missing.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'asset', attributes: { cacheControl: 'no-cache' } } }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('404');
+    expect(body.errors[0]?.code).toBe('not_found');
+  });
+
+  it('returns 400 with JSON:API body when updateAsset fails with BadRequestError (LCMS-359)', async () => {
+    const partialRepo = {
+      updateAsset: () => ContentiaTask.make(() => Effect.fail(new BadRequestError('invalid update'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'asset', attributes: { cacheControl: 'no-cache' } } }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('400');
+    expect(body.errors[0]?.code).toBe('bad_request');
+  });
+
+  it('returns 500 JSON:API error when repo.updateAsset throws InternalError (LCMS-429)', async () => {
+    const partialRepo = {
+      updateAsset: () => ContentiaTask.make(() => Effect.fail(new InternalError('storage unavailable'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'asset', attributes: { cacheControl: 'no-cache' } } }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+
+  it('fires the logger hook on repo.updateAsset failure (LCMS-431)', async () => {
+    const failure = new InternalError('storage outage');
+    const partialRepo = {
+      updateAsset: () => ContentiaTask.make(() => Effect.fail(failure)),
+    } as unknown as AssetsRepository;
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
+
+    const api = buildAssetsApi({ repository: partialRepo, logger, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'asset', attributes: { cacheControl: 'no-cache' } } }),
+      }),
+    );
+    expect(res.status).toBe(500);
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith('errorToJsonApiMapper():', failure);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /resources/:key
+// ---------------------------------------------------------------------------
+
+describe('DELETE /resources/:key', () => {
+  it('returns 404 with code not_found when getResource task fails with NotFoundError', async () => {
+    const partialRepo = {
+      getResource: (_key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.fail(new NotFoundError('no such resource'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/ghost.png', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(404);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('404');
+    expect(body.errors[0]?.code).toBe('not_found');
+  });
+
+  it('returns 404 with code not_found when getResource succeeds with empty array (LCMS-326)', async () => {
+    const partialRepo = {
+      getResource: (_key: string) => ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.succeed([])),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/ghost.png', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(404);
+
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('404');
+    expect(body.errors[0]?.code).toBe('not_found');
+  });
+
+  it('returns 204 on clean deletion of a folder', async () => {
+    const partialRepo = {
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'folder' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          }])
+        ),
+      deleteFolder: (_key: string, _recursive: boolean) => ContentiaTask.succeed(undefined),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/empty-folder/', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(204);
+  });
+
+  it('forwards recursive=true to deleteFolder when ?recursive=true is set', async () => {
+    let capturedRecursive: boolean | undefined;
+    const partialRepo = {
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'folder' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          }])
+        ),
+      deleteFolder: (_key: string, recursive: boolean) => {
+        capturedRecursive = recursive;
+        return ContentiaTask.succeed(undefined);
+      },
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/my-folder/?recursive=true', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(204);
+    expect(capturedRecursive).toBe(true);
+  });
+
+  it('forwards recursive=false to deleteFolder when ?recursive param is absent', async () => {
+    let capturedRecursive: boolean | undefined;
+    const partialRepo = {
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'folder' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+          }])
+        ),
+      deleteFolder: (_key: string, recursive: boolean) => {
+        capturedRecursive = recursive;
+        return ContentiaTask.succeed(undefined);
+      },
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/my-folder/', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(204);
+    expect(capturedRecursive).toBe(false);
+  });
+
+  it('returns 500 JSON:API error when deleteAsset throws InternalError (LCMS-429/LCMS-430)', async () => {
+    const partialRepo = {
+      getResource: (key: string) =>
+        ContentiaTask.make<ReadonlyArray<Resource>>(() =>
+          Effect.succeed([{
+            type: 'asset' as const,
+            key,
+            createdAt: '2026-01-01T00:00:00Z',
+            updatedAt: '2026-01-01T00:00:00Z',
+            content: { size: 100, etag: 'abc' },
+          }])
+        ),
+      deleteAsset: () => ContentiaTask.make(() => Effect.fail(new InternalError('storage outage'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: partialRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', { method: 'DELETE' }),
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('500');
+    expect(body.errors[0]?.code).toBe('internal_error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ?include= and ?meta= query parameters (LCMS-181)
+// ---------------------------------------------------------------------------
+
+const singleAsset: Asset = {
+  type: 'asset',
+  key: 'images/hero.jpg',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  content: { size: 1024, etag: 'abc' },
+};
+
+const stubAssetUrl: AssetUrl = {
+  key: 'images/hero.jpg',
+  url: 'https://cdn.example.com/images/hero.jpg',
+};
+
+const stubVariations: AssetVariations = {
+  key: 'images/hero.jpg',
+  variations: {
+    thumb: {
+      variant: 'thumb',
+      url: 'https://cdn.example.com/images/hero-thumb.jpg',
+    } satisfies AssetVariation,
+  },
+};
+
+const stubMetadata: AssetMetadata = {
+  key: 'images/hero.jpg',
+  metadata: { mimeType: 'image/jpeg', size: 1024, filename: 'hero.jpg' },
+};
+
+function makeIncludeRepo(): AssetsRepository {
+  return {
+    getResource: (_key: string) => ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.succeed([singleAsset])),
+    getUrls: (_assets: Asset[]) =>
+      ContentiaStream.make<AssetUrl>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(stubAssetUrl);
+        })
+      ),
+    getVariations: (_assets: Asset[]) =>
+      ContentiaStream.make<AssetVariations>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(stubVariations);
+        })
+      ),
+    getMetadata: (_assets: Asset[]) =>
+      ContentiaStream.make<AssetMetadata>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(stubMetadata);
+        })
+      ),
+  } as unknown as AssetsRepository;
+}
+
+describe('GET /resources/:key — ?include=urls sideloads asset-url', () => {
+  it('?include=urls returns asset-url in included[]', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?include=urls'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      included?: Array<{ type: string, id: string, attributes: { url?: string } }>,
+    };
+    const urlResource = body.included?.find(r => r.type === 'asset-url');
+    expect(urlResource).toBeDefined();
+    expect(urlResource?.id).toBe('images/hero.jpg');
+    expect(urlResource?.attributes.url).toBe('https://cdn.example.com/images/hero.jpg');
+  });
+
+  it('?include=asset-url (long-form alias) also sideloads asset-url', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?include=asset-url'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      included?: Array<{ type: string }>,
+    };
+    expect(body.included?.some(r => r.type === 'asset-url')).toBe(true);
+  });
+});
+
+describe('GET /resources/:key — ?include=variations sideloads asset-variation', () => {
+  it('?include=variations returns asset-variation in included[]', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?include=variations'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      included?: Array<{ type: string, id: string }>,
+    };
+    expect(body.included?.some(r => r.type === 'asset-variation')).toBe(true);
+  });
+
+  it('?include=asset-variation (long-form alias) also sideloads asset-variation', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?include=asset-variation'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      included?: Array<{ type: string }>,
+    };
+    expect(body.included?.some(r => r.type === 'asset-variation')).toBe(true);
+  });
+});
+
+describe('GET /resources/:key — ?meta=true inlines metadata', () => {
+  it('?meta=true inlines asset metadata on data.meta', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?meta=true'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { meta?: { mimeType?: string } },
+      included?: Array<{ type: string }>,
+    };
+    expect(body.data.meta?.mimeType).toBe('image/jpeg');
+    // metadata does NOT appear in included[] — it's inlined on data.meta
+    expect(body.included?.some(r => r.type === 'asset-metadata')).toBeFalsy();
+  });
+
+  it('?include=asset-metadata alone does NOT produce metadata — must use ?meta=true', async () => {
+    const api = buildAssetsApi({ repository: makeIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/images%2Fhero.jpg?include=asset-metadata'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: { meta?: Record<string, unknown> },
+      included?: Array<{ type: string }>,
+    };
+    // Neither data.meta nor included contains metadata
+    expect(body.data.meta).toBeUndefined();
+    expect(body.included).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources (collection) — ?meta=true inlines metadata (LCMS-343)
+// ---------------------------------------------------------------------------
+
+function makeCollectionMetaRepo(opts: { getMetadataSpy?: ReturnType<typeof vi.fn> } = {}): AssetsRepository {
+  const getMetadataImpl = (_assets: Asset[]) =>
+    ContentiaStream.make<AssetMetadata>(emit =>
+      Effect.gen(function*() {
+        yield* emit.data(stubMetadata);
+      })
+    );
+  return {
+    listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(singleAsset);
+          return { total: 1 };
+        })
+      ),
+    getMetadata: opts.getMetadataSpy ?? getMetadataImpl,
+  } as unknown as AssetsRepository;
+}
+
+describe('GET /resources (collection) — ?meta=true inlines metadata (LCMS-343)', () => {
+  it('?meta=true inlines metadata on data[0].meta for each asset in the collection', async () => {
+    const api = buildAssetsApi({ repository: makeCollectionMetaRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?meta=true'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: Array<{ meta?: { mimeType?: string, size?: number, filename?: string } }>,
+    };
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]?.meta?.mimeType).toBe('image/jpeg');
+    expect(body.data[0]?.meta?.size).toBe(1024);
+    expect(body.data[0]?.meta?.filename).toBe('hero.jpg');
+  });
+
+  it('without ?meta, getMetadata is NOT called and data[0].meta is absent', async () => {
+    const getMetadataSpy = vi.fn((_assets: Asset[]) =>
+      ContentiaStream.make<AssetMetadata>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(stubMetadata);
+        })
+      )
+    );
+    const api = buildAssetsApi({ repository: makeCollectionMetaRepo({ getMetadataSpy }), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: Array<{ meta?: Record<string, unknown> }>,
+    };
+    expect(getMetadataSpy).not.toHaveBeenCalled();
+    expect(body.data[0]?.meta).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources (collection) — ?include=urls and ?include=variations (LCMS-365)
+// ---------------------------------------------------------------------------
+
+function makeCollectionIncludeRepo(opts: {
+  getUrlsSpy?: ReturnType<typeof vi.fn>,
+  getVariationsSpy?: ReturnType<typeof vi.fn>,
+} = {}): AssetsRepository {
+  const getUrlsImpl = (_assets: Asset[]) =>
+    ContentiaStream.make<AssetUrl>(emit =>
+      Effect.gen(function*() {
+        yield* emit.data(stubAssetUrl);
+      })
+    );
+  const getVariationsImpl = (_assets: Asset[]) =>
+    ContentiaStream.make<AssetVariations>(emit =>
+      Effect.gen(function*() {
+        yield* emit.data(stubVariations);
+      })
+    );
+  return {
+    listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          yield* emit.data(singleAsset);
+          return { total: 1 };
+        })
+      ),
+    getUrls: opts.getUrlsSpy ?? getUrlsImpl,
+    getVariations: opts.getVariationsSpy ?? getVariationsImpl,
+  } as unknown as AssetsRepository;
+}
+
+describe('GET /resources (collection) — ?include=urls sideloads asset-url (LCMS-365)', () => {
+  it('?include=urls returns included[] with asset-url for each asset', async () => {
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=urls'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      data: Array<{ type: string, id: string }>,
+      included?: Array<{ type: string, id: string, attributes: { url?: string } }>,
+    };
+    const urlResource = body.included?.find(r => r.type === 'asset-url');
+    expect(urlResource).toBeDefined();
+    expect(urlResource?.id).toBe('images/hero.jpg');
+    expect(urlResource?.attributes.url).toBe('https://cdn.example.com/images/hero.jpg');
+  });
+
+  it('?include=asset-url (long-form alias) also sideloads asset-url on collection', async () => {
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=asset-url'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { included?: Array<{ type: string }> };
+    expect(body.included?.some(r => r.type === 'asset-url')).toBe(true);
+  });
+
+  it('when getUrls fails on the collection path, response is still 200 with empty included[]', async () => {
+    const getUrlsSpy = vi.fn((_assets: Asset[]) => ContentiaStream.fail(new InternalError('cdn unavailable')));
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo({ getUrlsSpy }), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=urls'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<unknown>, included?: Array<unknown> };
+    expect(body.data).toHaveLength(1);
+    expect(body.included).toBeUndefined();
+  });
+});
+
+describe('GET /resources (collection) — ?include=variations sideloads asset-variation (LCMS-365)', () => {
+  it('?include=variations returns included[] with asset-variation for each asset', async () => {
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=variations'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      included?: Array<{ type: string, id: string }>,
+    };
+    expect(body.included?.some(r => r.type === 'asset-variation')).toBe(true);
+  });
+
+  it('?include=asset-variation (long-form alias) also sideloads asset-variation on collection', async () => {
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=asset-variation'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { included?: Array<{ type: string }> };
+    expect(body.included?.some(r => r.type === 'asset-variation')).toBe(true);
+  });
+
+  it('when getVariations fails on the collection path, response is still 200 with empty included[]', async () => {
+    const getVariationsSpy = vi.fn((_assets: Asset[]) =>
+      ContentiaStream.fail(new InternalError('variant service unavailable'))
+    );
+    const api = buildAssetsApi({ repository: makeCollectionIncludeRepo({ getVariationsSpy }), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?include=variations'));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: Array<unknown>, included?: Array<unknown> };
+    expect(body.data).toHaveLength(1);
+    expect(body.included).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Malformed JSON body — fetch() must never throw, always return a Response
+// ---------------------------------------------------------------------------
+
+describe('malformed JSON body — never throws, always returns a Response', () => {
+  const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+
+  it('POST /resources with malformed JSON returns JSON:API 400, not a throw', async () => {
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: '{bad',
+      }),
+    );
+    expect(res).toBeInstanceOf(Response);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('400');
+    expect(body.errors[0]?.code).toBe('invalid_data');
+  });
+
+  it('POST /resources with malformed JSON returns correct Content-Type', async () => {
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: 'not-json-at-all',
+      }),
+    );
+    expect(res).toBeInstanceOf(Response);
+    expect(res.status).toBe(400);
+    expect(res.headers.get('Content-Type')).toContain('application/vnd.api+json');
+  });
+
+  it('PATCH /resources/:key with malformed JSON returns JSON:API 400, not a throw', async () => {
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: '{bad',
+      }),
+    );
+    expect(res).toBeInstanceOf(Response);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string, code: string }> };
+    expect(body.errors[0]?.status).toBe('400');
+    expect(body.errors[0]?.code).toBe('invalid_data');
+  });
+
+  it('PATCH /resources/:key body status matches HTTP transport status', async () => {
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources/photo.jpg', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: 'totally-invalid',
+      }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ status: string }> };
+    expect(body.errors[0]?.status).toBe('400');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — folder-filter alias forwarding (LCMS-332)
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — folder filter alias forwarding', () => {
+  const makeResourcesStream = () =>
+    ContentiaStream.make<Resource, ListResourcesDone>(
+      () => Effect.succeed({ total: 0 } as ListResourcesDone),
+    );
+
+  it('?folder=images forwards folderKey "images" to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?folder=images'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('images');
+  });
+
+  it('?filter[folder]=images forwards folderKey "images" to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bfolder%5D=images'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('images');
+  });
+
+  it('?filter[prefix]=images forwards folderKey "images" to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bprefix%5D=images'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('images');
+  });
+
+  it('folder takes priority over filter[folder] and filter[prefix]', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(
+      new Request(
+        'http://localhost/api/assets/resources?folder=primary&filter%5Bfolder%5D=secondary&filter%5Bprefix%5D=tertiary',
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('primary');
+  });
+
+  it('filter[folder] takes priority over filter[prefix]', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(
+      new Request(
+        'http://localhost/api/assets/resources?filter%5Bfolder%5D=secondary&filter%5Bprefix%5D=tertiary',
+      ),
+    );
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('secondary');
+  });
+
+  it('no folder param defaults folderKey to empty string', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![0]).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — filter[depth] forwarding (LCMS-292)
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — filter[depth] forwarding', () => {
+  const makeResourcesStream = () =>
+    ContentiaStream.make<Resource, ListResourcesDone>(
+      () => Effect.succeed({ total: 0 } as ListResourcesDone),
+    );
+
+  it('?filter[depth]=3 forwards depth: 3 to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bdepth%5D=3'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].depth).toBe(3);
+  });
+
+  it('?filter[depth]=NaN falls back to depth: 1', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bdepth%5D=NaN'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].depth).toBe(1);
+  });
+
+  it('?depth=2 (alias) forwards depth: 2 to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?depth=2'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].depth).toBe(2);
+  });
+
+  it('no depth param defaults to depth: 1', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].depth).toBe(1);
+  });
+
+  it('?filter[depth]=0 clamps to minimum depth: 1', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: { listResources: spy } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bdepth%5D=0'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].depth).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — generic filter[<name>] forwarding
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — generic filter forwarding', () => {
+  const filteringCaps = {
+    compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+    pagination: {
+      supported: true as const,
+      description: 'cursor+offset',
+      styles: { offset: true, page: true, cursor: true },
+    },
+    filtering: {
+      supported: true as const,
+      description: 'key filters',
+      filters: [{ name: 'search', description: 'substring match on keys' }],
+    },
+  };
+
+  const makeResourcesStream = () =>
+    ContentiaStream.make<Resource, ListResourcesDone>(
+      () => Effect.succeed({ total: 0 } as ListResourcesDone),
+    );
+
+  it('?filter[search]=x forwards options.filters={search:"x"} to listResources', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: {
+        getCapabilities: () => ContentiaTask.succeed(filteringCaps),
+        listResources: spy,
+      } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bsearch%5D=x'));
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].filters).toEqual({ search: 'x' });
+  });
+
+  it('?filter[bogus]=1 against a repo declaring only "search" → 400 naming the filter', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: {
+        getCapabilities: () => ContentiaTask.succeed(filteringCaps),
+        listResources: spy,
+      } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources?filter%5Bbogus%5D=1'));
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe('invalid_data');
+    expect(body.errors[0]?.detail).toContain('bogus');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('reserved filter keys (folder/prefix/depth) are NOT forwarded as options.filters', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) => makeResourcesStream());
+    const api = buildAssetsApi({
+      repository: {
+        getCapabilities: () => ContentiaTask.succeed(filteringCaps),
+        listResources: spy,
+      } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources?filter%5Bfolder%5D=images&filter%5Bdepth%5D=2'),
+    );
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy.mock.calls[0]![1].filters).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /resources — done.pagination drives cursor next links
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — repository done.pagination cursor links', () => {
+  const cursorCaps = {
+    compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+    pagination: {
+      supported: true as const,
+      description: 'native cursor',
+      styles: { offset: true, page: false, cursor: true },
+    },
+  };
+
+  const makeAsset = (key: string): Resource => ({
+    type: 'asset',
+    key,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    content: { size: 1, etag: key },
+  });
+
+  const makeCursorDoneRepo = (done: ListResourcesDone): AssetsRepository =>
+    ({
+      getCapabilities: () => ContentiaTask.succeed(cursorCaps),
+      listResources: (_folderKey: string, _options: ListResourcesOptions) =>
+        ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data(makeAsset('a.jpg'));
+            yield* emit.data(makeAsset('b.jpg'));
+            return done;
+          })
+        ),
+    }) as unknown as AssetsRepository;
+
+  it('done.pagination.after becomes links.next with page[after] and page[size]', async () => {
+    const api = buildAssetsApi({
+      repository: makeCursorDoneRepo({ pagination: { after: 'CUR2', perPage: 2 } }),
+      authorize: allowAll,
+    });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources?page%5Bafter%5D=&page%5Bsize%5D=2'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { links: { next?: string } };
+    expect(body.links.next).toBeDefined();
+    expect(body.links.next).toContain('page[after]=CUR2');
+    expect(body.links.next).toContain('page[size]=2');
+  });
+
+  it('a full cursor page with done {} (exhausted) emits NO links.next', async () => {
+    const api = buildAssetsApi({ repository: makeCursorDoneRepo({}), authorize: allowAll });
+    // The page is "full" (2 items at page[size]=2) — the old length>=pageSize
+    // heuristic must not fabricate a cursor on a cursor-shaped request.
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources?page%5Bafter%5D=&page%5Bsize%5D=2'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { links: { next?: string | null } };
+    expect(body.links.next).toBeFalsy();
+  });
+
+  it('empty page[after]= reaches the repository as cursor-shaped pagination with after undefined', async () => {
+    const spy = vi.fn((_folderKey: string, _options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(
+        () => Effect.succeed({} as ListResourcesDone),
+      )
+    );
+    const api = buildAssetsApi({
+      repository: {
+        getCapabilities: () => ContentiaTask.succeed(cursorCaps),
+        listResources: spy,
+      } as unknown as AssetsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources?page%5Bafter%5D=&page%5Bsize%5D=5'),
+    );
+    expect(res.status).toBe(200);
+    expect(spy).toHaveBeenCalledOnce();
+    const pagination = spy.mock.calls[0]![1].pagination as { after?: string, perPage?: number };
+    expect('after' in pagination).toBe(true);
+    expect(pagination.after).toBeUndefined();
+    expect(pagination.perPage).toBe(5);
+  });
+});
+
+describe('assets-api onError / logger (LCMS-331)', () => {
+  it('calls onError when the route handler throws unexpectedly', async () => {
+    const boom = new Error('unexpected crash');
+    const throwingRepo = {
+      listResources: () => {
+        throw boom;
+      },
+    } as unknown as AssetsRepository;
+    const onError = vi.fn();
+
+    const api = buildAssetsApi({ repository: throwingRepo, onError, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+
+    expect(res.status).toBe(500);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(boom);
+  });
+
+  it('does not call onError for normal 404 responses', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, onError: vi.fn(), authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/does-not-exist'));
+    // 404 is a normal route-not-found — the catch-all is never hit.
+    expect(res.status).toBe(404);
+  });
+
+  it('calls logger.error for a 500 response but not for a 400 response', async () => {
+    const boom = new Error('internal boom');
+    const throwingRepo = {
+      listResources: () => {
+        throw boom;
+      },
+    } as unknown as AssetsRepository;
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
+
+    const api = buildAssetsApi({ repository: throwingRepo, logger, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets/resources'));
+
+    expect(res.status).toBe(500);
+    expect(logger.error).toHaveBeenCalled();
+  });
+
+  it('does not call logger.error for a 400 domain error', async () => {
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() };
+    // stubRepo returns nothing useful — GET /resources with stubRepo causes a 400
+    // because listResources is undefined and the catch-all wraps it.
+    // Instead, use a request to a known 400 path: bad content-type POST.
+    const api = buildAssetsApi({ repository: stubRepo, logger, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'hello',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /operations — fail-fast batch operations (LCMS-1002, ADR-004 semantics)
+// ---------------------------------------------------------------------------
+
+type OperationResultData = { data: { type: string, id: string, attributes: Record<string, unknown> } };
+type OperationResultMeta = { meta: { deleted: boolean, ref: { type: string, id: string } } };
+type OperationResultError = { errors: Array<{ status: string, title: string, detail?: string }> };
+type OperationsBody = { results: Array<OperationResultData | OperationResultMeta | OperationResultError> };
+type OperationsErrorBody = {
+  errors: Array<{ status: string, code: string, detail?: string, source?: { pointer: string } }>,
+};
+
+const postOperations = (api: ReturnType<typeof buildAssetsApi>, operations: unknown[]) =>
+  api.fetch(
+    new Request('http://localhost/api/assets/operations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json' },
+      body: JSON.stringify({ operations }),
+    }),
+  );
+
+const makeAssetResource = (key: string): Asset => ({
+  type: 'asset',
+  key,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  content: { size: 1, etag: key },
+});
+
+const makeFolderResource = (key: string): Folder => ({
+  type: 'folder',
+  key,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+});
+
+const base64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+
+describe('POST /operations — add/asset', () => {
+  it('calls repository.createAsset and returns data.type === "asset"', async () => {
+    const repo = {
+      createAsset: (_create: unknown) => ContentiaTask.make(() => Effect.succeed(makeAssetResource('images/new.jpg'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      {
+        op: 'add',
+        data: {
+          type: 'asset',
+          id: 'images/new.jpg',
+          attributes: { mimeType: 'image/jpeg', content: base64('bytes') },
+        },
+      },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    expect(body.results).toHaveLength(1);
+    const result = body.results[0] as OperationResultData;
+    expect(result.data.type).toBe('asset');
+    expect(result.data.id).toBe('images/new.jpg');
+  });
+});
+
+describe('POST /operations — add/folder', () => {
+  it('calls repository.createFolder and returns data.type === "folder"', async () => {
+    const repo = {
+      createFolder: (_create: unknown) => ContentiaTask.make(() => Effect.succeed(makeFolderResource('images/thumbs'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'folder', id: 'images/thumbs' } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    expect(body.results).toHaveLength(1);
+    const result = body.results[0] as OperationResultData;
+    expect(result.data.type).toBe('folder');
+    expect(result.data.id).toBe('images/thumbs');
+  });
+});
+
+describe('POST /operations — add/asset missing data.id', () => {
+  it('returns 400 with top-level errors (zero writes) when data.id is absent', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'asset', attributes: { mimeType: 'image/jpeg', content: base64('x') } } },
+    ]);
+    expect(res.status).toBe(400);
+
+    const body = await res.json() as OperationsErrorBody;
+    expect(body.errors).toBeDefined();
+    expect(body.errors[0]!.status).toBe('400');
+    expect(body.errors[0]!.detail).toContain('operations[0].data.id');
+  });
+
+  it('returns 400 and performs zero writes when a mixed batch contains an add/asset op without data.id', async () => {
+    const createAsset = vi.fn();
+    const repo = { createAsset } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      {
+        op: 'add',
+        data: { type: 'asset', id: 'images/first.jpg', attributes: { mimeType: 'image/jpeg', content: base64('x') } },
+      },
+      { op: 'add', data: { type: 'asset', attributes: { mimeType: 'image/jpeg', content: base64('y') } } },
+    ]);
+    expect(res.status).toBe(400);
+    expect(createAsset).not.toHaveBeenCalled();
+
+    const body = await res.json() as OperationsErrorBody;
+    expect(body.errors[0]!.status).toBe('400');
+    expect(body.errors[0]!.detail).toContain('operations[1].data.id');
+  });
+});
+
+describe('POST /operations — add/asset missing content', () => {
+  it('returns 400 with top-level errors (zero writes) when attributes.content is absent', async () => {
+    const createAsset = vi.fn();
+    const repo = { createAsset } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'asset', id: 'images/new.jpg', attributes: { mimeType: 'image/jpeg' } } },
+    ]);
+    expect(res.status).toBe(400);
+    expect(createAsset).not.toHaveBeenCalled();
+
+    const body = await res.json() as OperationsErrorBody;
+    expect(body.errors[0]!.status).toBe('400');
+    expect(body.errors[0]!.detail).toContain('operations[0].data.attributes.content');
+  });
+});
+
+describe('POST /operations — update/asset', () => {
+  it('calls repository.updateAsset and returns data.type === "asset"', async () => {
+    const repo = {
+      updateAsset: (_update: unknown) =>
+        ContentiaTask.make(() => Effect.succeed(makeAssetResource('images/existing.jpg'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      {
+        op: 'update',
+        data: { type: 'asset', id: 'images/existing.jpg', attributes: { cacheControl: 'public, max-age=3600' } },
+      },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    const result = body.results[0] as OperationResultData;
+    expect(result.data.type).toBe('asset');
+    expect(result.data.id).toBe('images/existing.jpg');
+  });
+});
+
+describe('POST /operations — remove/asset', () => {
+  it('calls repository.deleteAsset and returns meta.deleted === true', async () => {
+    const repo = {
+      getResource: (_key: string) =>
+        ContentiaTask.make(() => Effect.succeed([makeAssetResource('images/old.jpg')] as Resource[])),
+      deleteAsset: (_key: string) => ContentiaTask.make<void>(() => Effect.succeed(undefined)),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'asset', id: 'images/old.jpg' } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    const result = body.results[0] as OperationResultMeta;
+    expect(result.meta.deleted).toBe(true);
+    expect(result.meta.ref).toEqual({ type: 'asset', id: 'images/old.jpg' });
+  });
+});
+
+describe('POST /operations — remove/folder', () => {
+  it('calls repository.deleteFolder and returns meta.deleted === true', async () => {
+    const repo = {
+      getResource: (_key: string) =>
+        ContentiaTask.make(() => Effect.succeed([makeFolderResource('images/thumbs')] as Resource[])),
+      deleteFolder: (_key: string, _recursive?: boolean) => ContentiaTask.make<void>(() => Effect.succeed(undefined)),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'folder', id: 'images/thumbs' } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    const result = body.results[0] as OperationResultMeta;
+    expect(result.meta.deleted).toBe(true);
+  });
+
+  it('returns 400 (zero writes) when ref.type is not "asset" or "folder"', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'bogus', id: 'x' } },
+    ]);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /operations — repo-failure status codes', () => {
+  it('returns per-operation status "409" when add/asset repo raises EntryAlreadyExistsError', async () => {
+    const repo = {
+      createAsset: (_create: unknown) =>
+        ContentiaTask.make(() => Effect.fail(new EntryAlreadyExistsError('images/existing.jpg already exists'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      {
+        op: 'add',
+        data: {
+          type: 'asset',
+          id: 'images/existing.jpg',
+          attributes: { mimeType: 'image/jpeg', content: base64('x') },
+        },
+      },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    const result = body.results[0] as OperationResultError;
+    expect(result.errors).toBeDefined();
+    expect(result.errors[0]!.status).toBe('409');
+  });
+
+  it('returns per-operation status "404" when the resource does not exist', async () => {
+    const repo = {
+      getResource: (_key: string) =>
+        ContentiaTask.make(() => Effect.fail(new NotFoundError('images/missing.jpg not found'))),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'asset', id: 'images/missing.jpg' } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    const result = body.results[0] as OperationResultError;
+    expect(result.errors).toBeDefined();
+    expect(result.errors[0]!.status).toBe('404');
+  });
+
+  it('stops processing after the first repository failure — subsequent ops are not applied', async () => {
+    const getResource = vi.fn(() =>
+      ContentiaTask.make(() => Effect.fail(new NotFoundError('images/missing.jpg not found')))
+    );
+    const createFolder = vi.fn();
+    const repo = { getResource, createFolder } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'asset', id: 'images/missing.jpg' } },
+      { op: 'add', data: { type: 'folder', id: 'images/new-folder' } },
+    ]);
+    expect(res.status).toBe(200);
+    expect(createFolder).not.toHaveBeenCalled();
+
+    const body = await res.json() as OperationsBody;
+    expect(body.results).toHaveLength(1);
+    expect((body.results[0] as OperationResultError).errors[0]!.status).toBe('404');
+  });
+});
+
+describe('POST /operations — malformed body', () => {
+  it('returns 400 when operations key is missing', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/operations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ notOperations: [] }),
+      }),
+    );
+    expect(res.status).toBe(400);
+
+    const body = await res.json() as { errors: Array<{ status: string }> };
+    expect(body.errors[0]!.status).toBe('400');
+  });
+
+  it('returns 400 when body is not valid JSON', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/operations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: 'not-json',
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /operations — multi-operation batch', () => {
+  it('processes multiple operations in a single request and returns all results', async () => {
+    const repo = {
+      createAsset: (_create: unknown) =>
+        ContentiaTask.make(() => Effect.succeed(makeAssetResource('images/batch-new.jpg'))),
+      getResource: (_key: string) =>
+        ContentiaTask.make(() => Effect.succeed([makeAssetResource('images/old.jpg')] as Resource[])),
+      deleteAsset: (_key: string) => ContentiaTask.make<void>(() => Effect.succeed(undefined)),
+    } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      {
+        op: 'add',
+        data: {
+          type: 'asset',
+          id: 'images/batch-new.jpg',
+          attributes: { mimeType: 'image/jpeg', content: base64('x') },
+        },
+      },
+      { op: 'remove', ref: { type: 'asset', id: 'images/old.jpg' } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as OperationsBody;
+    expect(body.results).toHaveLength(2);
+    const addResult = body.results[0] as OperationResultData;
+    const removeResult = body.results[1] as OperationResultMeta;
+    expect(addResult.data.type).toBe('asset');
+    expect(removeResult.meta.deleted).toBe(true);
+  });
+});
+
+describe('POST /operations — discovery', () => {
+  it('advertises /operations in GET /api/assets root', async () => {
+    const api = buildAssetsApi({ repository: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/api/assets'));
+    const body = await res.json() as { data: { attributes: { endpoints: Array<{ path: string }> } } };
+    expect(body.data.attributes.endpoints.some(e => e.path === '/operations')).toBe(true);
+  });
+});

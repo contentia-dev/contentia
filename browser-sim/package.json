@@ -1,7 +1,7 @@
 {
-  "name": "laikacms-browser-sim",
+  "name": "contentia-browser-sim",
   "version": "1.0.0",
-  "description": "Headless browser smoke tests for the LaikaCMS admin UI quickstart",
+  "description": "Headless browser smoke tests for the Contentia admin UI quickstart",
   "type": "module",
   "private": true,
   "scripts": {

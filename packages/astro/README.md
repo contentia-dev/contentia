@@ -1,38 +1,38 @@
-# @laikacms/astro
+# @contentia/astro
 
-Astro integration for Laika. Content reaches your pages through Astro's own
+Astro integration for Contentia. Content reaches your pages through Astro's own
 [Content Layer](https://docs.astro.build/en/guides/content-collections/) — `getCollection()`,
-`getEntry()`, `render()`, Zod schemas — instead of a Laika-specific import protocol.
+`getEntry()`, `render()`, Zod schemas — instead of a Contentia-specific import protocol.
 
 Three pieces, usable independently:
 
-| Export                   | What it gives you                                                                   |
-| ------------------------ | ----------------------------------------------------------------------------------- |
-| `@laikacms/astro/loader` | `documentsLoader()` / `objectsLoader()` for `defineCollection({ loader })`          |
-| `@laikacms/astro`        | the `laika()` integration — dev JSON:API, content hot-refresh, types                |
-| `@laikacms/astro/live`   | `liveDocumentsLoader()` for `defineLiveCollection()` — runtime reads, draft preview |
+| Export                    | What it gives you                                                                   |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| `@contentia/astro/loader` | `documentsLoader()` / `objectsLoader()` for `defineCollection({ loader })`          |
+| `@contentia/astro`        | the `contentia()` integration — dev JSON:API, content hot-refresh, types            |
+| `@contentia/astro/live`   | `liveDocumentsLoader()` for `defineLiveCollection()` — runtime reads, draft preview |
 
 ## Install
 
 ```sh
-pnpm add @laikacms/astro laikacms
+pnpm add @contentia/astro contentia
 ```
 
 ## Quick start
 
 ```js
 // astro.config.mjs
-import { laika } from '@laikacms/astro';
+import { contentia } from '@contentia/astro';
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
-  integrations: [laika({ dir: 'content', defaultExtension: 'md' })],
+  integrations: [contentia({ dir: 'content', defaultExtension: 'md' })],
 });
 ```
 
 ```ts
 // src/content.config.ts
-import { documentsLoader } from '@laikacms/astro/loader';
+import { documentsLoader } from '@contentia/astro/loader';
 import { defineCollection, z } from 'astro:content';
 
 export const collections = {
@@ -64,8 +64,8 @@ const { Content } = await render(post);
 <Content />
 ```
 
-The Astro collection name is the Laika collection by default, so `posts` reads document keys under
-`posts/`. A document key of `posts/2026/hello` becomes the entry id `2026/hello`.
+The Astro collection name is the Contentia collection by default, so `posts` reads document keys
+under `posts/`. A document key of `posts/2026/hello` becomes the entry id `2026/hello`.
 
 ## Declaring your fields once
 
@@ -83,12 +83,12 @@ The loader derives the collection's schema from the catalog and generates matchi
 types are inferred from the content instead. Both go through Astro's `Loader.createSchema()`, which
 writes them into `.astro/loaders/`.
 
-To enumerate all collections from the catalog at once, use `laikaCollections()`:
+To enumerate all collections from the catalog at once, use `contentiaCollections()`:
 
 ```ts
-import { laikaCollections } from '@laikacms/astro/loader';
+import { contentiaCollections } from '@contentia/astro/loader';
 
-export const collections = await laikaCollections({ dir: 'content', catalog: 'decap', z });
+export const collections = await contentiaCollections({ dir: 'content', catalog: 'decap', z });
 ```
 
 This trades static typing for brevity (`entry.data` stays `unknown`). Shape the result with
@@ -100,16 +100,16 @@ empty).
 ## Where content comes from
 
 Every loader accepts any `DocumentsRepository`. With no repository given, a filesystem repository
-over `dir` is built for you — that is the zero-config path. To read from a running Laika server,
+over `dir` is built for you — that is the zero-config path. To read from a running Contentia server,
 pass a proxy repository; no extra option exists because none is needed:
 
 ```ts
-import { DocumentsJsonApiProxyRepository } from 'laikacms/documents/jsonapi-proxy';
+import { DocumentsJsonApiProxyRepository } from 'contentia/documents/jsonapi-proxy';
 
 documentsLoader({
   documents: new DocumentsJsonApiProxyRepository({
     baseUrl: 'https://cms.example.com/api/documents',
-    authToken: process.env.LAIKA_TOKEN,
+    authToken: process.env.CONTENTIA_TOKEN,
   }),
 });
 ```
@@ -163,7 +163,7 @@ drafts: defineCollection({
 | `render.mode`       | `'markdown' \| 'none' \| 'deferred'`                | `'markdown'` | How the body field is rendered. `'deferred'` is the only route to MDX and custom remark/rehype plugins — it requires `render.filePath` and a file-backed repository. |
 | `render.bodyField`  | `string`                                            | `'body'`     | Which content field holds the prose.                                                                                                                                 |
 | `render.retainBody` | `boolean`                                           | `true`       | Keep the raw body string on `entry.body`.                                                                                                                            |
-| `render.filePath`   | `(ctx: { key, collection }) => string \| undefined` | —            | Resolve a Laika key to an on-disk path, required for `mode: 'deferred'`.                                                                                             |
+| `render.filePath`   | `(ctx: { key, collection }) => string \| undefined` | —            | Resolve a Contentia key to an on-disk path, required for `mode: 'deferred'`.                                                                                         |
 
 ```ts
 // MDX + custom plugins via deferred rendering
@@ -179,12 +179,12 @@ posts: defineCollection({
 });
 ```
 
-### `entry` — control how Laika keys become Astro entry ids
+### `entry` — control how Contentia keys become Astro entry ids
 
 | Option               | Type                                   | Default                 | Description                                                        |
 | -------------------- | -------------------------------------- | ----------------------- | ------------------------------------------------------------------ |
-| `entry.id`           | `(ctx: { key, collection }) => string` | strip collection prefix | Derive the Astro entry id from a Laika key.                        |
-| `entry.keyField`     | `string`                               | —                       | Copy the full Laika key into `entry.data` under this name.         |
+| `entry.id`           | `(ctx: { key, collection }) => string` | strip collection prefix | Derive the Astro entry id from a Contentia key.                    |
+| `entry.keyField`     | `string`                               | —                       | Copy the full Contentia key into `entry.data` under this name.     |
 | `entry.versionField` | `string`                               | —                       | Copy the record's version token into `entry.data` under this name. |
 
 ### `sync` — choose the incremental sync tier
@@ -203,7 +203,7 @@ documentsLoader({ dir: 'content', name: 'my-posts' });
 // Then: Astro.locals.refreshContent({ loaders: ['my-posts'] })
 ```
 
-Default: `'laikacms'`.
+Default: `'contentia'`.
 
 ---
 
@@ -215,7 +215,7 @@ no publication state, no status, and no language. Its option set is narrower tha
 
 ```ts
 // src/content.config.ts
-import { objectsLoader } from '@laikacms/astro/loader';
+import { objectsLoader } from '@contentia/astro/loader';
 
 export const collections = {
   settings: defineCollection({
@@ -249,7 +249,7 @@ lets you name one if they do.
 
 ### `name`
 
-Loader name for `refreshContent({ loaders })`. Defaults to `'laikacms:objects'`.
+Loader name for `refreshContent({ loaders })`. Defaults to `'contentia:objects'`.
 
 ---
 
@@ -260,7 +260,7 @@ Declare a `liveDocumentsLoader` in `src/live.config.ts`; pages that use it must 
 rendered.
 
 ```ts
-import { liveDocumentsLoader } from '@laikacms/astro/live';
+import { liveDocumentsLoader } from '@contentia/astro/live';
 import { defineLiveCollection } from 'astro:content';
 
 export const collections = {
@@ -274,22 +274,22 @@ Control Astro's per-entry cache hint with `cache`:
 liveDocumentsLoader({
   documents,
   cache: {
-    tags: ({ key, collection }) => [`laika:${collection}:${key}`],
+    tags: ({ key, collection }) => [`contentia:${collection}:${key}`],
     lastModified: false,
   },
 });
 ```
 
-Default tags: `['laika', 'laika:<collection>', 'laika:<key>']`. `lastModified` is taken from the
-entry's `updatedAt` when present; set `lastModified: false` to suppress it. The `LiveCacheOptions`
-type is exported from `@laikacms/astro/live`.
+Default tags: `['contentia', 'contentia:<collection>', 'contentia:<key>']`. `lastModified` is taken
+from the entry's `updatedAt` when present; set `lastModified: false` to suppress it. The
+`LiveCacheOptions` type is exported from `@contentia/astro/live`.
 
-## `laika()` options
+## `contentia()` options
 
-| Option    | Type                             | Default | Description                                                                              |
-| --------- | -------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `refresh` | `boolean \| LaikaRefreshOptions` | `true`  | Refresh content loaders when the repository emits a change. `false` disables hot-reload. |
-| `types`   | `boolean`                        | `true`  | Emit `.astro/integrations/@laikacms-astro/types.d.ts`. `false` skips it.                 |
+| Option    | Type                                 | Default | Description                                                                              |
+| --------- | ------------------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| `refresh` | `boolean \| ContentiaRefreshOptions` | `true`  | Refresh content loaders when the repository emits a change. `false` disables hot-reload. |
+| `types`   | `boolean`                            | `true`  | Emit `.astro/integrations/@contentia-astro/types.d.ts`. `false` skips it.                |
 
 When `refresh` is an object, two sub-options control the behaviour:
 
@@ -300,25 +300,28 @@ When `refresh` is an object, two sub-options control the behaviour:
 
 ```js
 // Disable hot-reload — useful when you have a custom watch setup
-laika({ dir: 'content', refresh: false });
+contentia({ dir: 'content', refresh: false });
 
 // Scope refresh to a specific loader and widen the debounce window
-laika({ dir: 'content', refresh: { loaders: ['my-posts'], debounceMs: 200 } });
+contentia({ dir: 'content', refresh: { loaders: ['my-posts'], debounceMs: 200 } });
 
 // Skip type declaration emission into .astro/
-laika({ dir: 'content', types: false });
+contentia({ dir: 'content', types: false });
 ```
 
 ## Serving the API
 
-While `astro dev` runs, the integration mounts Laika's JSON:API at `/__laika` so the Decap admin can
-edit content locally. That mount comes from Astro's dev-server hook, which never runs during
-`astro build`, so a built site has no route to it.
+While `astro dev` runs, the integration mounts Contentia's JSON:API at `/__contentia` so the Decap
+admin can edit content locally. That mount comes from Astro's dev-server hook, which never runs
+during `astro build`, so a built site has no route to it.
 
 For a deployment, opt in to a real route. It serves only published content unless you say otherwise:
 
 ```js
-laika({ dir: 'content', api: { mode: 'route', basePath: '/api/laika', access: 'published' } });
+contentia({
+  dir: 'content',
+  api: { mode: 'route', basePath: '/api/contentia', access: 'published' },
+});
 ```
 
 `access` is `'published'` (reads of published content only), `'read'` (adds drafts and revisions) or
@@ -329,19 +332,19 @@ laika({ dir: 'content', api: { mode: 'route', basePath: '/api/laika', access: 'p
 > (constructed outside the bundle in `astro.config`), the integration throws at build time because
 > the live object cannot cross the SSR bundle boundary.
 
-### Custom repositories — `@laikacms/astro/api`
+### Custom repositories — `@contentia/astro/api`
 
-When `mode: 'route'` is too limited (e.g. you already have a custom `LaikaRepositories` object),
-write the four-line route yourself using `createApiHandler` from `@laikacms/astro/api`:
+When `mode: 'route'` is too limited (e.g. you already have a custom `ContentiaRepositories` object),
+write the four-line route yourself using `createApiHandler` from `@contentia/astro/api`:
 
 ```ts
-// src/pages/api/laika/[...path].ts
-import { createApiHandler } from '@laikacms/astro/api';
-import { repositories } from '../../lib/laika'; // your LaikaRepositories instance
+// src/pages/api/contentia/[...path].ts
+import { createApiHandler } from '@contentia/astro/api';
+import { repositories } from '../../lib/contentia'; // your ContentiaRepositories instance
 
 const handler = createApiHandler({
   repositories,
-  basePath: '/api/laika',
+  basePath: '/api/contentia',
   access: 'published', // 'published' | 'read' | 'all'
 });
 
@@ -354,7 +357,7 @@ single `access` policy. It accepts the same `access` values as `mode: 'route'`.
 
 ## Documentation
 
-See the [Astro guide](https://laikacms.com/docs/guides/astro).
+See the [Astro guide](https://contentia.dev/docs/guides/astro).
 
 ## License
 

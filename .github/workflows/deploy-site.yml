@@ -1,7 +1,7 @@
 name: Deploy site
 
 # Builds the marketing site and the docs in parallel, combines them into one
-# static tree, and publishes it to GitHub Pages. laikacms.com is served at the
+# static tree, and publishes it to GitHub Pages. contentia.dev is served at the
 # root; the VitePress docs (built with base '/docs/') are served under /docs/.
 #
 # Deploys only from the primary branch
@@ -48,7 +48,7 @@ jobs:
           restore-keys: |
             turbo-website-${{ runner.os }}-
       - name: Build
-        run: pnpm turbo run build --filter=@laikacms/website
+        run: pnpm turbo run build --filter=@contentia/website
       - name: Upload website dist
         uses: actions/upload-artifact@v4
         with:
@@ -78,7 +78,7 @@ jobs:
           restore-keys: |
             turbo-docs-${{ runner.os }}-
       - name: Build
-        run: pnpm turbo run build --filter=@laikacms/docs
+        run: pnpm turbo run build --filter=@contentia/docs
       - name: Upload docs dist
         uses: actions/upload-artifact@v4
         with:

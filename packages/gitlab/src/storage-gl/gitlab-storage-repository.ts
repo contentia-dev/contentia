@@ -3,14 +3,14 @@ import * as Result from 'effect/Result';
 
 import {
   BadRequestError,
+  type ContentiaError,
+  type ContentiaResult,
+  ContentiaStream,
+  ContentiaTask,
   EntryAlreadyExistsError,
   InvalidData,
-  type LaikaError,
-  type LaikaResult,
-  LaikaStream,
-  LaikaTask,
   NotFoundError,
-} from 'laikacms/core';
+} from 'contentia/core';
 import {
   applyPagination,
   type Atom,
@@ -33,7 +33,7 @@ import {
   StorageRepository,
   type StorageSerializerRegistry,
   unsupportedChanges,
-} from 'laikacms/storage';
+} from 'contentia/storage';
 import * as minimatch from 'minimatch';
 
 import { GitlabDataSource, type GitlabDataSourceOptions } from './gitlab-datasource.js';
@@ -55,10 +55,10 @@ const DEFAULT_IGNORE_LIST = [
   '**/Thumbs.db',
   '**/desktop.ini',
   '**/.catalog',
-  '**/.laikacms',
+  '**/.contentia',
 ];
 
-const liftResult = <A>(promise: Promise<LaikaResult<A>>): Effect.Effect<A, LaikaError> =>
+const liftResult = <A>(promise: Promise<ContentiaResult<A>>): Effect.Effect<A, ContentiaError> =>
   Effect.flatMap(Effect.promise(() => promise), Effect.fromResult);
 
 /**
@@ -67,7 +67,7 @@ const liftResult = <A>(promise: Promise<LaikaResult<A>>): Effect.Effect<A, Laika
  * branch; reads and writes are commits attributed to the authenticated user
  * (or to {@link GitlabStorageRepositoryOptions.commitAuthor} when supplied).
  *
- * Parallels {@link @laikacms/github}'s `GithubStorageRepository`. The
+ * Parallels {@link @contentia/github}'s `GithubStorageRepository`. The
  * difference is auth: GitLab PATs/OAuth tokens are long-lived so there is no
  * App installation flow — bring a token, point at a project, and write.
  *
@@ -163,8 +163,8 @@ export class GitlabStorageRepository extends StorageRepository {
     return serializer.deserializeDocumentFileContents(raw, {});
   }
 
-  getObject(key: string): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  getObject(key: string): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(key));
         if (!resolved) {
@@ -190,8 +190,8 @@ export class GitlabStorageRepository extends StorageRepository {
     );
   }
 
-  createObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  createObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         if (!create.content) {
           return yield* Effect.fail(new InvalidData('Object content is required for creation'));
@@ -213,13 +213,13 @@ export class GitlabStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getObject(create.key));
+        return yield* ContentiaTask.runValue(this.getObject(create.key));
       })
     );
   }
 
-  updateObject(update: StorageObjectUpdate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  updateObject(update: StorageObjectUpdate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(update.key));
         if (!resolved) {
@@ -235,13 +235,13 @@ export class GitlabStorageRepository extends StorageRepository {
             }),
           );
         }
-        return yield* LaikaTask.runValue(this.getObject(update.key));
+        return yield* ContentiaTask.runValue(this.getObject(update.key));
       })
     );
   }
 
-  createOrUpdateObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  createOrUpdateObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         // When metadata pins an extension, honour it — don't let a stale file
         // at a different extension capture the write.
@@ -261,13 +261,13 @@ export class GitlabStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getObject(create.key));
+        return yield* ContentiaTask.runValue(this.getObject(create.key));
       })
     );
   }
 
-  getFolder(key: string): LaikaTask.LaikaTask<Folder> {
-    return LaikaTask.make<Folder>(() =>
+  getFolder(key: string): ContentiaTask.ContentiaTask<Folder> {
+    return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
         // Probing the listing is the cheapest way to confirm the directory
         // exists — GitLab has no first-class "stat directory" call.
@@ -278,8 +278,8 @@ export class GitlabStorageRepository extends StorageRepository {
     );
   }
 
-  createFolder(folderCreate: FolderCreate): LaikaTask.LaikaTask<Folder> {
-    return LaikaTask.make<Folder>(() =>
+  createFolder(folderCreate: FolderCreate): ContentiaTask.ContentiaTask<Folder> {
+    return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
         // Git tracks files, not directories — write a `.keep` so the folder
         // exists at all. Mirrors the github/storage-fs convention.
@@ -290,13 +290,13 @@ export class GitlabStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getFolder(folderCreate.key));
+        return yield* ContentiaTask.runValue(this.getFolder(folderCreate.key));
       })
     );
   }
 
-  getAtom(key: string): LaikaTask.LaikaTask<Atom> {
-    return LaikaTask.make<Atom>(() =>
+  getAtom(key: string): ContentiaTask.ContentiaTask<Atom> {
+    return ContentiaTask.make<Atom>(() =>
       Effect.gen({ self: this }, function*() {
         const typed = yield* Effect.result(
           Effect.tryPromise({
@@ -312,12 +312,12 @@ export class GitlabStorageRepository extends StorageRepository {
         // pathType NotFound → fall back to a getObject probe (the path may
         // be a key without its on-server extension).
         if (typed._tag === 'Failure') {
-          return yield* LaikaTask.runValue(this.getObject(key));
+          return yield* ContentiaTask.runValue(this.getObject(key));
         }
         if (typed.success === 'file') {
-          return yield* LaikaTask.runValue(this.getObject(key));
+          return yield* ContentiaTask.runValue(this.getObject(key));
         }
-        return yield* LaikaTask.runValue(this.getFolder(key));
+        return yield* ContentiaTask.runValue(this.getFolder(key));
       })
     );
   }
@@ -325,8 +325,8 @@ export class GitlabStorageRepository extends StorageRepository {
   listAtomSummaries(
     folderKey: string,
     options: ListAtomsOptions,
-  ): LaikaStream.LaikaStream<AtomSummary, ListAtomsDone> {
-    return LaikaStream.make<AtomSummary, ListAtomsDone>(emit =>
+  ): ContentiaStream.ContentiaStream<AtomSummary, ListAtomsDone> {
+    return ContentiaStream.make<AtomSummary, ListAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         const { summaries, missingFolder, aggregateTotal } = yield* this.collectSummaries(folderKey, options);
         if (missingFolder) yield* emit.recoverableError(missingFolder);
@@ -336,18 +336,18 @@ export class GitlabStorageRepository extends StorageRepository {
     );
   }
 
-  listAtoms(folderKey: string, options: ListAtomsOptions): LaikaStream.LaikaStream<Atom, ListAtomsDone> {
-    return LaikaStream.make<Atom, ListAtomsDone>(emit =>
+  listAtoms(folderKey: string, options: ListAtomsOptions): ContentiaStream.ContentiaStream<Atom, ListAtomsDone> {
+    return ContentiaStream.make<Atom, ListAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         const { summaries, missingFolder, aggregateTotal } = yield* this.collectSummaries(folderKey, options);
         if (missingFolder) yield* emit.recoverableError(missingFolder);
         for (const summary of summaries) {
           if (summary.type === 'object-summary') {
-            const result = yield* Effect.result(LaikaTask.runValue(this.getObject(summary.key)));
+            const result = yield* Effect.result(ContentiaTask.runValue(this.getObject(summary.key)));
             if (Result.isFailure(result)) yield* emit.recoverableError(result.failure);
             else yield* emit.data(result.success);
           } else {
-            const result = yield* Effect.result(LaikaTask.runValue(this.getFolder(summary.key)));
+            const result = yield* Effect.result(ContentiaTask.runValue(this.getFolder(summary.key)));
             if (Result.isFailure(result)) yield* emit.recoverableError(result.failure);
             else yield* emit.data(result.success);
           }
@@ -361,8 +361,8 @@ export class GitlabStorageRepository extends StorageRepository {
     folderKey: string,
     options: ListAtomsOptions,
   ): Effect.Effect<
-    { summaries: ReadonlyArray<AtomSummary>, missingFolder?: LaikaError, aggregateTotal: number },
-    LaikaError
+    { summaries: ReadonlyArray<AtomSummary>, missingFolder?: ContentiaError, aggregateTotal: number },
+    ContentiaError
   > {
     return Effect.gen({ self: this }, function*() {
       const r = yield* Effect.result(
@@ -379,7 +379,7 @@ export class GitlabStorageRepository extends StorageRepository {
     });
   }
 
-  private listFolderLevel(folderKey: string): Effect.Effect<AtomSummary[], LaikaError> {
+  private listFolderLevel(folderKey: string): Effect.Effect<AtomSummary[], ContentiaError> {
     return Effect.gen({ self: this }, function*() {
       const listing = yield* liftResult(this.dataSource.listDirectory(folderKey));
       const filtered = listing.filter(entry => this.excludeFilter.every(re => !re.test(entry.path)));
@@ -399,8 +399,8 @@ export class GitlabStorageRepository extends StorageRepository {
     });
   }
 
-  removeAtoms(keys: readonly string[]): LaikaStream.LaikaStream<string, RemoveAtomsDone> {
-    return LaikaStream.make<string, RemoveAtomsDone>(emit =>
+  removeAtoms(keys: readonly string[]): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
+    return ContentiaStream.make<string, RemoveAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         let removed = 0;
         let skipped = 0;
@@ -432,8 +432,8 @@ export class GitlabStorageRepository extends StorageRepository {
     );
   }
 
-  getCapabilities(): LaikaTask.LaikaTask<Capabilities> {
-    return LaikaTask.succeed<Capabilities>({
+  getCapabilities(): ContentiaTask.ContentiaTask<Capabilities> {
+    return ContentiaTask.succeed<Capabilities>({
       changes: unsupportedChanges,
       compatibilityDate: CompatibilityDate.make('2026-05-19'),
       fileExtensions: {

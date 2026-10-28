@@ -1,4 +1,4 @@
-import type { StorageRepository } from 'laikacms/storage';
+import type { StorageRepository } from 'contentia/storage';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -50,7 +50,7 @@ const readOptions = (raw: Record<string, unknown>): GitlabOptions => {
 
 export const gitlabDriver: StorageDriver = {
   name: 'gitlab',
-  packageName: '@laikacms/gitlab',
+  packageName: '@contentia/gitlab',
   version: '2.0.0',
   subpath: 'storage-gl',
   description: 'GitLab project (commits per write, via PAT/OAuth/CI job token)',

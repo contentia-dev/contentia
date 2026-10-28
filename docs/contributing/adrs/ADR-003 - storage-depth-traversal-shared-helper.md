@@ -9,7 +9,7 @@ status: accepted
 
 ## Context
 
-`StorageRepository` (`packages/laikacms/src/domain/storage/domain/repositories/repository.ts`)
+`StorageRepository` (`packages/contentia/src/domain/storage/domain/repositories/repository.ts`)
 declares `listAtoms` and `listAtomSummaries` as **abstract**. Every one of the ~43 integration
 backends (`packages/integrations/*/src/storage-*/`) therefore reimplements the _entire_ listing
 operation — flat single-level collection, pagination, streaming, **and** the `depth > 1` recursion
@@ -17,7 +17,7 @@ that walks nested folders.
 
 The recursion logic is identical across backends; only the "list the immediate children of one
 folder" step is backend-specific. All backends are validated by a single shared contract test
-(`packages/laikacms/src/domain/storage/testing/contract.ts`) that asserts, among other things, that
+(`packages/contentia/src/domain/storage/testing/contract.ts`) that asserts, among other things, that
 with `depth > 1` nested atoms surface at the parent level.
 
 LCMS-188 surfaced as a regression of exactly this contract clause, and was being fixed one backend
@@ -36,7 +36,7 @@ whack-a-mole over duplicated logic.
 ## Decision
 
 **Option 1.** The depth-recursion logic for `listAtoms` / `listAtomSummaries` MUST live in exactly
-one module under `packages/laikacms/src/domain/storage/`, and every backend MUST delegate to it.
+one module under `packages/contentia/src/domain/storage/`, and every backend MUST delegate to it.
 
 Mechanism (implementer owns the exact shape; these are the hard constraints):
 

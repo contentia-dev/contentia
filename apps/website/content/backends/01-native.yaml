@@ -5,29 +5,29 @@ note: >-
   around.
 items:
   - name: Filesystem
-    sub: laikacms/storage-fs
+    sub: contentia/storage-fs
     icon: { adapter: fs }
   - name: Cloudflare R2
-    sub: laikacms/storage-r2
+    sub: contentia/storage-r2
     icon: { adapter: r2 }
   - name: S3-compatible
-    sub: laikacms/storage-s3
+    sub: contentia/storage-s3
     icon: { adapter: s3 }
   - name: WebDAV
-    sub: laikacms/storage-webdav
+    sub: contentia/storage-webdav
     icon: { adapter: webdav }
   - name: Drizzle (SQL)
-    sub: laikacms/storage-drizzle
+    sub: contentia/storage-drizzle
     icon: { adapter: drizzle }
   - name: GitHub CDN
-    sub: laikacms/storage-github-cdn
+    sub: contentia/storage-github-cdn
     icon: { adapter: github-cdn }
   - name: Browser File System
-    sub: laikacms/storage-web-fs
+    sub: contentia/storage-web-fs
     icon: { adapter: web-fs }
   - name: Web Storage
-    sub: laikacms/storage-web
+    sub: contentia/storage-web
     icon: { adapter: web }
   - name: JSON:API proxy
-    sub: laikacms/storage-jsonapi-proxy
+    sub: contentia/storage-jsonapi-proxy
     icon: { adapter: jsonapi-proxy }

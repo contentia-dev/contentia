@@ -1,0 +1,467 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { ContentiaStream } from 'contentia/core';
+
+import { jsonSerializer } from '../../serializers/storage-serializers-json/index.js';
+import { R2StorageRepository } from '../storage-r2/infrastructure/repositories/r2-storage-repository.js';
+
+import { createS3Bucket } from './index.js';
+import type { S3ClientLike, S3Commands } from './index.js';
+
+// ---------------------------------------------------------------------------
+// Minimal mock command classes — the adapter only uses `new Cmd(input)` and
+// passes the resulting object to `client.send()`.  We capture the input so
+// assertions can inspect what the adapter passed to the S3 client.
+// ---------------------------------------------------------------------------
+
+function makeCmd(name: string) {
+  return class {
+    readonly _name = name;
+    constructor(public readonly input: object) {}
+  };
+}
+
+const commands: S3Commands = {
+  HeadObjectCommand: makeCmd('HeadObjectCommand') as unknown as S3Commands['HeadObjectCommand'],
+  GetObjectCommand: makeCmd('GetObjectCommand') as unknown as S3Commands['GetObjectCommand'],
+  PutObjectCommand: makeCmd('PutObjectCommand') as unknown as S3Commands['PutObjectCommand'],
+  DeleteObjectCommand: makeCmd('DeleteObjectCommand') as unknown as S3Commands['DeleteObjectCommand'],
+  ListObjectsV2Command: makeCmd('ListObjectsV2Command') as unknown as S3Commands['ListObjectsV2Command'],
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeBucket(sendImpl: (cmd: object) => Promise<unknown>, keyPrefix = '') {
+  const client: S3ClientLike = { send: vi.fn(sendImpl) };
+  const bucket = createS3Bucket({
+    client,
+    bucketName: 'test-bucket',
+    commands,
+    keyPrefix,
+  });
+  return { bucket, client };
+}
+
+// ---------------------------------------------------------------------------
+// is404() — tested indirectly through head() and get()
+// ---------------------------------------------------------------------------
+
+describe('is404() detection', () => {
+  describe('name-based detection', () => {
+    it('returns null (treats as 404) when error name is "NotFound"', async () => {
+      const { bucket } = makeBucket(() => Promise.reject(Object.assign(new Error('not found'), { name: 'NotFound' })));
+      expect(await bucket.head('any-key')).toBeNull();
+    });
+
+    it('returns null (treats as 404) when error name is "NoSuchKey"', async () => {
+      const { bucket } = makeBucket(() =>
+        Promise.reject(Object.assign(new Error('no such key'), { name: 'NoSuchKey' }))
+      );
+      expect(await bucket.head('any-key')).toBeNull();
+    });
+
+    it('rethrows when error name is something else', async () => {
+      const err = Object.assign(new Error('access denied'), { name: 'AccessDenied' });
+      const { bucket } = makeBucket(() => Promise.reject(err));
+      await expect(bucket.head('any-key')).rejects.toThrow('access denied');
+    });
+  });
+
+  describe('httpStatusCode-based detection', () => {
+    it('returns null (treats as 404) when $metadata.httpStatusCode is 404', async () => {
+      const err = Object.assign(new Error('not found'), {
+        $metadata: { httpStatusCode: 404 },
+      });
+      const { bucket } = makeBucket(() => Promise.reject(err));
+      expect(await bucket.head('any-key')).toBeNull();
+    });
+
+    it('rethrows when $metadata.httpStatusCode is 403', async () => {
+      const err = Object.assign(new Error('forbidden'), {
+        $metadata: { httpStatusCode: 403 },
+      });
+      const { bucket } = makeBucket(() => Promise.reject(err));
+      await expect(bucket.head('any-key')).rejects.toThrow('forbidden');
+    });
+
+    it('rethrows when $metadata.httpStatusCode is 500', async () => {
+      const err = Object.assign(new Error('server error'), {
+        $metadata: { httpStatusCode: 500 },
+      });
+      const { bucket } = makeBucket(() => Promise.reject(err));
+      await expect(bucket.head('any-key')).rejects.toThrow('server error');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// head()
+// ---------------------------------------------------------------------------
+
+describe('head()', () => {
+  it('returns an R2Object with key, size, etag on success', async () => {
+    const { bucket } = makeBucket(() => Promise.resolve({ ContentLength: 42, ETag: '"abc123"' }));
+    const result = await bucket.head('docs/hello.md');
+    expect(result).toEqual({ key: 'docs/hello.md', size: 42, etag: '"abc123"' });
+  });
+
+  it('returns null on 404 (name-based)', async () => {
+    const { bucket } = makeBucket(() => Promise.reject(Object.assign(new Error(), { name: 'NoSuchKey' })));
+    expect(await bucket.head('missing')).toBeNull();
+  });
+
+  it('rethrows non-404 errors', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.reject(Object.assign(new Error('throttled'), { name: 'ThrottlingException' }))
+    );
+    await expect(bucket.head('x')).rejects.toThrow('throttled');
+  });
+
+  it('prepends keyPrefix to HeadObjectCommand Key', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({ ContentLength: 1, ETag: '"e"' })) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'ns/' });
+    await bucket.head('file.md');
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Key']).toBe('ns/file.md');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// put()
+// ---------------------------------------------------------------------------
+
+describe('put()', () => {
+  it('returns synthesized { key, size: 0, etag: "" } regardless of S3 response', async () => {
+    const { bucket } = makeBucket(() => Promise.resolve({ ETag: '"server-etag"' }));
+    const result = await bucket.put('docs/file.md', 'content');
+    expect(result).toEqual({ key: 'docs/file.md', size: 0, etag: '' });
+  });
+
+  it('returns size: 0 even when S3 response is empty', async () => {
+    const { bucket } = makeBucket(() => Promise.resolve({}));
+    const result = await bucket.put('a.md', 'body');
+    expect(result.size).toBe(0);
+  });
+
+  it('passes ContentType through when provided in httpMetadata', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({})) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands });
+    await bucket.put('file.md', 'x', { httpMetadata: { contentType: 'text/markdown' } });
+    expect(vi.mocked(client.send)).toHaveBeenCalledOnce();
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['ContentType']).toBe('text/markdown');
+  });
+
+  it('prepends keyPrefix to PutObjectCommand Key', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({})) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'ns/' });
+    await bucket.put('file.md', 'content');
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Key']).toBe('ns/file.md');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list() — keyPrefix stripping
+// ---------------------------------------------------------------------------
+
+describe('list() keyPrefix stripping', () => {
+  it('strips keyPrefix from Contents[].Key', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [
+          { Key: 'content/docs/a.md', Size: 10, ETag: '"e1"' },
+          { Key: 'content/docs/b.md', Size: 20, ETag: '"e2"' },
+        ],
+        CommonPrefixes: [],
+        IsTruncated: false,
+      }), 'content/');
+
+    const result = await bucket.list({ prefix: 'docs/' });
+    expect(result.objects).toEqual([
+      { key: 'docs/a.md', size: 10, etag: '"e1"' },
+      { key: 'docs/b.md', size: 20, etag: '"e2"' },
+    ]);
+  });
+
+  it('strips keyPrefix from CommonPrefixes[].Prefix', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [],
+        CommonPrefixes: [
+          { Prefix: 'content/posts/' },
+          { Prefix: 'content/pages/' },
+        ],
+        IsTruncated: false,
+      }), 'content/');
+
+    const result = await bucket.list({ prefix: '', delimiter: '/' });
+    expect(result.delimitedPrefixes).toEqual(['posts/', 'pages/']);
+  });
+
+  it('does not strip anything when keyPrefix is empty', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [{ Key: 'docs/a.md', Size: 5, ETag: '"e"' }],
+        CommonPrefixes: [{ Prefix: 'docs/sub/' }],
+        IsTruncated: false,
+      })
+    );
+
+    const result = await bucket.list({ prefix: 'docs/' });
+    expect(result.objects[0]!.key).toBe('docs/a.md');
+    expect(result.delimitedPrefixes[0]).toBe('docs/sub/');
+  });
+
+  it('filters out Contents entries with undefined Key', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [
+          { Key: undefined, Size: 0 },
+          { Key: 'valid.md', Size: 1, ETag: '"e"' },
+        ],
+        IsTruncated: false,
+      })
+    );
+
+    const result = await bucket.list({});
+    expect(result.objects).toHaveLength(1);
+    expect(result.objects[0]!.key).toBe('valid.md');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list() — NextContinuationToken → cursor mapping
+// ---------------------------------------------------------------------------
+
+describe('list() pagination cursor mapping', () => {
+  it('maps NextContinuationToken to cursor in the return value', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [{ Key: 'a.md', Size: 1, ETag: '"e"' }],
+        IsTruncated: true,
+        NextContinuationToken: 'token-abc-123',
+      })
+    );
+
+    const result = await bucket.list({});
+    expect(result.cursor).toBe('token-abc-123');
+    expect(result.truncated).toBe(true);
+  });
+
+  it('cursor is undefined when NextContinuationToken is absent', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        Contents: [],
+        IsTruncated: false,
+      })
+    );
+
+    const result = await bucket.list({});
+    expect(result.cursor).toBeUndefined();
+    expect(result.truncated).toBe(false);
+  });
+
+  it('passes cursor option as ContinuationToken to the S3 command', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({ Contents: [], IsTruncated: false })) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands });
+    await bucket.list({ cursor: 'my-continuation-token' });
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['ContinuationToken']).toBe('my-continuation-token');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list() — prefix passed to S3 with keyPrefix prepended
+// ---------------------------------------------------------------------------
+
+describe('list() prefix construction', () => {
+  it('prepends keyPrefix to the S3 Prefix when prefix is provided', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({ Contents: [], IsTruncated: false })) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'tenant/' });
+    await bucket.list({ prefix: 'posts/' });
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Prefix']).toBe('tenant/posts/');
+  });
+
+  it('uses keyPrefix alone as S3 Prefix when no prefix option given', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({ Contents: [], IsTruncated: false })) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'tenant/' });
+    await bucket.list({});
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Prefix']).toBe('tenant/');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// get()
+// ---------------------------------------------------------------------------
+
+describe('get()', () => {
+  it('returns null on 404', async () => {
+    const { bucket } = makeBucket(() => Promise.reject(Object.assign(new Error(), { name: 'NoSuchKey' })));
+    expect(await bucket.get('missing')).toBeNull();
+  });
+
+  it('returns null when Body is absent', async () => {
+    const { bucket } = makeBucket(() => Promise.resolve({ ContentLength: 10, ETag: '"e"' }));
+    expect(await bucket.get('key')).toBeNull();
+  });
+
+  it('returns an R2ObjectBody with working text() when Body is present', async () => {
+    const { bucket } = makeBucket(() =>
+      Promise.resolve({
+        ContentLength: 5,
+        ETag: '"etag"',
+        Body: { transformToString: async () => 'hello' },
+      })
+    );
+    const result = await bucket.get('file.md');
+    expect(result).not.toBeNull();
+    expect(result!.key).toBe('file.md');
+    expect(result!.size).toBe(5);
+    expect(await result!.text()).toBe('hello');
+  });
+
+  it('rethrows non-404 errors', async () => {
+    const { bucket } = makeBucket(() => Promise.reject(Object.assign(new Error('boom'), { name: 'InternalError' })));
+    await expect(bucket.get('key')).rejects.toThrow('boom');
+  });
+
+  it('prepends keyPrefix to GetObjectCommand Key', async () => {
+    const client: S3ClientLike = {
+      send: vi.fn(() =>
+        Promise.resolve({
+          ContentLength: 3,
+          ETag: '"e"',
+          Body: { transformToString: async () => 'hi' },
+        })
+      ),
+    };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'ns/' });
+    await bucket.get('file.md');
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Key']).toBe('ns/file.md');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// delete()
+// ---------------------------------------------------------------------------
+
+describe('delete()', () => {
+  it('calls the S3 client with the correct key', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({})) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands });
+    await bucket.delete('to-remove.md');
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Key']).toBe('to-remove.md');
+  });
+
+  it('prepends keyPrefix when deleting', async () => {
+    const client: S3ClientLike = { send: vi.fn(() => Promise.resolve({})) };
+    const bucket = createS3Bucket({ client, bucketName: 'b', commands, keyPrefix: 'ns/' });
+    await bucket.delete('file.md');
+    const cmd = vi.mocked(client.send).mock.calls[0]![0] as { input: Record<string, unknown> };
+    expect(cmd.input['Key']).toBe('ns/file.md');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listAtoms/listAtomSummaries on a missing folder (LCMS-1004) — driven through
+// R2StorageRepository, since that's what interprets `bucket.list()` results
+// into the missing-vs-empty-folder distinction. ListObjectsV2 never 404s on a
+// nonexistent prefix — it just returns empty Contents/CommonPrefixes — so
+// R2StorageRepository synthesizes a NotFoundError whenever a listing comes
+// back completely empty (see r2-datasource.ts `listDirectory`). Because
+// `createS3Bucket` is a thin ListObjectsV2 passthrough, storage-s3 inherits
+// that exact same "empty + recoverable warning" contract.
+// ---------------------------------------------------------------------------
+
+interface InMemoryObject {
+  key: string;
+  body: string;
+}
+
+function makeInMemoryS3Client(objects: InMemoryObject[] = []): S3ClientLike {
+  return {
+    send: vi.fn(async (cmd: { input: object } & { readonly _name?: string }) => {
+      const name = (cmd as { _name?: string })._name;
+      const input = cmd.input as Record<string, unknown>;
+      if (name === 'ListObjectsV2Command') {
+        const prefix = (input['Prefix'] as string | undefined) ?? '';
+        const delimiter = input['Delimiter'] as string | undefined;
+        const matching = objects.filter(o => o.key.startsWith(prefix));
+        const contents: { Key: string, Size: number, ETag: string }[] = [];
+        const commonPrefixes = new Set<string>();
+        for (const o of matching) {
+          if (delimiter) {
+            const tail = o.key.slice(prefix.length);
+            const sepIdx = tail.indexOf(delimiter);
+            if (sepIdx !== -1) {
+              commonPrefixes.add(prefix + tail.slice(0, sepIdx + delimiter.length));
+              continue;
+            }
+          }
+          contents.push({ Key: o.key, Size: o.body.length, ETag: '"e"' });
+        }
+        return {
+          Contents: contents,
+          CommonPrefixes: Array.from(commonPrefixes).map(Prefix => ({ Prefix })),
+          IsTruncated: false,
+        };
+      }
+      if (name === 'GetObjectCommand' || name === 'HeadObjectCommand') {
+        const key = input['Key'] as string;
+        const obj = objects.find(o => o.key === key);
+        if (!obj) throw Object.assign(new Error('not found'), { name: 'NoSuchKey' });
+        if (name === 'HeadObjectCommand') return { ContentLength: obj.body.length, ETag: '"e"' };
+        return {
+          ContentLength: obj.body.length,
+          ETag: '"e"',
+          Body: { transformToString: async () => obj.body },
+        };
+      }
+      throw new Error(`Unexpected command ${name}`);
+    }),
+  };
+}
+
+function makeS3BackedRepo(objects: InMemoryObject[] = []) {
+  const client = makeInMemoryS3Client(objects);
+  const bucket = createS3Bucket({ client, bucketName: 'test-bucket', commands });
+  return new R2StorageRepository(bucket as never, { json: jsonSerializer }, 'json');
+}
+
+describe('storage-s3 missing-folder behavior (via R2StorageRepository)', () => {
+  it('listAtoms on a missing folder: empty + recoverable warning', async () => {
+    const repo = makeS3BackedRepo();
+    const collected = await ContentiaStream.runPromiseCollect(
+      repo.listAtoms('does-not-exist', { depth: 1, pagination: { offset: 0, limit: 100 } }),
+    );
+    expect(collected.data).toHaveLength(0);
+    expect(collected.done.total).toBe(0);
+    expect(collected.recoverableErrors.length).toBeGreaterThan(0);
+  });
+
+  it('listAtomSummaries on a missing folder: empty + recoverable warning', async () => {
+    const repo = makeS3BackedRepo();
+    const collected = await ContentiaStream.runPromiseCollect(
+      repo.listAtomSummaries('does-not-exist', { depth: 1, pagination: { offset: 0, limit: 100 } }),
+    );
+    expect(collected.data).toHaveLength(0);
+    expect(collected.done.total).toBe(0);
+    expect(collected.recoverableErrors.length).toBeGreaterThan(0);
+  });
+
+  it('listAtoms on an existing but empty folder: empty, no warning', async () => {
+    const repo = makeS3BackedRepo([{ key: 'posts/.keep', body: '' }]);
+    const collected = await ContentiaStream.runPromiseCollect(
+      repo.listAtoms('posts', { depth: 1, pagination: { offset: 0, limit: 100 } }),
+    );
+    expect(collected.data).toHaveLength(0);
+    expect(collected.recoverableErrors).toHaveLength(0);
+  });
+});

@@ -1,8 +1,8 @@
 {
-  "name": "@laikacms/starter-hono-blog",
+  "name": "@contentia/starter-hono-blog",
   "version": "0.0.1",
   "private": true,
-  "description": "Starter blog built with Hono + LaikaCMS on Node.js. Demonstrates createEmbeddedLaika, SSR blog routes, documents via laikacms/compat, and the bare Decap admin app bundled locally.",
+  "description": "Starter blog built with Hono + Contentia on Node.js. Demonstrates createEmbeddedContentia, SSR blog routes, documents via contentia/compat, and the bare Decap admin app bundled locally.",
   "type": "module",
   "scripts": {
     "build:admin": "esbuild src/admin-client.ts --bundle --outfile=public/admin/bundle.js --format=esm --platform=browser",
@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@laikacms/server": "^6.0.0",
+    "@contentia/server": "^6.0.0",
     "@laikacms/decap-cms": "^4.1.0",
     "hono": "^4.12.31",
-    "laikacms": "^6.0.0",
+    "contentia": "^6.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.4"
   },

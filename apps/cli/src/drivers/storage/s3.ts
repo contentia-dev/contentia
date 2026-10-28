@@ -1,5 +1,5 @@
-import { R2StorageRepository } from 'laikacms/storage-r2';
-import { createS3Bucket, type S3Commands } from 'laikacms/storage-s3';
+import { R2StorageRepository } from 'contentia/storage-r2';
+import { createS3Bucket, type S3Commands } from 'contentia/storage-s3';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -46,7 +46,7 @@ const readOptions = (raw: Record<string, unknown>): S3Options => {
 /**
  * Any S3-compatible object store (AWS S3, Cloudflare R2 over its S3 endpoint,
  * MinIO, …). The `@aws-sdk/client-s3` client + command classes are lazy-loaded
- * (auto-installed on demand) and fed through laikacms's built-in `createS3Bucket`
+ * (auto-installed on demand) and fed through contentia's built-in `createS3Bucket`
  * adapter into the `R2StorageRepository`.
  */
 export const s3Driver: StorageDriver = {

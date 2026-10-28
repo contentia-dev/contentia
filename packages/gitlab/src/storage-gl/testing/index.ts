@@ -1,5 +1,5 @@
-import type { StorageObjectContent } from 'laikacms/storage';
-import type { StorageContractCase } from 'laikacms/storage/testing';
+import type { StorageObjectContent } from 'contentia/storage';
+import type { StorageContractCase } from 'contentia/storage/testing';
 
 import { GitlabStorageRepository } from '../gitlab-storage-repository.js';
 

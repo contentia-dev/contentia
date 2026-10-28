@@ -3,14 +3,14 @@ import * as Result from 'effect/Result';
 
 import {
   BadRequestError,
+  type ContentiaError,
+  type ContentiaResult,
+  ContentiaStream,
+  ContentiaTask,
   EntryAlreadyExistsError,
   InvalidData,
-  type LaikaError,
-  type LaikaResult,
-  LaikaStream,
-  LaikaTask,
   NotFoundError,
-} from 'laikacms/core';
+} from 'contentia/core';
 import {
   applyPagination,
   type Atom,
@@ -33,7 +33,7 @@ import {
   StorageRepository,
   type StorageSerializerRegistry,
   unsupportedChanges,
-} from 'laikacms/storage';
+} from 'contentia/storage';
 import * as minimatch from 'minimatch';
 
 import { GithubDataSource, type GithubDataSourceOptions } from './github-datasource.js';
@@ -52,10 +52,10 @@ const DEFAULT_IGNORE_LIST = [
   '**/Thumbs.db',
   '**/desktop.ini',
   '**/.catalog',
-  '**/.laikacms',
+  '**/.contentia',
 ];
 
-const liftResult = <A>(p: Promise<LaikaResult<A>>): Effect.Effect<A, LaikaError> =>
+const liftResult = <A>(p: Promise<ContentiaResult<A>>): Effect.Effect<A, ContentiaError> =>
   Effect.flatMap(Effect.promise(() => p), Effect.fromResult);
 
 /**
@@ -147,8 +147,8 @@ export class GithubStorageRepository extends StorageRepository {
     return serializer.deserializeDocumentFileContents(content, {});
   }
 
-  getObject(key: string): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  getObject(key: string): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(key));
         if (!resolved) {
@@ -174,8 +174,8 @@ export class GithubStorageRepository extends StorageRepository {
     );
   }
 
-  createObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  createObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         if (!create.content) {
           return yield* Effect.fail(new InvalidData('Object content is required for creation'));
@@ -197,13 +197,13 @@ export class GithubStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getObject(create.key));
+        return yield* ContentiaTask.runValue(this.getObject(create.key));
       })
     );
   }
 
-  updateObject(update: StorageObjectUpdate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  updateObject(update: StorageObjectUpdate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(update.key));
         if (!resolved) {
@@ -218,13 +218,13 @@ export class GithubStorageRepository extends StorageRepository {
             }),
           );
         }
-        return yield* LaikaTask.runValue(this.getObject(update.key));
+        return yield* ContentiaTask.runValue(this.getObject(update.key));
       })
     );
   }
 
-  createOrUpdateObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
-    return LaikaTask.make<StorageObject>(() =>
+  createOrUpdateObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
+    return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
         // When metadata pins an extension, that's authoritative — don't let a stale
         // file at a different extension capture the write.
@@ -244,13 +244,13 @@ export class GithubStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getObject(create.key));
+        return yield* ContentiaTask.runValue(this.getObject(create.key));
       })
     );
   }
 
-  getFolder(key: string): LaikaTask.LaikaTask<Folder> {
-    return LaikaTask.make<Folder>(() =>
+  getFolder(key: string): ContentiaTask.ContentiaTask<Folder> {
+    return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
         yield* liftResult(this.dataSource.listDirectory(key));
         const now = new Date(0).toISOString();
@@ -259,8 +259,8 @@ export class GithubStorageRepository extends StorageRepository {
     );
   }
 
-  createFolder(folderCreate: FolderCreate): LaikaTask.LaikaTask<Folder> {
-    return LaikaTask.make<Folder>(() =>
+  createFolder(folderCreate: FolderCreate): ContentiaTask.ContentiaTask<Folder> {
+    return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
         const keepPath = pathCombine(folderCreate.key, '.keep');
         yield* liftResult(
@@ -269,20 +269,20 @@ export class GithubStorageRepository extends StorageRepository {
             author: this.commitAuthor,
           }),
         );
-        return yield* LaikaTask.runValue(this.getFolder(folderCreate.key));
+        return yield* ContentiaTask.runValue(this.getFolder(folderCreate.key));
       })
     );
   }
 
-  getAtom(key: string): LaikaTask.LaikaTask<Atom> {
-    return LaikaTask.make<Atom>(() =>
+  getAtom(key: string): ContentiaTask.ContentiaTask<Atom> {
+    return ContentiaTask.make<Atom>(() =>
       Effect.gen({ self: this }, function*() {
         const typeResult = yield* Effect.result(
           Effect.tryPromise({
             try: () => this.dataSource.pathType(key),
             // pathType already maps octokit failures onto domain errors (NotFoundError,
             // TooManyRequestsError, ForbiddenError, ...); preserve them as-is here.
-            catch: (e): LaikaError => (e instanceof Error ? e as LaikaError : new BadRequestError(String(e))),
+            catch: (e): ContentiaError => (e instanceof Error ? e as ContentiaError : new BadRequestError(String(e))),
           }),
         );
         // pathType NotFound → probe as file with an extension via getObject. All other
@@ -291,12 +291,12 @@ export class GithubStorageRepository extends StorageRepository {
           if (!(typeResult.failure instanceof NotFoundError)) {
             return yield* Effect.fail(typeResult.failure);
           }
-          return yield* LaikaTask.runValue(this.getObject(key));
+          return yield* ContentiaTask.runValue(this.getObject(key));
         }
         if (typeResult.success === 'file') {
-          return yield* LaikaTask.runValue(this.getObject(key));
+          return yield* ContentiaTask.runValue(this.getObject(key));
         }
-        return yield* LaikaTask.runValue(this.getFolder(key));
+        return yield* ContentiaTask.runValue(this.getFolder(key));
       })
     );
   }
@@ -304,8 +304,8 @@ export class GithubStorageRepository extends StorageRepository {
   listAtomSummaries(
     folderKey: string,
     options: ListAtomsOptions,
-  ): LaikaStream.LaikaStream<AtomSummary, ListAtomsDone> {
-    return LaikaStream.make<AtomSummary, ListAtomsDone>(emit =>
+  ): ContentiaStream.ContentiaStream<AtomSummary, ListAtomsDone> {
+    return ContentiaStream.make<AtomSummary, ListAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         const { summaries, aggregateTotal } = yield* this.collectFilteredSummaries(folderKey, options);
         if (summaries.length > 0) yield* emit.dataMany(summaries);
@@ -317,17 +317,17 @@ export class GithubStorageRepository extends StorageRepository {
   listAtoms(
     folderKey: string,
     options: ListAtomsOptions,
-  ): LaikaStream.LaikaStream<Atom, ListAtomsDone> {
-    return LaikaStream.make<Atom, ListAtomsDone>(emit =>
+  ): ContentiaStream.ContentiaStream<Atom, ListAtomsDone> {
+    return ContentiaStream.make<Atom, ListAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         const { summaries, aggregateTotal } = yield* this.collectFilteredSummaries(folderKey, options);
         for (const summary of summaries) {
           if (summary.type === 'object-summary') {
-            const r = yield* Effect.result(LaikaTask.runValue(this.getObject(summary.key)));
+            const r = yield* Effect.result(ContentiaTask.runValue(this.getObject(summary.key)));
             if (Result.isFailure(r)) yield* emit.recoverableError(r.failure);
             else yield* emit.data(r.success);
           } else {
-            const r = yield* Effect.result(LaikaTask.runValue(this.getFolder(summary.key)));
+            const r = yield* Effect.result(ContentiaTask.runValue(this.getFolder(summary.key)));
             if (Result.isFailure(r)) yield* emit.recoverableError(r.failure);
             else yield* emit.data(r.success);
           }
@@ -340,7 +340,7 @@ export class GithubStorageRepository extends StorageRepository {
   private collectFilteredSummaries(
     folderKey: string,
     options: ListAtomsOptions,
-  ): Effect.Effect<{ summaries: ReadonlyArray<AtomSummary>, aggregateTotal: number }, LaikaError> {
+  ): Effect.Effect<{ summaries: ReadonlyArray<AtomSummary>, aggregateTotal: number }, ContentiaError> {
     return Effect.gen({ self: this }, function*() {
       const all = yield* collectAtomSummariesWithDepth(folderKey, key => this.listFolderLevel(key), options.depth);
       const aggregateTotal = all.length;
@@ -348,7 +348,7 @@ export class GithubStorageRepository extends StorageRepository {
     });
   }
 
-  private listFolderLevel(folderKey: string): Effect.Effect<AtomSummary[], LaikaError> {
+  private listFolderLevel(folderKey: string): Effect.Effect<AtomSummary[], ContentiaError> {
     return Effect.gen({ self: this }, function*() {
       const listing = yield* liftResult(this.dataSource.listDirectory(folderKey));
       const filtered = listing.filter(
@@ -373,8 +373,8 @@ export class GithubStorageRepository extends StorageRepository {
     });
   }
 
-  removeAtoms(keys: readonly string[]): LaikaStream.LaikaStream<string, RemoveAtomsDone> {
-    return LaikaStream.make<string, RemoveAtomsDone>(emit =>
+  removeAtoms(keys: readonly string[]): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
+    return ContentiaStream.make<string, RemoveAtomsDone>(emit =>
       Effect.gen({ self: this }, function*() {
         let removed = 0;
         let skipped = 0;
@@ -412,8 +412,8 @@ export class GithubStorageRepository extends StorageRepository {
     );
   }
 
-  getCapabilities(): LaikaTask.LaikaTask<Capabilities> {
-    return LaikaTask.succeed<Capabilities>({
+  getCapabilities(): ContentiaTask.ContentiaTask<Capabilities> {
+    return ContentiaTask.succeed<Capabilities>({
       changes: unsupportedChanges,
       fileExtensions: {
         supported: true,

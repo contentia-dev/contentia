@@ -1,7 +1,7 @@
 backend:
-  name: laika
-  base_url: /__laika
-  dev_token: laika-local-dev
+  name: contentia
+  base_url: /__contentia
+  dev_token: contentia-local-dev
 media_folder: public/uploads
 public_folder: /uploads
 collections:

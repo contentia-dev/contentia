@@ -5,7 +5,7 @@
  * Compatible with Google Authenticator, Authy, and other TOTP apps.
  * Works in both Cloudflare Workers and Node.js environments.
  *
- * @module @laikacms/server/oauth2
+ * @module @contentia/server/oauth2
  */
 
 export * from './totp.js';

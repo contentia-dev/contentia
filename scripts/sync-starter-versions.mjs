@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Pin every starter's laikacms / @laikacms/* dependency to a caret range
+ * Pin every starter's contentia / @contentia/* dependency to a caret range
  * against the package's current version. Run from the root `version` script,
  * right after `changeset version`, so a release automatically carries the new
  * version into the starters. Idempotent.

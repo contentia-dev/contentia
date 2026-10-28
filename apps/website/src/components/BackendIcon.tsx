@@ -1,7 +1,7 @@
 import { adapterIconSrc } from '../data/adapters';
 import { GenericIcon } from './icons';
 
-/* `adapter` — the key of an adapter Laika ships (repo-root adapters.yaml); uses that adapter's
+/* `adapter` — the key of an adapter Contentia ships (repo-root adapters.yaml); uses that adapter's
              own logo, the same one the docs show, with its dark variant in dark mode.
    `si`  — a simple-icons slug, served (brand-coloured) from cdn.simpleicons.org.
    `svg` — one of the local generic glyphs keyed in icons.tsx.

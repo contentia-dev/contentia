@@ -9,7 +9,7 @@ import { writeAtomic } from './atomic-write.js';
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-atomic-write-'));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-atomic-write-'));
 });
 
 afterEach(async () => {

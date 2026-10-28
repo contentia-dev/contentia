@@ -1,5 +1,5 @@
 ---
-"laikacms": minor
+"contentia": minor
 ---
 
 `assets-api` gains `POST /operations`, a fail-fast batch-write endpoint mirroring `documents-api`'s

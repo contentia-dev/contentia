@@ -1,6 +1,6 @@
 # Get Started
 
-Task-oriented walkthroughs for getting Laika running and wired into your stack.
+Task-oriented walkthroughs for getting Contentia running and wired into your stack.
 
 ## Getting up and running
 
@@ -9,10 +9,10 @@ Task-oriented walkthroughs for getting Laika running and wired into your stack.
 
 ## Integrations
 
-- **[Astro](./astro)** — use Laika content through Astro's own Content Layer (`getCollection`,
+- **[Astro](./astro)** — use Contentia content through Astro's own Content Layer (`getCollection`,
   `getEntry`, `render`, Zod schemas) with incremental sync and dev-server hot-reload.
-- **[Vite](./vite)** — import content as ES modules at build time through the `laika:` protocol, for
-  fully static builds.
+- **[Vite](./vite)** — import content as ES modules at build time through the `contentia:` protocol,
+  for fully static builds.
 
 ## Tools
 
@@ -21,7 +21,7 @@ Task-oriented walkthroughs for getting Laika running and wired into your stack.
 
 ## Decap CMS
 
-Pair Laika with the [Decap CMS](https://decapcms.org/) admin UI. Start with the quickstart, then
+Pair Contentia with the [Decap CMS](https://decapcms.org/) admin UI. Start with the quickstart, then
 reach for the deeper guides as needed.
 
 - **[Decap Integration overview](./decap/)** — the two integration shapes and how the pieces fit.

@@ -112,7 +112,7 @@ describe("'all' access", () => {
 describe('the policy shape', () => {
   it('is an allowlist, so an action added upstream is denied until reviewed', () => {
     // A denylist would silently make a newly-added action public the moment
-    // laikacms is upgraded.
+    // contentia is upgraded.
     expect(documents('published', 'someFutureAction')).toBe(false);
     expect(storage('published', 'someFutureAction')).toBe(false);
     expect(assets('published', 'someFutureAction')).toBe(false);

@@ -1,10 +1,10 @@
 /**
- * Repository change channel — the dev-server half of Laika's hot reload.
+ * Repository change channel — the dev-server half of Contentia's hot reload.
  *
- * A {@link LaikaRepositories} storage repository can PUSH change notifications
+ * A {@link ContentiaRepositories} storage repository can PUSH change notifications
  * (see `StorageRepository.subscribeChanges`). This module bridges those
  * notifications to a Vite dev server: when content changes on disk, the
- * matching `laika:` virtual modules are invalidated in the module graph and the
+ * matching `contentia:` virtual modules are invalidated in the module graph and the
  * browser is told to reload.
  *
  * It is deliberately decoupled from `plugin.ts`: the plugin's `configureServer`
@@ -12,9 +12,9 @@
  * dev server, and disposes the returned handle when the server closes.
  */
 
-import type { ChangeListener, ChangeSummary, SubscribeChangesOptions, Unsubscribe } from 'laikacms/storage';
+import type { ChangeListener, ChangeSummary, SubscribeChangesOptions, Unsubscribe } from 'contentia/storage';
 
-import { type LaikaRepositories, readItem } from './backend.js';
+import { type ContentiaRepositories, readItem } from './backend.js';
 import { bodyOf, chunkPath, writeChunk } from './bodies.js';
 import { type Namespace, toVirtualId, VIRTUAL_PREFIX } from './protocol.js';
 
@@ -51,7 +51,7 @@ export interface HmrServer {
 
 export interface RepositoryChangeChannelOptions {
   /**
-   * When `true`, any change invalidates every resolved `laika:` virtual module
+   * When `true`, any change invalidates every resolved `contentia:` virtual module
    * rather than only the ones whose keys changed. Coarser but immune to
    * cross-namespace coupling (e.g. a storage object backing a Catalog
    * document). Defaults to `false` (targeted per-key invalidation).
@@ -69,7 +69,7 @@ export interface RepositoryChangeChannelOptions {
 type SubscribeChanges = (options: SubscribeChangesOptions, listener: ChangeListener) => Unsubscribe;
 
 /**
- * Wire a {@link LaikaRepositories} to a Vite dev server so on-disk content
+ * Wire a {@link ContentiaRepositories} to a Vite dev server so on-disk content
  * changes trigger HMR. Subscribes to the storage repository's push channel (and
  * any future documents push channel) when it advertises one; repositories
  * without subscription support are silently skipped.
@@ -77,7 +77,7 @@ type SubscribeChanges = (options: SubscribeChangesOptions, listener: ChangeListe
  * @returns a dispose function that removes every subscription. Idempotent.
  */
 export function createRepositoryChangeChannel(
-  repos: LaikaRepositories,
+  repos: ContentiaRepositories,
   server: HmrServer,
   options: RepositoryChangeChannelOptions = {},
 ): Unsubscribe {
@@ -123,7 +123,7 @@ export function createRepositoryChangeChannel(
  * Exported for testing.
  */
 export async function refreshBodyChunks(
-  repos: LaikaRepositories,
+  repos: ContentiaRepositories,
   root: string,
   server: HmrServer,
   namespace: Namespace,
@@ -147,7 +147,7 @@ export async function refreshBodyChunks(
 }
 
 /**
- * Invalidate the affected `laika:` virtual modules and request a full reload.
+ * Invalidate the affected `contentia:` virtual modules and request a full reload.
  * Exported for testing.
  */
 export function applyChanges(

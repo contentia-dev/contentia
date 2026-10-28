@@ -1,7 +1,7 @@
 /**
  * The repository slot shared by the integration and both build-time loaders.
  *
- * The field names mirror `LaikaVitePluginOptions` exactly. That is deliberate:
+ * The field names mirror `ContentiaVitePluginOptions` exactly. That is deliberate:
  * a reader who has wired the Vite plugin already knows this struct, and the two
  * packages can grow the same new option without diverging.
  *
@@ -16,16 +16,21 @@
 
 import path from 'node:path';
 
-import { createFsStorage, createRepositories, defaultSerializers, type LaikaRepositories } from '@laikacms/vite-plugin';
-import { AssetsRepository } from 'laikacms/assets';
-import { CatalogAssetsRepository } from 'laikacms/assets/catalog';
-import type { CatalogProvider } from 'laikacms/catalog';
-import { ConventionCatalogProvider } from 'laikacms/catalog-convention';
-import { DecapCatalogProvider } from 'laikacms/catalog-decap';
-import { CatalogDocumentsRepository } from 'laikacms/documents/catalog';
-import type { StorageRepository, StorageSerializerRegistry } from 'laikacms/storage';
+import {
+  type ContentiaRepositories,
+  createFsStorage,
+  createRepositories,
+  defaultSerializers,
+} from '@contentia/vite-plugin';
+import { AssetsRepository } from 'contentia/assets';
+import { CatalogAssetsRepository } from 'contentia/assets/catalog';
+import type { CatalogProvider } from 'contentia/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
+import type { StorageRepository, StorageSerializerRegistry } from 'contentia/storage';
 
-export type { LaikaRepositories };
+export type { ContentiaRepositories };
 export { defaultSerializers };
 
 /**
@@ -36,7 +41,7 @@ export { defaultSerializers };
  *   Decap `folder` matches its collection `name`.
  * - `'decap'` — read `config.yml`. Necessary when a collection's `folder`
  *   differs from its `name`, and the only option that can *enumerate* the
- *   collections, which is what {@link laikaCollections} needs.
+ *   collections, which is what {@link contentiaCollections} needs.
  * - a `CatalogProvider` — anything else.
  */
 export type CatalogChoice = 'convention' | 'decap' | CatalogProvider;
@@ -44,12 +49,12 @@ export type CatalogChoice = 'convention' | 'decap' | CatalogProvider;
 /** Where the Decap config lives, relative to the storage root. Extension is probed. */
 export const DEFAULT_CONFIG_KEY = 'config';
 
-export interface LaikaRepositoryOptions {
+export interface ContentiaRepositoryOptions {
   /**
    * Bring your own repositories. Highest precedence — nothing else in this
    * struct is read when it is set.
    */
-  repositories?: LaikaRepositories;
+  repositories?: ContentiaRepositories;
   /**
    * Provide only the storage repository; the documents and assets repositories
    * are derived from it via Catalog. Ignored when {@link repositories} is given.
@@ -78,16 +83,16 @@ export interface LaikaRepositoryOptions {
 export const DEFAULT_CONTENT_DIR = 'content';
 
 /**
- * Resolve a {@link LaikaRepositoryOptions} into concrete repositories.
+ * Resolve a {@link ContentiaRepositoryOptions} into concrete repositories.
  *
  * `root` is the Astro project root (`config.root`), used to resolve a relative
- * {@link LaikaRepositoryOptions.dir}. Loaders that run outside a configured
+ * {@link ContentiaRepositoryOptions.dir}. Loaders that run outside a configured
  * integration pass `process.cwd()`, which is where Astro is invoked from.
  */
 export function resolveRepositories(
-  options: LaikaRepositoryOptions,
+  options: ContentiaRepositoryOptions,
   root: string,
-): LaikaRepositories {
+): ContentiaRepositories {
   if (options.repositories) return options.repositories;
 
   const storage = options.storage ?? createFsStorage({

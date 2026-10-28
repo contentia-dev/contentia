@@ -4,10 +4,10 @@
   "commit": false,
   "fixed": [
     [
-      "laikacms",
-      "@laikacms/server",
-      "@laikacms/vite-plugin",
-      "@laikacms/astro"
+      "contentia",
+      "@contentia/server",
+      "@contentia/vite-plugin",
+      "@contentia/astro"
     ]
   ],
   "linked": [],

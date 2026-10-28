@@ -1,4 +1,4 @@
-import { GithubCdnStorageRepository } from 'laikacms/storage-github-cdn';
+import { GithubCdnStorageRepository } from 'contentia/storage-github-cdn';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -32,11 +32,11 @@ const readOptions = (raw: Record<string, unknown>): GithubCdnOptions => {
 /**
  * Read-only backend over a **public** GitHub repository served through jsDelivr's
  * CDN — no credentials, no `@octokit/*`. Ideal as a migration *source* (writes
- * reject). Ships in `laikacms`, so it never triggers an install prompt.
+ * reject). Ships in `contentia`, so it never triggers an install prompt.
  */
 export const githubCdnDriver: StorageDriver = {
   name: 'github-cdn',
-  packageName: 'laikacms',
+  packageName: 'contentia',
   version: '*',
   subpath: 'storage-github-cdn',
   description: 'Public GitHub repo over jsDelivr CDN (read-only, no credentials)',

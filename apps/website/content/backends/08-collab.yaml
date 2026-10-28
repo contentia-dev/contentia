@@ -5,17 +5,17 @@ note: >-
   live in.
 items:
   - name: Notion
-    sub: '@laikacms/notion'
+    sub: '@contentia/notion'
     icon: { si: notion }
   - name: Dropbox
-    sub: '@laikacms/dropbox'
+    sub: '@contentia/dropbox'
     icon: { si: dropbox }
   - name: Google Drive
-    sub: '@laikacms/google'
+    sub: '@contentia/google'
     icon: { si: googledrive }
   - name: OneDrive
-    sub: '@laikacms/microsoft'
+    sub: '@contentia/microsoft'
     icon: { img: onedrive }
   - name: Trello
-    sub: '@laikacms/trello'
+    sub: '@contentia/trello'
     icon: { si: trello }

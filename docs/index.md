@@ -1,26 +1,26 @@
-# Welcome to <span class="laika-accent">Laika</span>
+# Welcome to <span class="contentia-accent">Contentia</span>
 
-Laika is a unified abstraction for accessing files, API's and other content. It takes care of all
-the complexities like pagination, batching, concurrency, streaming and discovery. Along with that
-Laika provides easy to use integrations for common web frameworks and a ton of premade opinionated
-adapters.
+Contentia is a unified abstraction for accessing files, API's and other content. It takes care of
+all the complexities like pagination, batching, concurrency, streaming and discovery. Along with
+that Contentia provides easy to use integrations for common web frameworks and a ton of premade
+opinionated adapters.
 
-## Why Laika
+## Why Contentia
 
-### Laika is the transport, you provide the domain
+### Contentia is the transport, you provide the domain
 
-The reason to use Laika is that you don't want to model your domain around your CMS or storage
-implementation. The goal of Laika is to get you 90% there. Laika attempts to not hide any details
-from you, or to be opinionated about how you model your data and data retrieval. You can read more
-about the architecture of Laika [here](./concepts/architecture).
+The reason to use Contentia is that you don't want to model your domain around your CMS or storage
+implementation. The goal of Contentia is to get you 90% there. Contentia attempts to not hide any
+details from you, or to be opinionated about how you model your data and data retrieval. You can
+read more about the architecture of Contentia [here](./concepts/architecture).
 
 ### Built for AI
 
-Laika is also extremely useful as a homogeneous data access layer in the age of LLMs. Laika provides
-a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. Unlike EmDash CMS, it
-only has one 'request' tool.
+Contentia is also extremely useful as a homogeneous data access layer in the age of LLMs. Contentia
+provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. Unlike EmDash
+CMS, it only has one 'request' tool.
 
-### What Laika offers
+### What Contentia offers
 
 <table>
   <tr><th colspan="2">Out of the box</th></tr>
@@ -36,10 +36,10 @@ only has one 'request' tool.
 
 <!--@include: ./.vitepress/adapters/logos.md-->
 
-Laika's core sits on top of [Effect.ts](https://effect.website/). It provides the primitives that
-Laika uses, along with some custom primitives like
-[`LaikaTask`](./reference/api/laikacms/core/namespaces/LaikaTask/) and
-[`LaikaStream`](./reference/api/laikacms/core/namespaces/LaikaStream/).
+Contentia's core sits on top of [Effect.ts](https://effect.website/). It provides the primitives
+that Contentia uses, along with some custom primitives like
+[`ContentiaTask`](./reference/api/contentia/core/namespaces/ContentiaTask/) and
+[`ContentiaStream`](./reference/api/contentia/core/namespaces/ContentiaStream/).
 
 ## Architecture Overview
 
@@ -57,8 +57,8 @@ Each layer depends only on the layers below it.
 - **GitHub Issues** — For bugs and feature requests
 - **GitHub Discussions** — For questions and discussions
 - **Contributing** — See
-  [CONTRIBUTING.md](https://github.com/laikacms/laikacms/blob/develop/CONTRIBUTING.md)
+  [CONTRIBUTING.md](https://github.com/contentia-dev/contentia/blob/develop/CONTRIBUTING.md)
 
 ## License
 
-Laika is [MIT licensed](https://github.com/laikacms/laikacms/blob/develop/LICENSE).
+Contentia is [MIT licensed](https://github.com/contentia-dev/contentia/blob/develop/LICENSE).

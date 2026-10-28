@@ -36,10 +36,10 @@ export default __data;
 
   it('wrapAmbientModule strips `declare` and wraps in an exact module block', () => {
     const wrapped = wrapAmbientModule(
-      'laika:doc/posts/a',
+      'contentia:doc/posts/a',
       'export declare const title: string;\ndeclare const _default: { title: string };\nexport default _default;\n',
     );
-    expect(wrapped).toContain("declare module 'laika:doc/posts/a' {");
+    expect(wrapped).toContain("declare module 'contentia:doc/posts/a' {");
     expect(wrapped).toContain('  export const title: string;');
     expect(wrapped).toContain('  const _default: { title: string };');
     expect(wrapped).not.toContain('export declare');
@@ -48,7 +48,7 @@ export default __data;
 
   it('genericFallbackModule is the lowest-specificity wildcard', () => {
     const fallback = genericFallbackModule();
-    expect(fallback).toContain("declare module 'laika:*'");
+    expect(fallback).toContain("declare module 'contentia:*'");
     expect(fallback).toContain('export default data');
   });
 });

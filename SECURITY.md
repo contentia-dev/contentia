@@ -6,24 +6,24 @@ Email [security@laikacms.com](mailto:security@laikacms.com). Do not use public i
 
 ## Packages
 
-### `@laikacms/crypto`
+### `@contentia/crypto`
 
 - Argon2id password hashing
 - Constant-time comparison
 - Secure random generation
 
-### `@laikacms/decap-oauth2`
+### `@contentia/decap-oauth2`
 
 > [!WARNING]
 > Provided "as is" without warranty. Review the implementation and conduct your own security audits
 > before production use.
 
-### `@laikacms/file-sanitizer`
+### `@contentia/file-sanitizer`
 
 > [!CAUTION] **Best-effort sanitization only.** Will not stop determined attackers. Use additional
 > measures: isolated storage, antivirus scanning, CDN delivery.
 
-### `@laikacms/sanitizer`
+### `@contentia/sanitizer`
 
 HTML/input sanitization for XSS prevention.
 

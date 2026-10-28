@@ -2,18 +2,18 @@
 
 Store content as commits on a branch of a GitHub, GitLab, or Bitbucket repository. All three
 implement the same
-[`StorageRepository`](../reference/api/laikacms/storage/classes/StorageRepository) interface as
+[`StorageRepository`](../reference/api/contentia/storage/classes/StorageRepository) interface as
 every other [adapter](./), so the code that reads and writes content doesn't change. They only
 depend on `fetch`, so they run on any runtime.
 
 ## GitHub
 
 ```bash
-pnpm add laikacms @laikacms/github
+pnpm add contentia @contentia/github
 ```
 
 ```typescript
-import { GithubStorageRepository } from '@laikacms/github/storage-gh';
+import { GithubStorageRepository } from '@contentia/github/storage-gh';
 ```
 
 Authenticates as a GitHub App, or with an `Octokit` instance you configure yourself (for example
@@ -41,16 +41,16 @@ App credential fields:
 | `ignoreList`           | `string[]` (optional)                        | —                       | Glob patterns to exclude from directory listings. Defaults hide `.keep`, `.DS_Store`, etc.         |
 | `determineExtension`   | `DetermineExtension` (optional)              | —                       | Custom strategy for picking the on-server file extension. Defaults to `defaultDetermineExtension`. |
 | `tokenTtlSeconds`      | `number` (optional)                          | —                       | App mode only. Installation token TTL in seconds. Defaults to 50 minutes (tokens last ~1 h).       |
-| `userAgent`            | `string` (optional)                          | —                       | Custom User-Agent header for GitHub API requests. Defaults to `@laikacms/github`.                  |
+| `userAgent`            | `string` (optional)                          | —                       | Custom User-Agent header for GitHub API requests. Defaults to `@contentia/github`.                 |
 
 ## GitLab
 
 ```bash
-pnpm add laikacms @laikacms/gitlab
+pnpm add contentia @contentia/gitlab
 ```
 
 ```typescript
-import { GitlabStorageRepository } from '@laikacms/gitlab/storage-gl';
+import { GitlabStorageRepository } from '@contentia/gitlab/storage-gl';
 ```
 
 Uses the GitLab REST v4 API, on gitlab.com or a self-hosted instance. Authenticates with a personal
@@ -58,17 +58,17 @@ access token, an OAuth bearer token, or a CI job token.
 
 ### Options
 
-| Option                 | Type                                                                                                  | Required | Description                                                                                                                                                                 |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `projectId`            | `string \| number`                                                                                    | always   | Numeric project ID or URL-encoded path (`group/subgroup/project`).                                                                                                          |
-| `branch`               | `string`                                                                                              | always   | Branch to read from and commit to.                                                                                                                                          |
-| `auth`                 | [`GitlabAuth`](../reference/api/gitlab/interfaces/GitlabAuth)                                         | —        | Auth credentials. Omit for anonymous reads on public projects. See auth union below.                                                                                        |
-| `apiUrl`               | `string` (optional)                                                                                   | —        | API base URL. Defaults to `https://gitlab.com/api/v4`. Override for self-hosted GitLab.                                                                                     |
-| `serializerRegistry`   | [`StorageSerializerRegistry`](../reference/api/laikacms/storage/interfaces/StorageSerializerRegistry) | always   | Map of extension → serializer (e.g. `{ md: markdownSerializer }`).                                                                                                          |
-| `defaultFileExtension` | `string`                                                                                              | always   | Extension used when creating objects (e.g. `'md'`).                                                                                                                         |
-| `commitAuthor`         | `{ name: string, email: string }` (optional)                                                          | —        | Author attached to every commit. Omit to use the token owner's identity.                                                                                                    |
-| `ignoreList`           | `readonly string[]` (optional)                                                                        | —        | Glob patterns to exclude from directory listings. Defaults hide `.keep`, `.DS_Store`, etc.                                                                                  |
-| `determineExtension`   | [`DetermineExtension`](../reference/api/laikacms/storage/type-aliases/DetermineExtension) (optional)  | —        | Custom strategy for picking the on-server file extension. Defaults to [`defaultDetermineExtension`](../reference/api/laikacms/storage/variables/defaultDetermineExtension). |
+| Option                 | Type                                                                                                   | Required | Description                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`            | `string \| number`                                                                                     | always   | Numeric project ID or URL-encoded path (`group/subgroup/project`).                                                                                                           |
+| `branch`               | `string`                                                                                               | always   | Branch to read from and commit to.                                                                                                                                           |
+| `auth`                 | [`GitlabAuth`](../reference/api/gitlab/interfaces/GitlabAuth)                                          | —        | Auth credentials. Omit for anonymous reads on public projects. See auth union below.                                                                                         |
+| `apiUrl`               | `string` (optional)                                                                                    | —        | API base URL. Defaults to `https://gitlab.com/api/v4`. Override for self-hosted GitLab.                                                                                      |
+| `serializerRegistry`   | [`StorageSerializerRegistry`](../reference/api/contentia/storage/interfaces/StorageSerializerRegistry) | always   | Map of extension → serializer (e.g. `{ md: markdownSerializer }`).                                                                                                           |
+| `defaultFileExtension` | `string`                                                                                               | always   | Extension used when creating objects (e.g. `'md'`).                                                                                                                          |
+| `commitAuthor`         | `{ name: string, email: string }` (optional)                                                           | —        | Author attached to every commit. Omit to use the token owner's identity.                                                                                                     |
+| `ignoreList`           | `readonly string[]` (optional)                                                                         | —        | Glob patterns to exclude from directory listings. Defaults hide `.keep`, `.DS_Store`, etc.                                                                                   |
+| `determineExtension`   | [`DetermineExtension`](../reference/api/contentia/storage/type-aliases/DetermineExtension) (optional)  | —        | Custom strategy for picking the on-server file extension. Defaults to [`defaultDetermineExtension`](../reference/api/contentia/storage/variables/defaultDetermineExtension). |
 
 **`GitlabAuth` union** — supply exactly one of:
 
@@ -82,11 +82,11 @@ access token, an OAuth bearer token, or a CI job token.
 ## Bitbucket
 
 ```bash
-pnpm add laikacms @laikacms/bitbucket
+pnpm add contentia @contentia/bitbucket
 ```
 
 ```typescript
-import { BitbucketStorageRepository } from '@laikacms/bitbucket/storage-bb';
+import { BitbucketStorageRepository } from '@contentia/bitbucket/storage-bb';
 ```
 
 Uses the Bitbucket Cloud REST v2 API. Authenticates with an app password or an OAuth 2.0 token.

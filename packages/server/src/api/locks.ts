@@ -1,10 +1,10 @@
+import { ContentiaTask, errorCode, Url } from 'contentia/core';
+import type { DocumentsRepository } from 'contentia/documents';
+import type { Key, Lock, LockOwner, OwnedLock } from 'contentia/storage';
+import { LockToken } from 'contentia/storage';
 import { DateTime, Result } from 'effect';
-import { errorCode, LaikaTask, Url } from 'laikacms/core';
-import type { DocumentsRepository } from 'laikacms/documents';
-import type { Key, Lock, LockOwner, OwnedLock } from 'laikacms/storage';
-import { LockToken } from 'laikacms/storage';
 
-export type { Lock, LockOwner, OwnedLock } from 'laikacms/storage';
+export type { Lock, LockOwner, OwnedLock } from 'contentia/storage';
 
 /**
  * Advisory entry-locking for admin UIs, as a thin adapter over the documents
@@ -29,11 +29,11 @@ export type { Lock, LockOwner, OwnedLock } from 'laikacms/storage';
 
 /**
  * A standalone lock manager — the four atomic lock primitives without the rest
- * of a documents repository. `InProcessLockManager` (from `laikacms/locks/in-process`)
+ * of a documents repository. `InProcessLockManager` (from `contentia/locks/in-process`)
  * satisfies this interface.
  *
  * Pass an instance as `locks` in {@link BuildLocksApiOptions} (or in
- * {@link LaikaApiOptions} from `@laikacms/server/api`) to override the default
+ * {@link ContentiaApiOptions} from `@contentia/server/api`) to override the default
  * duck-typed documents-repo path and get real locking without a lock-capable
  * documents backend.
  */
@@ -42,15 +42,15 @@ export interface LockManager {
     key: Key,
     owner: LockOwner,
     options?: { ttlMs?: number | undefined, force?: boolean | undefined },
-  ): LaikaTask.LaikaTask<OwnedLock>;
+  ): ContentiaTask.ContentiaTask<OwnedLock>;
   refreshLock(
     key: Key,
     token: LockToken,
     owner: LockOwner,
     options?: { ttlMs?: number | undefined },
-  ): LaikaTask.LaikaTask<OwnedLock>;
-  releaseLock(key: Key, token: LockToken): LaikaTask.LaikaTask<void>;
-  getLock(key: Key): LaikaTask.LaikaTask<Lock | null>;
+  ): ContentiaTask.ContentiaTask<OwnedLock>;
+  releaseLock(key: Key, token: LockToken): ContentiaTask.ContentiaTask<void>;
+  getLock(key: Key): ContentiaTask.ContentiaTask<Lock | null>;
 }
 
 export interface BuildLocksApiOptions {
@@ -58,7 +58,7 @@ export interface BuildLocksApiOptions {
   documents: DocumentsRepository;
   /**
    * Explicit lock manager. Takes precedence over duck-typing `documents` for
-   * lock support. Use `InProcessLockManager` from `laikacms/locks/in-process`
+   * lock support. Use `InProcessLockManager` from `contentia/locks/in-process`
    * for single-node deployments.
    *
    * When omitted and `documents` does not implement the lock methods, every
@@ -123,7 +123,7 @@ export function buildLocksApi(options: BuildLocksApiOptions): LocksApi {
   // Prefer an explicit lock manager; fall back to the documents repo (duck-typed).
   const locks: LockManager = options.lockManager ?? options.documents;
 
-  const run = <T>(task: LaikaTask.LaikaTask<T>) => LaikaTask.runPromiseResult(task);
+  const run = <T>(task: ContentiaTask.ContentiaTask<T>) => ContentiaTask.runPromiseResult(task);
 
   return {
     async fetch(request: Request, owner: LockOwner): Promise<Response> {

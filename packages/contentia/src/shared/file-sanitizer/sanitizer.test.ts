@@ -1,0 +1,982 @@
+import { CorruptedFileError } from 'contentia/core';
+import { describe, expect, it } from 'vitest';
+import { canSanitize, getSupportedFileTypes, sanitizeFile } from './sanitizer.js';
+import { PngSanitizer } from './sanitizers/png.js';
+import { isSanitizableFileType } from './types.js';
+
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
+function crc32(data: Uint8Array): number {
+  const table: number[] = [];
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c;
+  }
+  let crc = 0xffffffff;
+  for (let i = 0; i < data.length; i++) {
+    crc = table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function be32(value: number): number[] {
+  return [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+}
+
+function pngChunk(type: string, data: number[]): number[] {
+  const typeBytes = [...type].map(c => c.charCodeAt(0));
+  const payload = new Uint8Array([...typeBytes, ...data]);
+  const crc = crc32(payload);
+  return [...be32(data.length), ...typeBytes, ...data, ...be32(crc)];
+}
+
+/** Build a minimal valid PNG with optional extra chunks before IEND. */
+function buildPng(extraChunks: number[][] = []): Uint8Array {
+  // IHDR for a 1x1 RGBA image
+  const ihdr = pngChunk('IHDR', [
+    0,
+    0,
+    0,
+    1, // width
+    0,
+    0,
+    0,
+    1, // height
+    8, // bit depth
+    6, // color type (RGBA)
+    0, // compression
+    0, // filter
+    0, // interlace
+  ]);
+  // IDAT with arbitrary bytes (we don't actually decode it)
+  const idat = pngChunk('IDAT', [0x78, 0x9c, 0x62, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff]);
+  const iend = pngChunk('IEND', []);
+  return new Uint8Array([
+    ...PNG_SIGNATURE,
+    ...ihdr,
+    ...extraChunks.flat(),
+    ...idat,
+    ...iend,
+  ]);
+}
+
+/** Build a minimal valid GIF89a with the given content blocks (between header+screen descriptor and trailer). */
+function buildGif(contentBlocks: number[][] = []): Uint8Array {
+  const header = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]; // "GIF89a"
+  // Logical screen descriptor: 1x1, no global color table, packed=0
+  const screenDescriptor = [0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00];
+  const trailer = [0x3b];
+  return new Uint8Array([...header, ...screenDescriptor, ...contentBlocks.flat(), ...trailer]);
+}
+
+/** Build a minimal Comment Extension block: 0x21 0xFE <sub-blocks> 0x00. */
+function gifCommentExtension(text: string): number[] {
+  const bytes = [...text].map(c => c.charCodeAt(0));
+  return [0x21, 0xfe, bytes.length, ...bytes, 0x00];
+}
+
+/** Build a minimal Application Extension block (e.g. NETSCAPE2.0). */
+function gifApplicationExtension(name: string, data: number[]): number[] {
+  const nameBytes = [...name].map(c => c.charCodeAt(0));
+  return [0x21, 0xff, nameBytes.length, ...nameBytes, data.length, ...data, 0x00];
+}
+
+/** Build a WebP RIFF chunk with the given FourCC and payload (auto-padded to even). */
+function webpChunk(fourCC: string, payload: number[]): number[] {
+  const fourCCBytes = [...fourCC].map(c => c.charCodeAt(0));
+  const size = payload.length;
+  const sizeLE = [size & 0xff, (size >> 8) & 0xff, (size >> 16) & 0xff, (size >> 24) & 0xff];
+  const padding = size % 2 === 0 ? [] : [0];
+  return [...fourCCBytes, ...sizeLE, ...payload, ...padding];
+}
+
+/** Build a minimal valid WebP file containing the given chunks. */
+function buildWebp(chunks: number[][]): Uint8Array {
+  const flat = chunks.flat();
+  const fileSize = 4 + flat.length; // "WEBP" + chunks
+  const sizeLE = [fileSize & 0xff, (fileSize >> 8) & 0xff, (fileSize >> 16) & 0xff, (fileSize >> 24) & 0xff];
+  return new Uint8Array([
+    0x52,
+    0x49,
+    0x46,
+    0x46, // "RIFF"
+    ...sizeLE,
+    0x57,
+    0x45,
+    0x42,
+    0x50, // "WEBP"
+    ...flat,
+  ]);
+}
+
+/** Build a minimal JPEG with the given pre-SOS segments and optional post-SOS bytes. */
+function buildJpeg(
+  segments: { marker: number, payload: number[] }[],
+  postSos: number[] = [],
+): Uint8Array {
+  const out: number[] = [0xff, 0xd8]; // SOI
+  for (const { marker, payload } of segments) {
+    const len = payload.length + 2;
+    out.push(0xff, marker, (len >> 8) & 0xff, len & 0xff, ...payload);
+  }
+  // SOS segment with a small payload (length = 8 -> 6 bytes of body) so the
+  // total file length stays above the 12-byte detect threshold.
+  out.push(0xff, 0xda, 0x00, 0x08, 0, 0, 0, 0, 0, 0);
+  out.push(...postSos);
+  out.push(0xff, 0xd9); // EOI
+  return new Uint8Array(out);
+}
+
+describe('canSanitize', () => {
+  it('approves PNG data', () => {
+    const result = canSanitize(buildPng());
+    expect(result.canSanitize).toBe(true);
+    expect(result.detectedType).toBe('png');
+  });
+
+  it('rejects PDF with a reason', () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0, 0, 0, 0, 0, 0, 0]);
+    const result = canSanitize(pdf);
+    expect(result.canSanitize).toBe(false);
+    expect(result.detectedType).toBe('pdf');
+    expect(result.reason).toMatch(/not supported/);
+  });
+});
+
+describe('getSupportedFileTypes', () => {
+  it('exposes exactly the four sanitizable formats', () => {
+    expect(getSupportedFileTypes()).toEqual(['png', 'gif', 'webp', 'jpeg']);
+  });
+});
+
+describe('isSanitizableFileType', () => {
+  it('narrows the union to sanitizable types', () => {
+    expect(isSanitizableFileType('png')).toBe(true);
+    expect(isSanitizableFileType('jpeg')).toBe(true);
+    expect(isSanitizableFileType('pdf')).toBe(false);
+    expect(isSanitizableFileType('unknown')).toBe(false);
+  });
+});
+
+describe('sanitizeFile (PNG)', () => {
+  it('strips a tEXt chunk that contains GPS metadata', async () => {
+    const tEXt = pngChunk(
+      'tEXt',
+      [...'Comment'].map(c => c.charCodeAt(0)).concat(0, ...[...'GPSLatitude=1.234'].map(c => c.charCodeAt(0))),
+    );
+    const png = buildPng([tEXt]);
+    const result = await sanitizeFile(png);
+    expect(result.fileType).toBe('png');
+    expect(result.ignored).toBe(false);
+    expect(result.strippedMetadata.hadTextMetadata).toBe(true);
+    expect(result.strippedMetadata.strippedChunks).toContain('tEXt');
+    expect(result.data.length).toBeLessThan(png.length);
+  });
+
+  it('preserves a benign tEXt chunk (e.g. tool attribution)', async () => {
+    const tEXt = pngChunk(
+      'tEXt',
+      [...'Software'].map(c => c.charCodeAt(0)).concat(0, ...[...'Made with Pixelmator Pro'].map(c => c.charCodeAt(0))),
+    );
+    const png = buildPng([tEXt]);
+    const result = await sanitizeFile(png);
+    expect(result.data).toBe(png);
+    expect(result.strippedMetadata.strippedChunks).toEqual([]);
+  });
+
+  it('strips an iTXt chunk that contains face-recognition metadata', async () => {
+    const iTXt = pngChunk(
+      'iTXt',
+      [...'XML:com.adobe.xmp'].map(c => c.charCodeAt(0)).concat(
+        0,
+        0,
+        0,
+        0,
+        0,
+        ...[...'<mwg-rs:Regions/>'].map(c => c.charCodeAt(0)),
+      ),
+    );
+    const png = buildPng([iTXt]);
+    const result = await sanitizeFile(png);
+    expect(result.strippedMetadata.strippedChunks).toContain('iTXt');
+  });
+
+  it('strips a tIME chunk and flags hadTimestamps', async () => {
+    const tIME = pngChunk('tIME', [0x07, 0xe6, 1, 1, 0, 0, 0]);
+    const png = buildPng([tIME]);
+    const result = await sanitizeFile(png);
+    expect(result.strippedMetadata.hadTimestamps).toBe(true);
+    expect(result.strippedMetadata.strippedChunks).toContain('tIME');
+  });
+
+  it('passes through a PNG with no metadata chunks', async () => {
+    const png = buildPng();
+    const result = await sanitizeFile(png);
+    expect(result.fileType).toBe('png');
+    expect(result.data.length).toBe(png.length);
+    expect(result.strippedMetadata.hadTextMetadata).toBe(false);
+    expect(result.strippedMetadata.strippedChunks).toEqual([]);
+  });
+
+  it('throws on a corrupted PNG (bad CRC)', async () => {
+    const png = buildPng();
+    const broken = new Uint8Array(png);
+    broken[broken.length - 1] ^= 0xff; // flip a byte in the IEND CRC
+    await expect(sanitizeFile(broken)).rejects.toThrow();
+  });
+
+  it('returns the original bytes verbatim when there is nothing to strip', async () => {
+    const png = buildPng();
+    const result = await sanitizeFile(png);
+    // Same reference — no allocation, no rewrite.
+    expect(result.data).toBe(png);
+  });
+
+  it('preserves an unknown ancillary chunk byte-for-byte while stripping tEXt', async () => {
+    const tEXt = pngChunk(
+      'tEXt',
+      [...'Comment'].map(c => c.charCodeAt(0)).concat(0, ...[...'GPSLatitude=1.234'].map(c => c.charCodeAt(0))),
+    );
+    // "prVt" (private ancillary chunk, lowercase first letter = ancillary, lowercase third = unknown vendor)
+    const prVt = pngChunk('prVt', [0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe]);
+    const png = buildPng([tEXt, prVt]);
+    const result = await sanitizeFile(png);
+    // The unknown chunk should still be in the output, untouched.
+    const prVtIndex = png.indexOf(0x70); // 'p'
+    expect(result.strippedMetadata.strippedChunks).toEqual(['tEXt']);
+    expect(prVtIndex).toBeGreaterThan(-1);
+    const outStr = Array.from(result.data);
+    const pIdx = outStr.findIndex((b, i) =>
+      b === 0x70 && outStr[i + 1] === 0x72 && outStr[i + 2] === 0x56 && outStr[i + 3] === 0x74
+    );
+    expect(pIdx).toBeGreaterThan(-1);
+    // Bytes after the type — payload + CRC — match the input verbatim.
+    const prVtLen = 6;
+    for (let i = 0; i < 4 + prVtLen + 4; i++) {
+      expect(result.data[pIdx - 4 + i]).toBe(png[prVtIndex - 4 + i]);
+    }
+  });
+});
+
+describe('sanitizeFile (GIF)', () => {
+  it('strips a Comment Extension that contains GPS metadata', async () => {
+    const gif = buildGif([gifCommentExtension('GPSLatitude=37.4N,GPSLongitude=122.1W')]);
+    const result = await sanitizeFile(gif);
+    expect(result.fileType).toBe('gif');
+    expect(result.strippedMetadata.hadTextMetadata).toBe(true);
+    expect(result.strippedMetadata.strippedChunks).toContain('Comment');
+    expect(result.data.length).toBeLessThan(gif.length);
+  });
+
+  it('preserves a benign Comment Extension (e.g. tool signature)', async () => {
+    const gif = buildGif([gifCommentExtension('Made with GIMP')]);
+    const result = await sanitizeFile(gif);
+    expect(result.data).toBe(gif);
+    expect(result.strippedMetadata.strippedChunks).toEqual([]);
+  });
+
+  it('preserves a benign Comment Extension that just carries a caption', async () => {
+    const gif = buildGif([gifCommentExtension('A funny dancing cat animation, 2024 edition')]);
+    const result = await sanitizeFile(gif);
+    expect(result.data).toBe(gif);
+  });
+
+  it('returns the original bytes verbatim when no comment/plain-text extensions are present', async () => {
+    const gif = buildGif([gifApplicationExtension('NETSCAPE2.0', [0x01, 0x00, 0x00])]);
+    const result = await sanitizeFile(gif);
+    expect(result.data).toBe(gif);
+    expect(result.strippedMetadata.strippedChunks).toEqual([]);
+  });
+
+  it('preserves an Application Extension byte-for-byte while stripping a dangerous Comment', async () => {
+    const netscape = gifApplicationExtension('NETSCAPE2.0', [0x01, 0x00, 0x00]);
+    const comment = gifCommentExtension('FaceRegion=person:Alice');
+    const gif = buildGif([netscape, comment]);
+    const result = await sanitizeFile(gif);
+    expect(result.strippedMetadata.strippedChunks).toEqual(['Comment']);
+    // Application extension fingerprint (NETSCAPE) must survive untouched.
+    const outStr = String.fromCharCode(...result.data);
+    expect(outStr).toContain('NETSCAPE2.0');
+  });
+
+  it('throws on an invalid GIF signature', async () => {
+    await expect(sanitizeFile(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]))).rejects.toThrow();
+  });
+});
+
+describe('sanitizeFile (WebP)', () => {
+  it('strips an EXIF chunk and flags timestamps + text metadata', async () => {
+    const vp8 = webpChunk('VP8 ', new Array(16).fill(0));
+    const exif = webpChunk('EXIF', [...'EXIF metadata'].map(c => c.charCodeAt(0)));
+    const webp = buildWebp([vp8, exif]);
+    const result = await sanitizeFile(webp);
+    expect(result.fileType).toBe('webp');
+    expect(result.strippedMetadata.hadTextMetadata).toBe(true);
+    expect(result.strippedMetadata.hadTimestamps).toBe(true);
+    expect(result.strippedMetadata.strippedChunks).toContain('EXIF');
+    expect(result.data.length).toBeLessThan(webp.length);
+  });
+
+  it('returns the original bytes verbatim when no EXIF/XMP chunks are present', async () => {
+    const vp8 = webpChunk('VP8 ', new Array(16).fill(0));
+    const iccp = webpChunk('ICCP', [...'fake icc'].map(c => c.charCodeAt(0)));
+    const webp = buildWebp([vp8, iccp]);
+    const result = await sanitizeFile(webp);
+    expect(result.data).toBe(webp);
+    expect(result.strippedMetadata.strippedChunks).toEqual([]);
+  });
+
+  it('clears VP8X EXIF/XMP flag bits only for the chunks actually stripped', async () => {
+    // VP8X header: flags(1) + reserved(3) + canvasW-1(3) + canvasH-1(3) = 10 bytes
+    // Set EXIF (bit 3 = 0x08) and XMP (bit 2 = 0x04) bits.
+    const vp8x = webpChunk('VP8X', [
+      0x0c, // flags: EXIF + XMP set
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+    ]);
+    const vp8 = webpChunk('VP8 ', new Array(16).fill(0));
+    const exif = webpChunk('EXIF', [0xaa, 0xbb]);
+    // Note: NO XMP chunk in this file, just the VP8X flag claiming it.
+    const webp = buildWebp([vp8x, vp8, exif]);
+    const result = await sanitizeFile(webp);
+    // VP8X is at offset 12. Flags byte at offset 12 + 8 = 20.
+    expect(result.data[20]).toBe(0x04); // EXIF bit cleared, XMP bit left alone
+    expect(result.strippedMetadata.strippedChunks).toEqual(['EXIF']);
+  });
+
+  it('updates the RIFF size header after stripping', async () => {
+    const vp8 = webpChunk('VP8 ', new Array(16).fill(0));
+    const exif = webpChunk('EXIF', [...'metadata'].map(c => c.charCodeAt(0)));
+    const webp = buildWebp([vp8, exif]);
+    const result = await sanitizeFile(webp);
+    // RIFF size at bytes 4..7 (little-endian) = output.length - 8
+    const recordedSize = result.data[4] | (result.data[5] << 8) | (result.data[6] << 16) | (result.data[7] << 24);
+    expect(recordedSize).toBe(result.data.length - 8);
+  });
+
+  it('throws on an invalid WebP signature', async () => {
+    await expect(sanitizeFile(new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]))).rejects.toThrow();
+  });
+});
+
+describe('sanitizeFile (JPEG)', () => {
+  it('strips an APP1 (EXIF) segment and flags timestamps + text metadata', async () => {
+    const exifPayload = [...'Exif\0\0', 0xaa, 0xbb, 0xcc].map(v => typeof v === 'string' ? v.charCodeAt(0) : v);
+    const jpeg = buildJpeg([{ marker: 0xe1, payload: exifPayload }]);
+    const result = await sanitizeFile(jpeg);
+    expect(result.fileType).toBe('jpeg');
+    expect(result.strippedMetadata.hadTextMetadata).toBe(true);
+    expect(result.strippedMetadata.hadTimestamps).toBe(true);
+    expect(result.strippedMetadata.strippedChunks).toContain('APP1');
+  });
+
+  it('strips a COM segment that contains GPS metadata', async () => {
+    const payload = [...'GPSLatitude=37.4'].map(c => c.charCodeAt(0));
+    const jpeg = buildJpeg([{ marker: 0xfe, payload }]);
+    const result = await sanitizeFile(jpeg);
+    expect(result.strippedMetadata.strippedChunks).toContain('COM');
+  });
+
+  it('preserves a benign COM segment (e.g. tool signature)', async () => {
+    const payload = [...'Made with Pixelmator Pro'].map(c => c.charCodeAt(0));
+    const jpeg = buildJpeg([{ marker: 0xfe, payload }]);
+    const result = await sanitizeFile(jpeg);
+    expect(result.data).toBe(jpeg);
+    expect(result.strippedMetadata.strippedChunks).toBeUndefined();
+  });
+
+  it('preserves an APP0/JFIF segment', async () => {
+    // APP0 ("JFIF\0" + version 1.1 + units + xdens + ydens + thumb wh)
+    const jfif = [0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0, 0x48, 0, 0x48, 0, 0];
+    const jpeg = buildJpeg([{ marker: 0xe0, payload: jfif }]);
+    const result = await sanitizeFile(jpeg);
+    // APP0 is not in the strip list — output should still contain JFIF magic.
+    const outStr = String.fromCharCode(...result.data);
+    expect(outStr).toContain('JFIF');
+    expect(result.strippedMetadata.strippedChunks).toBeUndefined();
+  });
+
+  it('returns the original bytes verbatim when there is nothing to strip', async () => {
+    const jfif = [0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0, 0x48, 0, 0x48, 0, 0];
+    const jpeg = buildJpeg([{ marker: 0xe0, payload: jfif }]);
+    const result = await sanitizeFile(jpeg);
+    // Same reference — we did not allocate or rewrite anything.
+    expect(result.data).toBe(jpeg);
+  });
+
+  it('preserves entropy-coded scan data containing extra markers (progressive JPEGs)', async () => {
+    // Simulate a progressive JPEG: bytes after SOS that include a DHT marker
+    // (0xff 0xc4) followed by another SOS segment. The previous sanitizer
+    // would `break` at the DHT and truncate everything after it.
+    const progressiveTail = [
+      0x12,
+      0x34,
+      0x56, // first scan entropy data
+      0xff,
+      0x00, // escaped 0xff inside entropy data
+      0xff,
+      0xd0, // RST0 marker
+      0x78,
+      0x9a,
+      0xff,
+      0xc4,
+      0x00,
+      0x06,
+      0x11,
+      0x22,
+      0x33,
+      0x44, // DHT segment (length=6)
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0, // second SOS (progressive scan)
+      0xbc,
+      0xde,
+      0xf0, // second scan entropy data
+    ];
+    const jpeg = buildJpeg([], progressiveTail);
+    const result = await sanitizeFile(jpeg);
+    expect(result.data).toEqual(jpeg);
+  });
+
+  it('strips APP1 surgically while preserving everything else byte-for-byte', async () => {
+    const exifPayload = [...'Exif\0\0', 0xaa, 0xbb, 0xcc, 0xdd].map(v => typeof v === 'string' ? v.charCodeAt(0) : v);
+    const jfif = [0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0, 0x48, 0, 0x48, 0, 0];
+    const tail = [0x12, 0x34, 0xff, 0x00, 0xff, 0xd0, 0x56, 0x78];
+    const jpeg = buildJpeg(
+      [{ marker: 0xe0, payload: jfif }, { marker: 0xe1, payload: exifPayload }],
+      tail,
+    );
+    // Find the APP1 segment boundaries in the input.
+    const app1Start = 2 /* SOI */ + 4 + jfif.length; // after SOI + APP0 (FF E0 + len + payload)
+    const app1Length = exifPayload.length + 2;
+    const app1End = app1Start + 2 + app1Length;
+
+    const result = await sanitizeFile(jpeg);
+    // Output = bytes before APP1 + bytes after APP1, untouched.
+    const expected = new Uint8Array(jpeg.length - (app1End - app1Start));
+    expected.set(jpeg.subarray(0, app1Start), 0);
+    expected.set(jpeg.subarray(app1End), app1Start);
+    expect(result.data).toEqual(expected);
+    expect(result.strippedMetadata.strippedChunks).toEqual(['APP1']);
+  });
+
+  it('preserves fill bytes between segments', async () => {
+    // Hand-build a JPEG with fill 0xff bytes before APP0 and before SOS.
+    const jpeg = new Uint8Array([
+      0xff,
+      0xd8, // SOI
+      0xff,
+      0xff,
+      0xff,
+      0xe0,
+      0x00,
+      0x07,
+      0x4a,
+      0x46,
+      0x49,
+      0x46,
+      0x00, // fill + APP0/JFIF (truncated)
+      0xff,
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0, // fill + SOS
+      0xff,
+      0xd9, // EOI
+    ]);
+    const result = await sanitizeFile(jpeg);
+    // Nothing dangerous → original returned.
+    expect(result.data).toBe(jpeg);
+  });
+
+  it('throws on a missing SOI marker', async () => {
+    await expect(sanitizeFile(new Uint8Array([0x00, 0x00, 0xff, 0xd9]))).rejects.toThrow();
+  });
+});
+
+describe('sanitizeFile (options)', () => {
+  it('rejects files larger than maxFileSize', async () => {
+    const png = buildPng();
+    await expect(sanitizeFile(png, { maxFileSize: 4 })).rejects.toThrow(/exceeds maximum/);
+  });
+
+  it('passes through ignored extensions unchanged', async () => {
+    const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const result = await sanitizeFile(pdf, { ignoreExtensions: ['pdf'] });
+    expect(result.ignored).toBe(true);
+    expect(result.fileType).toBe('ignored');
+    expect(result.data).toBe(pdf);
+  });
+
+  it('throws UnsupportedFileTypeError when expectedMimeType disagrees with detected', async () => {
+    const png = buildPng();
+    await expect(sanitizeFile(png, {}, 'image/jpeg')).rejects.toThrow(/MIME type/);
+  });
+
+  it('accepts image/jpg as a synonym for image/jpeg when detected type matches', async () => {
+    const jpeg = buildJpeg([]);
+    const result = await sanitizeFile(jpeg, {}, 'image/jpg');
+    expect(result.fileType).toBe('jpeg');
+  });
+
+  it('rejects an unsupported file type with no dangerous content', async () => {
+    // Plain "%PDF-" header followed by zeros: no dangerous markers found.
+    const pdf = new Uint8Array(32);
+    pdf.set([0x25, 0x50, 0x44, 0x46, 0x2d]);
+    await expect(sanitizeFile(pdf)).rejects.toThrow(/not supported/);
+  });
+});
+
+// ─── JPEG corrupt-file error paths (LCMS-386) ──────────────────────────────
+
+// All inputs must start with FF D8 FF (JPEG magic) so detectFileType routes
+// them to JpegSanitizer; the 3rd byte 0xFF is the magic requirement.
+
+describe('sanitizeFile (JPEG) — CorruptedFileError branches', () => {
+  it('throws CorruptedFileError when a byte that should be a marker prefix is not 0xFF', async () => {
+    // SOI (FF D8) + valid APP0 segment (FF E0, length=4, 2 payload bytes)
+    // so offset advances past 2, then hits a 0x00 byte instead of 0xFF.
+    const data = new Uint8Array([
+      0xFF,
+      0xD8, // SOI
+      0xFF,
+      0xE0,
+      0x00,
+      0x04,
+      0xAA,
+      0xBB, // APP0 — segmentEnd = 8
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // non-0xFF at offset 8 → triggers "expected marker"
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('expected marker at offset');
+  });
+
+  it('throws CorruptedFileError when fill bytes (0xFF…) exhaust the buffer before a real marker code', async () => {
+    // SOI + all 0xFF fill bytes — the inner fill-byte loop advances offset until
+    // offset >= data.length - 1, which triggers "unexpected end of file".
+    const data = new Uint8Array([
+      0xFF,
+      0xD8, // SOI
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF, // 10 fill bytes
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('unexpected end of file');
+  });
+
+  it("throws CorruptedFileError when fewer than 4 bytes remain for a segment's length field", async () => {
+    // SOI + valid APP0 (segmentEnd = 9) + start of APP1 with only 2 bytes left:
+    // offset+4 = 13 > 12 = data.length → "segment length extends beyond file".
+    const data = new Uint8Array([
+      0xFF,
+      0xD8, // SOI
+      0xFF,
+      0xE0,
+      0x00,
+      0x05,
+      0xAA,
+      0xBB,
+      0xCC, // APP0 — length 5, segmentEnd = 9
+      0xFF,
+      0xE1,
+      0x00, // APP1 start — only 3 bytes, needs 4 for length field
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('segment length extends beyond file');
+  });
+
+  it('throws CorruptedFileError when the segment length field value is less than 2', async () => {
+    // SOI + APP0 with length field = 0 (minimum valid is 2, which encodes just the length itself).
+    const data = new Uint8Array([
+      0xFF,
+      0xD8, // SOI
+      0xFF,
+      0xE0,
+      0x00,
+      0x00, // APP0, length = 0 < 2 → "segment length too small"
+      0xAA,
+      0xBB,
+      0xCC,
+      0xDD,
+      0xEE,
+      0xFF, // padding to satisfy detectFileType ≥ 12 bytes
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('segment length too small');
+  });
+
+  it('throws CorruptedFileError when the segment data extends beyond the end of the file', async () => {
+    // SOI + APP0 with length = 10, but only 4 bytes of payload present:
+    // segmentEnd = 2 + 2 + 10 = 14 > 12 = data.length → "segment extends beyond file".
+    const data = new Uint8Array([
+      0xFF,
+      0xD8, // SOI
+      0xFF,
+      0xE0,
+      0x00,
+      0x0A, // APP0, length = 10
+      0xAA,
+      0xBB,
+      0xCC,
+      0xDD,
+      0xEE,
+      0xFF, // only 6 bytes of payload (10 - 2(length field) = 8 needed, 6 present)
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('segment extends beyond file');
+  });
+});
+
+// ─── PNG corrupt-file error paths (LCMS-386) ───────────────────────────────
+
+describe('sanitizeFile (PNG) — CorruptedFileError branches', () => {
+  it('throws CorruptedFileError when data does not start with the PNG signature (PngSanitizer.sanitize direct)', async () => {
+    // "Invalid PNG signature" is unreachable via sanitizeFile() because detectFileType()
+    // uses the same 8-byte magic check — if the signature is wrong, the file is routed
+    // elsewhere before reaching PngSanitizer.sanitize(). Call it directly to cover the
+    // guard that a future refactor might make reachable.
+    const sanitizer = new PngSanitizer();
+    const err = await sanitizer.sanitize(new Uint8Array(20).fill(0), {}).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('Invalid PNG signature');
+  });
+
+  it('throws CorruptedFileError when a chunk length field claims more data than the file contains', async () => {
+    // PNG signature + a chunk whose 4-byte length field is 0xFFFFFFFF — far more than
+    // the 0 remaining data bytes. Triggers "Invalid chunk length".
+    const data = new Uint8Array([
+      ...PNG_SIGNATURE,
+      0xFF,
+      0xFF,
+      0xFF,
+      0xFF, // chunk length = 4 294 967 295
+      0x49,
+      0x48,
+      0x44,
+      0x52, // chunk type "IHDR" (content irrelevant — length check fires first)
+      0x00,
+      0x00,
+      0x00,
+      0x00, // 4 bytes of what would be data/CRC
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('Invalid chunk length');
+  });
+
+  it('throws CorruptedFileError when a CRC check fails for a chunk', async () => {
+    // Build a valid 1x1 PNG, then flip one byte inside the IHDR data section
+    // (offset 16 = first byte of the IHDR 13-byte data block). The stored CRC at
+    // offset 29 no longer matches → "Invalid CRC for chunk IHDR".
+    const png = buildPng();
+    const broken = new Uint8Array(png);
+    broken[16] ^= 0xFF; // corrupt first byte of IHDR data (high byte of image width)
+    const err = await sanitizeFile(broken).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('Invalid CRC for chunk IHDR');
+  });
+
+  it('throws CorruptedFileError when no IHDR chunk is present', async () => {
+    // PNG signature + valid IEND chunk only (no IHDR). All CRCs are correct, but
+    // hasIHDR stays false throughout the chunk walk → "Missing IHDR chunk".
+    const iend = pngChunk('IEND', []);
+    const data = new Uint8Array([...PNG_SIGNATURE, ...iend]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('Missing IHDR chunk');
+  });
+
+  it('throws CorruptedFileError when no IEND chunk is present', async () => {
+    // PNG signature + valid IHDR (correct CRC) but no IEND. The chunk walk exhausts
+    // the buffer without setting hasIEND → "Missing IEND chunk".
+    const ihdr = pngChunk('IHDR', [
+      0x00,
+      0x00,
+      0x00,
+      0x01, // width = 1
+      0x00,
+      0x00,
+      0x00,
+      0x01, // height = 1
+      0x08, // bit depth
+      0x06, // color type RGBA
+      0x00, // compression
+      0x00, // filter
+      0x00, // interlace
+    ]);
+    const data = new Uint8Array([...PNG_SIGNATURE, ...ihdr]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('Missing IEND chunk');
+  });
+});
+
+// ─── WebP corrupt-file error paths (LCMS-389) ──────────────────────────────
+
+describe('sanitizeFile (WebP) — CorruptedFileError branches', () => {
+  it('throws CorruptedFileError when a chunk header declares a size that extends beyond the file', async () => {
+    // Valid RIFF+WEBP header (12 bytes) + VP8  chunk whose size field (100) far exceeds
+    // the 4 remaining data bytes — chunkEnd = 12 + 8 + 100 = 120 > 24 = data.length.
+    const data = new Uint8Array([
+      0x52,
+      0x49,
+      0x46,
+      0x46, // RIFF
+      0x14,
+      0x00,
+      0x00,
+      0x00, // RIFF size (value not validated by the sanitizer)
+      0x57,
+      0x45,
+      0x42,
+      0x50, // WEBP
+      0x56,
+      0x50,
+      0x38,
+      0x20, // VP8  (FourCC with trailing space)
+      0x64,
+      0x00,
+      0x00,
+      0x00, // chunkSize = 100 (LE)
+      0xAA,
+      0xBB,
+      0xCC,
+      0xDD, // only 4 bytes present (100 needed)
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('extends beyond file');
+  });
+});
+
+// ─── GIF corrupt-file error paths (LCMS-389) ───────────────────────────────
+
+describe('sanitizeFile (GIF) — CorruptedFileError branches', () => {
+  it('throws CorruptedFileError when data is shorter than the minimum 13 bytes needed for the screen descriptor', async () => {
+    // GIF89a signature (6 bytes) + only 6 bytes of the 7-byte screen descriptor = 12 bytes total.
+    // Signature check passes (isGifSignature requires only 6 bytes); size check fires first.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00, // partial screen descriptor (6 of 7 bytes)
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF too short for screen descriptor');
+  });
+
+  it('throws CorruptedFileError when the global color table is declared but truncated', async () => {
+    // Screen descriptor packed byte = 0x80: hasGlobalColorTable=true, size index 0 → 6 bytes needed.
+    // File ends at offset 13 (just after the screen descriptor) with no color table bytes.
+    // offset (13) + globalColorTableSize (6) = 19 > 13 = data.length.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x80,
+      0x00,
+      0x00, // screen descriptor, packed=0x80 (GCT present, size index 0)
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated in global color table');
+  });
+
+  it('throws CorruptedFileError when an extension introducer appears as the final byte with no label following', async () => {
+    // Extension introducer (0x21) at offset 13 is the last byte; no extension label byte follows.
+    // offset (13) + 1 = 14 >= 14 = data.length.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // screen descriptor, no GCT
+      0x21, // extension introducer — no label byte
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated in extension');
+  });
+
+  it('throws CorruptedFileError when a Graphics Control Extension is shorter than its required 8 bytes', async () => {
+    // GCE introducer (0x21) + label (0xF9) at offsets 13–14, but only 2 bytes present.
+    // offset (13) + 8 = 21 > 15 = data.length.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // screen descriptor, no GCT
+      0x21,
+      0xF9, // GCE introducer + label (needs 8 bytes total from offset 13)
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated in graphics control extension');
+  });
+
+  it('throws CorruptedFileError when the image descriptor block is truncated', async () => {
+    // Image separator (0x2C) at offset 13 with only 1 byte — needs 10 bytes.
+    // offset (13) + 10 = 23 > 14 = data.length.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // screen descriptor, no GCT
+      0x2C, // image separator — only 1 of 10 required bytes present
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated in image descriptor');
+  });
+
+  it('throws CorruptedFileError when the local color table is declared but truncated', async () => {
+    // Full 10-byte image descriptor at offset 13; packed byte (offset 22) = 0x80:
+    // hasLocalColorTable=true, LCT size index 0 → 6 bytes needed.
+    // After the descriptor offset advances to 23, but data.length = 23 → 23 + 6 = 29 > 23.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // screen descriptor, no GCT
+      0x2C, // image separator
+      0x00,
+      0x00,
+      0x00,
+      0x00, // left=0, top=0
+      0x01,
+      0x00,
+      0x01,
+      0x00, // width=1, height=1
+      0x80, // packed: hasLCT=1, LCT size index 0 → 6 bytes needed
+      // No LCT bytes follow
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated in local color table');
+  });
+
+  it('throws CorruptedFileError when the file ends before the LZW minimum code size byte', async () => {
+    // Full 10-byte image descriptor at offset 13; packed byte = 0x00 (no LCT).
+    // After the descriptor offset advances to 23 = data.length → offset >= data.length.
+    const data = new Uint8Array([
+      0x47,
+      0x49,
+      0x46,
+      0x38,
+      0x39,
+      0x61, // GIF89a
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      0x00,
+      0x00, // screen descriptor, no GCT
+      0x2C, // image separator
+      0x00,
+      0x00,
+      0x00,
+      0x00, // left=0, top=0
+      0x01,
+      0x00,
+      0x01,
+      0x00, // width=1, height=1
+      0x00, // packed: no LCT
+      // No LZW minimum code size byte follows
+    ]);
+    const err = await sanitizeFile(data).catch(e => e);
+    expect(err).toBeInstanceOf(CorruptedFileError);
+    expect(err.message).toContain('GIF truncated before LZW data');
+  });
+});

@@ -1,9 +1,9 @@
 ---
 layout: ../layouts/Base.astro
-title: 'Laika CMS: one content API, any backend'
+title: 'Contentia: one content API, any backend'
 ---
 
-import { codeSwap, compare } from '../data/laika';
+import { codeSwap, compare } from '../data/contentia';
 
 import { CodePanel } from '../components/CodePanel';
 import { Compare } from '../components/Compare';
@@ -18,7 +18,7 @@ import { PromiseGrid } from '../components/PromiseGrid';
 {/* The sections are React components. Their copy lives here as props and MDX
     children, except the two data-heavy blocks — the hero's repository-swap demo
     and the comparison table — which are content files under `content/` served
-    through Laika's own store as content collections, same as the backend catalogue.
+    through Contentia's own store as content collections, same as the backend catalogue.
     The one island — `<CodePanel client:load>` — sits here because a client
     directive only works in an `.astro`/`.mdx` file. */}
 
@@ -26,11 +26,11 @@ import { PromiseGrid } from '../components/PromiseGrid';
   headline="One content API."
   headlineAccent="Any backend."
   primaryCta={{ label: 'Get started', href: '/docs/guides/getting-started' }}
-  secondaryCta={{ label: 'View source', href: 'https://github.com/laikacms/laikacms' }}
+  secondaryCta={{ label: 'View source', href: 'https://github.com/contentia-dev/contentia' }}
   runtimesLabel="runs in"
   runtimes={['Node', 'Bun', 'Deno', 'Cloudflare Workers', 'Browser']}
 >
-  Laika is a content API. Define your content once and serve it as a JSON:API to your editors, sites
+  Contentia is a content API. Define your content once and serve it as a JSON:API to your editors, sites
   and apps. It runs on your own infrastructure, on top of the filesystem, a database, a Git
   repository or a content service you already use. More than 40 backends are supported.
 
@@ -38,7 +38,7 @@ import { PromiseGrid } from '../components/PromiseGrid';
 </Hero>
 
 <Features heading="Open source, on your own infrastructure.">
-  Laika puts an API in front of your content. The storage behind it is a configuration choice, so
+  Contentia puts an API in front of your content. The storage behind it is a configuration choice, so
   you can switch backends without rewriting your application. Everything is MIT licensed and
   self-hosted.
 
@@ -79,7 +79,7 @@ import { PromiseGrid } from '../components/PromiseGrid';
     </Pillar>
 
     <Pillar icon="decap" title="Works with Decap">
-      A git-gateway-compatible HTTP handler with OAuth2 and PKCE built in. Connect Decap CMS to Laika
+      A git-gateway-compatible HTTP handler with OAuth2 and PKCE built in. Connect Decap CMS to Contentia
       directly, or run the gateway yourself. All MIT.
     </Pillar>
 
@@ -102,7 +102,7 @@ import { PromiseGrid } from '../components/PromiseGrid';
     </PledgePromise>
 
     <PledgePromise icon="spark" title="Self-hosted by default">
-      Laika runs on your infrastructure with your storage. Your content stays where you put it.
+      Contentia runs on your infrastructure with your storage. Your content stays where you put it.
     </PledgePromise>
 
     <PledgePromise icon="spark" title="Managed, if you want it">

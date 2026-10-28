@@ -4,13 +4,14 @@ The Assets API manages binary files (assets) and folders. The default base path 
 Resource routes are mounted under `/resources`; `GET /capabilities` sits directly on the base path.
 
 > ⚠️ **You must state an access policy.**
-> [`buildAssetsApi`](../api/laikacms/assets/api/functions/buildAssetsApi) requires an `authorize`
+> [`buildAssetsApi`](../api/contentia/assets/api/functions/buildAssetsApi) requires an `authorize`
 > callback — it runs before every action below, including the two OpenAPI routes, and receives the
 > action descriptor plus the originating `Request`. Return `true` to allow, `false` for a 403, or a
-> [`LaikaError`](../api/laikacms/core/errors/classes/LaikaError) for a custom status. It decides
-> _what a caller may do_; authenticating them is still your job — validate the credential inside the
-> callback, or mount the handler behind `@laikacms/server/api`, which checks a Bearer token first.
-> For a deliberately open surface, say so with `authorize: allowAll` from `laikacms/json-api`.
+> [`ContentiaError`](../api/contentia/core/errors/classes/ContentiaError) for a custom status. It
+> decides _what a caller may do_; authenticating them is still your job — validate the credential
+> inside the callback, or mount the handler behind `@contentia/server/api`, which checks a Bearer
+> token first. For a deliberately open surface, say so with `authorize: allowAll` from
+> `contentia/json-api`.
 
 ### Resource Types
 
@@ -204,25 +205,25 @@ the repository's contract evolves — clients may use it to detect incompatible 
 
 **Backend pagination support**
 
-| Backend                                                                                        | `offset` | `page` | `cursor` |
-| ---------------------------------------------------------------------------------------------- | -------- | ------ | -------- |
-| [`R2AssetsRepository`](../api/laikacms/assets/r2/classes/R2AssetsRepository)                   | ✓        | ✓      | —        |
-| [`ObsidianAssetsRepository`](../api/laikacms/assets/obsidian/classes/ObsidianAssetsRepository) | ✓        | ✓      | —        |
+| Backend                                                                                         | `offset` | `page` | `cursor` |
+| ----------------------------------------------------------------------------------------------- | -------- | ------ | -------- |
+| [`R2AssetsRepository`](../api/contentia/assets/r2/classes/R2AssetsRepository)                   | ✓        | ✓      | —        |
+| [`ObsidianAssetsRepository`](../api/contentia/assets/obsidian/classes/ObsidianAssetsRepository) | ✓        | ✓      | —        |
 
 Two further backends advertise no fixed styles, so do not assume the table above covers you — call
 the endpoint.
-[`CatalogAssetsRepository`](../api/laikacms/assets/catalog/classes/CatalogAssetsRepository) forwards
-the pagination capability of whichever storage repository it wraps, and
-[`AssetsJsonApiProxyRepository`](../api/laikacms/assets/jsonapi-proxy/classes/AssetsJsonApiProxyRepository)
+[`CatalogAssetsRepository`](../api/contentia/assets/catalog/classes/CatalogAssetsRepository)
+forwards the pagination capability of whichever storage repository it wraps, and
+[`AssetsJsonApiProxyRepository`](../api/contentia/assets/jsonapi-proxy/classes/AssetsJsonApiProxyRepository)
 returns whatever the upstream API's own `GET /capabilities` reports (falling back to all three
 styles when the upstream does not answer).
 
 **Error Responses**
 
-| Status | Condition                                                                               |
-| ------ | --------------------------------------------------------------------------------------- |
-| `404`  | Repository returns [`NotFoundError`](../api/laikacms/core/errors/classes/NotFoundError) |
-| `500`  | Repository returns an unrecognised internal error                                       |
+| Status | Condition                                                                                |
+| ------ | ---------------------------------------------------------------------------------------- |
+| `404`  | Repository returns [`NotFoundError`](../api/contentia/core/errors/classes/NotFoundError) |
+| `500`  | Repository returns an unrecognised internal error                                        |
 
 ---
 
@@ -676,10 +677,10 @@ When scoped to a folder the response includes a `folder` attribute:
 
 **Error Responses**
 
-| Status | Condition                                                                                                                  |
-| ------ | -------------------------------------------------------------------------------------------------------------------------- |
-| `501`  | Backend does not support change signals ([`NotImplementedError`](../api/laikacms/core/errors/classes/NotImplementedError)) |
-| `403`  | Caller is not authorised to call `getSyncToken` ([`ForbiddenError`](../api/laikacms/core/errors/classes/ForbiddenError))   |
+| Status | Condition                                                                                                                   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `501`  | Backend does not support change signals ([`NotImplementedError`](../api/contentia/core/errors/classes/NotImplementedError)) |
+| `403`  | Caller is not authorised to call `getSyncToken` ([`ForbiddenError`](../api/contentia/core/errors/classes/ForbiddenError))   |
 
 ---
 

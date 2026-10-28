@@ -15,12 +15,12 @@ const input = (overrides: Partial<ResolveCliInput>): ResolveCliInput => ({
 describe('resolveCli', () => {
   it('prefers the setting over the env var and the workspace install', () => {
     const cli = resolveCli(input({
-      settingPath: '/opt/laika',
+      settingPath: '/opt/contentia',
       envPath: '/dev/cli.js',
       workspaceFolders: ['/ws'],
       exists: () => true,
     }));
-    expect(cli).toMatchObject({ command: '/opt/laika', args: [], source: 'setting' });
+    expect(cli).toMatchObject({ command: '/opt/contentia', args: [], source: 'setting' });
   });
 
   it('runs a .js entry point (the local apps/cli build) with node', () => {
@@ -28,19 +28,19 @@ describe('resolveCli', () => {
       .toMatchObject({ command: 'node', args: ['/repo/apps/cli/dist/cli.js'], source: 'env' });
   });
 
-  it("uses the first workspace folder that has the project's own laikacli", () => {
-    const own = path.join('/b', 'node_modules', '.bin', 'laika');
+  it("uses the first workspace folder that has the project's own contentia", () => {
+    const own = path.join('/b', 'node_modules', '.bin', 'contentia');
     const cli = resolveCli(input({ workspaceFolders: ['/a', '/b'], exists: file => file === own }));
     expect(cli).toMatchObject({ command: own, source: 'workspace', shell: false });
   });
 
   it('looks for the .cmd shim on Windows and runs it through a shell', () => {
-    const own = path.join('C:\\ws', 'node_modules', '.bin', 'laika.cmd');
+    const own = path.join('C:\\ws', 'node_modules', '.bin', 'contentia.cmd');
     const cli = resolveCli(input({ platform: 'win32', workspaceFolders: ['C:\\ws'], exists: file => file === own }));
     expect(cli).toMatchObject({ command: own, shell: true });
   });
 
-  it('falls back to npx laikacli', () => {
-    expect(resolveCli(input({}))).toMatchObject({ command: 'npx', args: ['--yes', 'laikacli'], source: 'npx' });
+  it('falls back to npx contentia', () => {
+    expect(resolveCli(input({}))).toMatchObject({ command: 'npx', args: ['--yes', 'contentia'], source: 'npx' });
   });
 });

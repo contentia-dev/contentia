@@ -1,8 +1,8 @@
 {
-  "name": "@laikacms/docs",
+  "name": "@contentia/docs",
   "version": "1.0.1",
   "private": true,
-  "description": "Laika documentation site (VitePress).",
+  "description": "Contentia documentation site (VitePress).",
   "type": "module",
   "scripts": {
     "generate-adapter-docs": "node scripts/generate-adapter-docs.mjs",
@@ -17,7 +17,7 @@
   "devDependencies": {
     "@scalar/api-reference": "catalog:docs",
     "js-yaml": "catalog:",
-    "laikacms": "workspace:*",
+    "contentia": "workspace:*",
     "mermaid": "catalog:docs",
     "typedoc": "catalog:docs",
     "typedoc-plugin-markdown": "catalog:docs",

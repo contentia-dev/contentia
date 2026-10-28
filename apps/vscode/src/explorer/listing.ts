@@ -1,7 +1,7 @@
-import type { LaikaError } from 'laikacms/core';
-import { LaikaStream } from 'laikacms/core';
-import type { DocumentsRepository } from 'laikacms/documents';
-import type { StorageRepository } from 'laikacms/storage';
+import type { ContentiaError } from 'contentia/core';
+import { ContentiaStream } from 'contentia/core';
+import type { DocumentsRepository } from 'contentia/documents';
+import type { StorageRepository } from 'contentia/storage';
 
 export const PAGE_SIZE = 100;
 
@@ -25,7 +25,7 @@ export interface Page {
   /** The page to request next, or `undefined` when this was the last one. */
   readonly nextPage: number | undefined;
   /** Recoverable warnings the repository reported while listing. */
-  readonly warnings: readonly LaikaError[];
+  readonly warnings: readonly ContentiaError[];
 }
 
 /** The last key segment: `posts/2026/hello` shows as `hello`. */
@@ -52,7 +52,7 @@ export const listStorageFolder = async (
   folderKey: string,
   page: number,
 ): Promise<Page> => {
-  const { data, done, recoverableErrors } = await LaikaStream.runPromiseCollect(
+  const { data, done, recoverableErrors } = await ContentiaStream.runPromiseCollect(
     repository.listAtomSummaries(folderKey, { depth: 1, pagination: { page, perPage: PAGE_SIZE } }),
   );
   const entries = data.map((atom): Entry =>
@@ -76,7 +76,7 @@ export const listDocumentsFolder = async (
   folder: string | undefined,
   page: number,
 ): Promise<Page> => {
-  const { data, done, recoverableErrors } = await LaikaStream.runPromiseCollect(
+  const { data, done, recoverableErrors } = await ContentiaStream.runPromiseCollect(
     repository.listRecordSummaries({ folder, depth: 1, pagination: { page, perPage: PAGE_SIZE } }),
   );
   const entries = data.map((record): Entry => {

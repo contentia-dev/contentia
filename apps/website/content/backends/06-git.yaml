@@ -5,14 +5,14 @@ note: >-
   a diff.
 items:
   - name: GitHub
-    sub: '@laikacms/github'
+    sub: '@contentia/github'
     icon: { adapter: github }
   - name: GitLab
-    sub: '@laikacms/gitlab'
+    sub: '@contentia/gitlab'
     icon: { adapter: gitlab }
   - name: Bitbucket
-    sub: '@laikacms/bitbucket'
+    sub: '@contentia/bitbucket'
     icon: { adapter: bitbucket }
   - name: Gist
-    sub: '@laikacms/gist'
+    sub: '@contentia/gist'
     icon: { si: github }

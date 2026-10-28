@@ -23,13 +23,13 @@ export const blogCollections = [
   },
 ] as const;
 
-/** Full Decap config — passed to laika on the server and to CMS.init() in the browser. */
+/** Full Decap config — passed to contentia on the server and to CMS.init() in the browser. */
 export const decapConfig = {
   backend: {
     name: 'laika',
     base_url: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     api_root: '/api/decap',
-    dev_token: 'dev-local-laika-token',
+    dev_token: 'dev-local-contentia-token',
   },
   // For production, point media_folder at an R2 bucket (see wrangler.toml [[r2_buckets]]).
   media_folder: 'uploads',

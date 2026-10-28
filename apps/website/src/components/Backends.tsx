@@ -1,9 +1,9 @@
-import { LAIKA_GROUPS } from '../data/laika';
+import { CONTENTIA_GROUPS } from '../data/contentia';
 import { BackendGroup, type BackendGroupData } from './BackendGroup';
 
 /* Re-exported so the components that already import it from here keep working;
    the catalogue itself now comes from the `backends` content collection. */
-export { LAIKA_GROUPS };
+export { CONTENTIA_GROUPS };
 
 /* Two groups that don't come from `content/backends/*`: they describe the other
    contract (assets) and the on-disk formats (serializers), so they live with
@@ -14,11 +14,11 @@ export const CATALOGUE_ASSETS: Omit<BackendGroupData, 'id'> = {
   note:
     'Two contracts, same shape. Pair a content store with an asset store (bytes, transforms and URLs) on the backend you already use.',
   items: [
-    { name: 'Cloudinary', sub: '@laikacms/cloudinary', icon: { si: 'cloudinary' } },
-    { name: 'Cloudflare Images', sub: '@laikacms/cloudflare', icon: { si: 'cloudflare' } },
-    { name: 'S3 assets', sub: '@laikacms/aws', icon: { img: 'aws' } },
-    { name: 'R2 assets', sub: 'laikacms/assets-r2', icon: { adapter: 'r2' } },
-    { name: 'Obsidian vault', sub: 'laikacms/assets-obsidian', icon: { adapter: 'obsidian' } },
+    { name: 'Cloudinary', sub: '@contentia/cloudinary', icon: { si: 'cloudinary' } },
+    { name: 'Cloudflare Images', sub: '@contentia/cloudflare', icon: { si: 'cloudflare' } },
+    { name: 'S3 assets', sub: '@contentia/aws', icon: { img: 'aws' } },
+    { name: 'R2 assets', sub: 'contentia/assets-r2', icon: { adapter: 'r2' } },
+    { name: 'Obsidian vault', sub: 'contentia/assets-obsidian', icon: { adapter: 'obsidian' } },
   ],
 };
 
@@ -37,10 +37,10 @@ export const CATALOGUE_SERIALIZERS: Omit<BackendGroupData, 'id'> = {
 const FOOTNOTE = {
   text: 'Adapters are small.',
   linkLabel: 'Write one for your store ↗',
-  href: 'https://github.com/laikacms/laikacms',
+  href: 'https://github.com/contentia-dev/contentia',
 };
 
-const groups: Omit<BackendGroupData, 'id'>[] = [...LAIKA_GROUPS, CATALOGUE_ASSETS, CATALOGUE_SERIALIZERS];
+const groups: Omit<BackendGroupData, 'id'>[] = [...CONTENTIA_GROUPS, CATALOGUE_ASSETS, CATALOGUE_SERIALIZERS];
 
 export function Backends() {
   return (

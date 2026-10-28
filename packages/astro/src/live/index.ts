@@ -1,7 +1,7 @@
-export { type LaikaLiveCollections, type LiveCollectionData, type LiveCollectionKey } from '../live-collections.js';
+export { type ContentiaLiveCollections, type LiveCollectionData, type LiveCollectionKey } from '../live-collections.js';
 export {
-  type LaikaCollectionFilter,
-  type LaikaEntryFilter,
+  type ContentiaCollectionFilter,
+  type ContentiaEntryFilter,
   type LiveCacheOptions,
   liveDocumentsLoader,
   type LiveDocumentsLoaderOptions,

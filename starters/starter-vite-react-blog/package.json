@@ -1,8 +1,8 @@
 {
-  "name": "@laikacms/starter-vite-react-blog",
+  "name": "@contentia/starter-vite-react-blog",
   "version": "0.0.1",
   "private": true,
-  "description": "Starter blog using bare Vite SSR + React + Express + LaikaCMS. No meta-framework — shows what Next.js and TanStack Start abstract away: server-side renderToString, Express request handling, and the Decap proxy.",
+  "description": "Starter blog using bare Vite SSR + React + Express + Contentia. No meta-framework — shows what Next.js and TanStack Start abstract away: server-side renderToString, Express request handling, and the Decap proxy.",
   "type": "module",
   "scripts": {
     "build:admin": "esbuild src/admin-client.ts --bundle --outfile=public/admin/bundle.js --format=esm --platform=browser",
@@ -12,10 +12,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@laikacms/server": "^6.0.0",
+    "@contentia/server": "^6.0.0",
     "@laikacms/decap-cms": "^4.1.0",
     "express": "^5.1.0",
-    "laikacms": "^6.0.0",
+    "contentia": "^6.0.0",
     "prismjs": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.4"

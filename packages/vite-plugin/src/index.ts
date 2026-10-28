@@ -1,9 +1,9 @@
 export {
+  type ContentiaRepositories,
   createFsStorage,
   createRepositories,
   defaultSerializers,
   type FsStorageOptions,
-  type LaikaRepositories,
   listKeys,
   readItem,
   type ReadResult,
@@ -26,34 +26,34 @@ export {
 export { isSafeIdentifier, RESERVED_WORDS } from './identifier.js';
 export {
   type ConnectMiddleware,
+  type ContentiaLocalApiOptions,
   DEFAULT_LOCAL_API_BASE_PATH,
-  type LaikaLocalApiOptions,
   type LocalApiMiddlewares,
   type LocalApiServer,
   mountLocalApi,
 } from './local-api.js';
 export { renderModule, type RenderModuleOptions } from './module.js';
 export {
-  laikacms,
-  laikacms as default,
-  type LaikaTypegenPluginOptions,
-  type LaikaVitePluginOptions,
+  contentia,
+  contentia as default,
+  type ContentiaTypegenPluginOptions,
+  type ContentiaVitePluginOptions,
 } from './plugin.js';
 export {
-  isLaikaSource,
-  type LaikaId,
-  type LaikaNamespace,
+  type ContentiaId,
+  type ContentiaNamespace,
+  isContentiaSource,
   type Namespace,
-  parseLaikaId,
+  parseContentiaId,
   PROTOCOL,
   toSource,
   toVirtualId,
 } from './protocol.js';
 export type { ContentChangeChannel, ContentChangeEvent } from './typegen/channel.js';
 export {
+  ContentiaTypegen,
+  type ContentiaTypegenOptions,
   createTypegen,
-  LaikaTypegen,
-  type LaikaTypegenOptions,
   regenerateAll,
   regenerateItem,
   removeItem,

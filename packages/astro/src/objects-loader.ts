@@ -1,5 +1,5 @@
 /**
- * The Content Layer loader for Laika storage objects.
+ * The Content Layer loader for Contentia storage objects.
  *
  * This is the counterpart to {@link documentsLoader} for content that has no
  * publication state — site settings, navigation, a table of feature rows. It is
@@ -9,24 +9,24 @@
  * meaningless on half its inputs.
  */
 
-import { collectStream, runTask } from 'laikacms/compat';
-import { NotFoundError, NotImplementedError } from 'laikacms/core/errors';
-import type { StorageRepository } from 'laikacms/storage';
+import { collectStream, runTask } from 'contentia/compat';
+import { NotFoundError, NotImplementedError } from 'contentia/core/errors';
+import type { StorageRepository } from 'contentia/storage';
 
 import type { LoaderPagination } from './documents-loader.js';
 import { inferTypeScript } from './infer-types.js';
 import { renderEntryModule } from './json-schema-to-types.js';
 import type { ZodNamespace } from './json-schema-to-zod.js';
 import {
+  type ContentiaLoader,
+  type ContentiaLoaderContext,
   DEFAULT_BODY_FIELD,
   type EntryOptions,
-  type LaikaLoader,
-  type LaikaLoaderContext,
   type RenderOptions,
   type SourceRecord,
   toDataEntry,
 } from './mapping.js';
-import { type LaikaRepositoryOptions, resolveRepositories } from './repositories.js';
+import { type ContentiaRepositoryOptions, resolveRepositories } from './repositories.js';
 import { runSync, type SyncSource } from './sync.js';
 
 /**
@@ -48,7 +48,7 @@ export interface ObjectSelectOptions {
   pagination?: LoaderPagination;
 }
 
-export interface ObjectsLoaderOptions extends LaikaRepositoryOptions {
+export interface ObjectsLoaderOptions extends ContentiaRepositoryOptions {
   /** The storage repository to read. Highest precedence. */
   storage?: StorageRepository;
   select?: ObjectSelectOptions;
@@ -76,10 +76,10 @@ export interface ObjectsLoaderOptions extends LaikaRepositoryOptions {
 const DEFAULT_DEPTH = 64;
 const DEFAULT_PER_PAGE = 1000;
 
-/** A Content Layer loader over a Laika {@link StorageRepository}. */
-export function objectsLoader(options: ObjectsLoaderOptions = {}): LaikaLoader {
+/** A Content Layer loader over a Contentia {@link StorageRepository}. */
+export function objectsLoader(options: ObjectsLoaderOptions = {}): ContentiaLoader {
   return {
-    name: options.name ?? 'laikacms:objects',
+    name: options.name ?? 'contentia:objects',
     // Astro asks for the schema before `load` runs, so the folder cannot be
     // defaulted from the collection name here — it has to be given.
     ...(options.z !== undefined && options.select?.folder !== undefined
@@ -93,7 +93,7 @@ export function objectsLoader(options: ObjectsLoaderOptions = {}): LaikaLoader {
           ),
       }
       : {}),
-    load: async (context: LaikaLoaderContext) => {
+    load: async (context: ContentiaLoaderContext) => {
       const folder = options.select?.folder ?? context.collection;
       const storage = options.storage
         ?? resolveRepositories(options, context.config.root.pathname).storage;

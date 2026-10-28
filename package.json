@@ -1,8 +1,8 @@
 {
   "private": true,
-  "description": "Laika CMS workspace root.",
+  "description": "Contentia workspace root.",
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "scripts": {
     "clean": "rimraf --glob '**/node_modules' '**/dist' '**/.turbo' '**/cdk.out' '**/.tanstack/*' '**/.wrangler/*'",
     "build": "turbo run build",

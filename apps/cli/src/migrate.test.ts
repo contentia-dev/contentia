@@ -1,4 +1,4 @@
-import { EntryAlreadyExistsError, LaikaStream, LaikaTask } from 'laikacms/core';
+import { ContentiaStream, ContentiaTask, EntryAlreadyExistsError } from 'contentia/core';
 import type {
   Atom,
   AtomSummary,
@@ -11,8 +11,8 @@ import type {
   StorageObject,
   StorageObjectCreate,
   StorageObjectUpdate,
-} from 'laikacms/storage';
-import { CompatibilityDate, StorageRepository } from 'laikacms/storage';
+} from 'contentia/storage';
+import { CompatibilityDate, StorageRepository } from 'contentia/storage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateStorage } from './migrate.js';
@@ -25,8 +25,8 @@ class StubStorageRepository extends StorageRepository {
   private readonly objects = new Map<string, StorageObject>();
   private readonly explicitFolders = new Set<string>();
 
-  getCapabilities(): LaikaTask.LaikaTask<Capabilities> {
-    return LaikaTask.succeed<Capabilities>({
+  getCapabilities(): ContentiaTask.ContentiaTask<Capabilities> {
+    return ContentiaTask.succeed<Capabilities>({
       compatibilityDate: CompatibilityDate.make('2026-05-11'),
       fileExtensions: { supported: false, description: '' },
       pagination: { supported: false, description: '', styles: { offset: false, page: false, cursor: false } },
@@ -52,15 +52,15 @@ class StubStorageRepository extends StorageRepository {
     return this.objects.size;
   }
 
-  getObject(key: string): LaikaTask.LaikaTask<StorageObject> {
+  getObject(key: string): ContentiaTask.ContentiaTask<StorageObject> {
     const v = this.objects.get(key);
-    if (!v) return LaikaTask.fail(new Error(`Not found: ${key}`) as never);
-    return LaikaTask.succeed(v);
+    if (!v) return ContentiaTask.fail(new Error(`Not found: ${key}`) as never);
+    return ContentiaTask.succeed(v);
   }
 
-  createObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
+  createObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
     if (this.objects.has(create.key)) {
-      return LaikaTask.fail(new EntryAlreadyExistsError(`Already exists: ${create.key}`));
+      return ContentiaTask.fail(new EntryAlreadyExistsError(`Already exists: ${create.key}`));
     }
     const now = new Date().toISOString();
     const obj: StorageObject = {
@@ -71,10 +71,10 @@ class StubStorageRepository extends StorageRepository {
       updatedAt: now,
     };
     this.objects.set(create.key, obj);
-    return LaikaTask.succeed(obj);
+    return ContentiaTask.succeed(obj);
   }
 
-  createOrUpdateObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject> {
+  createOrUpdateObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
     const existing = this.objects.get(create.key);
     const now = new Date().toISOString();
     const obj: StorageObject = {
@@ -85,22 +85,22 @@ class StubStorageRepository extends StorageRepository {
       updatedAt: now,
     };
     this.objects.set(create.key, obj);
-    return LaikaTask.succeed(obj);
+    return ContentiaTask.succeed(obj);
   }
 
-  updateObject(update: StorageObjectUpdate): LaikaTask.LaikaTask<StorageObject> {
+  updateObject(update: StorageObjectUpdate): ContentiaTask.ContentiaTask<StorageObject> {
     const existing = this.objects.get(update.key);
-    if (!existing) return LaikaTask.fail(new Error(`Not found: ${update.key}`) as never);
+    if (!existing) return ContentiaTask.fail(new Error(`Not found: ${update.key}`) as never);
     const updated: StorageObject = {
       ...existing,
       content: (update.content ?? existing.content) as StorageObject['content'],
       updatedAt: new Date().toISOString(),
     };
     this.objects.set(update.key, updated);
-    return LaikaTask.succeed(updated);
+    return ContentiaTask.succeed(updated);
   }
 
-  removeAtoms(keys: readonly string[]): LaikaStream.LaikaStream<string, RemoveAtomsDone> {
+  removeAtoms(keys: readonly string[]): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
     const removed: string[] = [];
     let skipped = 0;
     for (const key of keys) {
@@ -108,45 +108,48 @@ class StubStorageRepository extends StorageRepository {
       else skipped += 1;
     }
     return removed.length > 0
-      ? LaikaStream.succeedMany<string, RemoveAtomsDone>(removed, { removed: removed.length, skipped })
-      : LaikaStream.empty<RemoveAtomsDone>({ removed: 0, skipped });
+      ? ContentiaStream.succeedMany<string, RemoveAtomsDone>(removed, { removed: removed.length, skipped })
+      : ContentiaStream.empty<RemoveAtomsDone>({ removed: 0, skipped });
   }
 
-  getFolder(key: string): LaikaTask.LaikaTask<Folder> {
+  getFolder(key: string): ContentiaTask.ContentiaTask<Folder> {
     const exists = this.explicitFolders.has(key)
       || [...this.objects.keys()].some(k => k.startsWith(`${key}/`));
-    if (!exists) return LaikaTask.fail(new Error(`Folder not found: ${key}`) as never);
+    if (!exists) return ContentiaTask.fail(new Error(`Folder not found: ${key}`) as never);
     const now = new Date().toISOString();
-    return LaikaTask.succeed({ type: 'folder', key, createdAt: now, updatedAt: now } as Folder);
+    return ContentiaTask.succeed({ type: 'folder', key, createdAt: now, updatedAt: now } as Folder);
   }
 
-  createFolder(create: FolderCreate): LaikaTask.LaikaTask<Folder> {
+  createFolder(create: FolderCreate): ContentiaTask.ContentiaTask<Folder> {
     if (this.explicitFolders.has(create.key)) {
-      return LaikaTask.fail(new EntryAlreadyExistsError(`Already exists: ${create.key}`));
+      return ContentiaTask.fail(new EntryAlreadyExistsError(`Already exists: ${create.key}`));
     }
     this.explicitFolders.add(create.key);
     const now = new Date().toISOString();
-    return LaikaTask.succeed({ type: 'folder', key: create.key, createdAt: now, updatedAt: now } as Folder);
+    return ContentiaTask.succeed({ type: 'folder', key: create.key, createdAt: now, updatedAt: now } as Folder);
   }
 
-  getAtom(key: string): LaikaTask.LaikaTask<Atom> {
+  getAtom(key: string): ContentiaTask.ContentiaTask<Atom> {
     const obj = this.objects.get(key);
-    if (obj) return LaikaTask.succeed(obj as Atom);
+    if (obj) return ContentiaTask.succeed(obj as Atom);
     const now = new Date().toISOString();
     if (this.explicitFolders.has(key)) {
-      return LaikaTask.succeed({ type: 'folder', key, createdAt: now, updatedAt: now } as Atom);
+      return ContentiaTask.succeed({ type: 'folder', key, createdAt: now, updatedAt: now } as Atom);
     }
-    return LaikaTask.fail(new Error(`Not found: ${key}`) as never);
+    return ContentiaTask.fail(new Error(`Not found: ${key}`) as never);
   }
 
-  listAtoms(folderKey: string, _options: ListAtomsOptions): LaikaStream.LaikaStream<Atom, ListAtomsDone> {
-    return this.listAtomSummaries(folderKey, _options) as unknown as LaikaStream.LaikaStream<Atom, ListAtomsDone>;
+  listAtoms(folderKey: string, _options: ListAtomsOptions): ContentiaStream.ContentiaStream<Atom, ListAtomsDone> {
+    return this.listAtomSummaries(folderKey, _options) as unknown as ContentiaStream.ContentiaStream<
+      Atom,
+      ListAtomsDone
+    >;
   }
 
   listAtomSummaries(
     folderKey: string,
     _options: ListAtomsOptions,
-  ): LaikaStream.LaikaStream<AtomSummary, ListAtomsDone> {
+  ): ContentiaStream.ContentiaStream<AtomSummary, ListAtomsDone> {
     const prefix = folderKey ? (folderKey.endsWith('/') ? folderKey : `${folderKey}/`) : '';
     const seenFolders = new Set<string>();
     const summaries: AtomSummary[] = [];
@@ -171,8 +174,8 @@ class StubStorageRepository extends StorageRepository {
     }
 
     return summaries.length > 0
-      ? LaikaStream.succeedMany<AtomSummary, ListAtomsDone>(summaries, { total: summaries.length })
-      : LaikaStream.empty<ListAtomsDone>({ total: 0 });
+      ? ContentiaStream.succeedMany<AtomSummary, ListAtomsDone>(summaries, { total: summaries.length })
+      : ContentiaStream.empty<ListAtomsDone>({ total: 0 });
   }
 }
 
@@ -265,7 +268,7 @@ describe('migrateStorage', () => {
     source.seed('broken.md');
     // …then make getObject throw for that key specifically
     vi.spyOn(source, 'getObject').mockImplementation((key: string) => {
-      return LaikaTask.fail(new Error('disk read error') as never);
+      return ContentiaTask.fail(new Error('disk read error') as never);
     });
 
     const result = await migrateStorage(source, destination);
@@ -277,7 +280,7 @@ describe('migrateStorage', () => {
   it('emits error event when write fails unexpectedly', async () => {
     source.seed('oops.md');
     vi.spyOn(destination, 'createObject').mockImplementation(() => {
-      return LaikaTask.fail(new Error('write failure') as never);
+      return ContentiaTask.fail(new Error('write failure') as never);
     });
     const errorEvents: Array<{ type: string, key: string }> = [];
 

@@ -68,11 +68,11 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
-      - name: Pack local @laikacms packages
+      - name: Pack local @contentia packages
         id: pack
         run: |
           mkdir -p "$RUNNER_TEMP/tgz"
-          for pkg in laikacms server github; do
+          for pkg in contentia server github; do
             pnpm --filter "./packages/$pkg" pack --out "$RUNNER_TEMP/tgz/$pkg.tgz"
           done
 
@@ -86,9 +86,9 @@ jobs:
           # repo root workspace). Never committed — CI-only.
           cat > pnpm-workspace.yaml <<EOF
           overrides:
-            laikacms: "file:$RUNNER_TEMP/tgz/laikacms.tgz"
-            "@laikacms/server": "file:$RUNNER_TEMP/tgz/server.tgz"
-            "@laikacms/github": "file:$RUNNER_TEMP/tgz/github.tgz"
+            contentia: "file:$RUNNER_TEMP/tgz/contentia.tgz"
+            "@contentia/server": "file:$RUNNER_TEMP/tgz/server.tgz"
+            "@contentia/github": "file:$RUNNER_TEMP/tgz/github.tgz"
           EOF
           pnpm install --no-frozen-lockfile
           pnpm run typecheck

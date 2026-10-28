@@ -22,8 +22,8 @@
  * yourself when a custom widget resolves to `unknown` and you know better:
  *
  * ```ts
- * declare module '@laikacms/astro/live-collections' {
- *   interface LaikaLiveCollections {
+ * declare module '@contentia/astro/live-collections' {
+ *   interface ContentiaLiveCollections {
  *     posts: { title: string, tags: string[] };
  *   }
  * }
@@ -31,18 +31,18 @@
  */
 
 /**
- * Maps a Laika collection key to the shape of one live entry's `data`.
+ * Maps a Contentia collection key to the shape of one live entry's `data`.
  *
  * Empty by default. The integration fills it in; a project can add to or
  * replace any member by augmenting this module.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the point is for it to be empty until augmented.
-export interface LaikaLiveCollections {}
+export interface ContentiaLiveCollections {}
 
 /** The collection keys the augmentation has typed. `never` when there are none. */
-export type LiveCollectionKey = keyof LaikaLiveCollections & string;
+export type LiveCollectionKey = keyof ContentiaLiveCollections & string;
 
 /** The `data` shape for one typed live collection. */
-export type LiveCollectionData<K extends LiveCollectionKey> = LaikaLiveCollections[K] extends Record<string, unknown>
-  ? LaikaLiveCollections[K]
+export type LiveCollectionData<K extends LiveCollectionKey> = ContentiaLiveCollections[K] extends
+  Record<string, unknown> ? ContentiaLiveCollections[K]
   : Record<string, unknown>;

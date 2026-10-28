@@ -1,7 +1,7 @@
 /**
  * Deriving collections from a catalog, against the real providers.
  *
- * The point of `laikaCollections` is that a project declares its collections
+ * The point of `contentiaCollections` is that a project declares its collections
  * once. These tests check that claim end to end: write a CMS config, derive the
  * collections, and assert the schema really validates the fields that config
  * declared — including which ones are optional.
@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 // `astro:content` would hand a real project.
 import * as zod from 'astro/zod';
 
-import { laikaCollections } from './collections.js';
+import { contentiaCollections } from './collections.js';
 import { documentsLoader } from './documents-loader.js';
 import { jsonSchemaToZod, type ZodNamespace } from './json-schema-to-zod.js';
 import { objectsLoader } from './objects-loader.js';
@@ -33,7 +33,7 @@ afterEach(async () => {
 
 const DECAP_CONFIG = `
 backend:
-  name: laika
+  name: contentia
 media_folder: public/uploads
 collections:
   - name: posts
@@ -55,7 +55,7 @@ collections:
 `;
 
 async function createProject(config = DECAP_CONFIG): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-cat-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-cat-'));
   tempDirs.push(dir);
   await fs.writeFile(path.join(dir, 'config.yml'), config);
   await fs.mkdir(path.join(dir, 'posts'), { recursive: true });
@@ -64,7 +64,7 @@ async function createProject(config = DECAP_CONFIG): Promise<string> {
 }
 
 const derive = (root: string, overrides: Record<string, unknown> = {}) =>
-  laikaCollections({ dir: '.', root, defaultExtension: 'md', catalog: 'decap', z, ...overrides });
+  contentiaCollections({ dir: '.', root, defaultExtension: 'md', catalog: 'decap', z, ...overrides });
 
 describe('collection discovery', () => {
   it('finds every collection the CMS config declares', async () => {
@@ -96,14 +96,14 @@ describe('collection discovery', () => {
 
     // The convention catalog cannot enumerate; silently returning no
     // collections would look like a site that simply has no content.
-    await expect(laikaCollections({ dir: '.', root, catalog: 'convention', z }))
+    await expect(contentiaCollections({ dir: '.', root, catalog: 'convention', z }))
       .rejects.toMatchObject({ code: 'bad_request' });
   });
 
   it('returns an empty set when that is explicitly expected', async () => {
     const root = await createProject();
 
-    await expect(laikaCollections({ dir: '.', root, catalog: 'convention', z, allowEmpty: true }))
+    await expect(contentiaCollections({ dir: '.', root, catalog: 'convention', z, allowEmpty: true }))
       .resolves.toEqual({});
   });
 });
@@ -187,7 +187,7 @@ describe('schema derivation', () => {
   it('omits schemas entirely when no zod namespace is supplied', async () => {
     const root = await createProject();
 
-    const collections = await laikaCollections({
+    const collections = await contentiaCollections({
       dir: '.',
       root,
       defaultExtension: 'md',
@@ -201,7 +201,7 @@ describe('schema derivation', () => {
 describe('the catalog directory mapping', () => {
   it('reads a collection whose folder differs from its name', async () => {
     // This is the case the convention catalog cannot express, and the reason
-    // laikaCollections wires the loader through the same provider it enumerated
+    // contentiaCollections wires the loader through the same provider it enumerated
     // from: collection `pages` lives in `site-pages/`.
     const root = await createProject();
     await fs.writeFile(

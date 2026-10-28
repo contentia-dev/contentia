@@ -1,13 +1,13 @@
 {
-  "name": "laika-vscode",
+  "name": "contentia-vscode",
   "private": true,
   "version": "0.0.0",
-  "displayName": "Laika CMS",
-  "description": "Browse Laika CMS content (folders, objects, documents) from VS Code.",
-  "publisher": "laikacms",
+  "displayName": "Contentia",
+  "description": "Browse Contentia content (folders, objects, documents) from VS Code.",
+  "publisher": "contentia",
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
-  "icon": "media/laika-icon.png",
+  "repository": "https://github.com/contentia-dev/contentia",
+  "icon": "media/contentia-icon.png",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -20,126 +20,126 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "laika",
-          "title": "Laika CMS",
-          "icon": "media/laika.svg"
+          "id": "contentia",
+          "title": "Contentia",
+          "icon": "media/contentia.svg"
         }
       ]
     },
     "views": {
-      "laika": [
+      "contentia": [
         {
-          "id": "laika.storage",
+          "id": "contentia.storage",
           "name": "Storage"
         },
         {
-          "id": "laika.documents",
+          "id": "contentia.documents",
           "name": "Documents"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "laika.storage",
-        "contents": "No Laika connections configured.\n[Add Connection](command:laika.addConnection)\nConnections live in the `laika.connections` setting."
+        "view": "contentia.storage",
+        "contents": "No Contentia connections configured.\n[Add Connection](command:contentia.addConnection)\nConnections live in the `contentia.connections` setting."
       },
       {
-        "view": "laika.documents",
-        "contents": "No connection exposes a Documents API. Add a remote connection with a `documentsUrl`.\n[Add Connection](command:laika.addConnection)"
+        "view": "contentia.documents",
+        "contents": "No connection exposes a Documents API. Add a remote connection with a `documentsUrl`.\n[Add Connection](command:contentia.addConnection)"
       }
     ],
     "commands": [
       {
-        "command": "laika.refresh",
+        "command": "contentia.refresh",
         "title": "Refresh",
-        "category": "Laika",
+        "category": "Contentia",
         "icon": "$(refresh)"
       },
       {
-        "command": "laika.addConnection",
+        "command": "contentia.addConnection",
         "title": "Add Connection",
-        "category": "Laika",
+        "category": "Contentia",
         "icon": "$(add)"
       },
       {
-        "command": "laika.restartServers",
+        "command": "contentia.restartServers",
         "title": "Restart Local Servers",
-        "category": "Laika",
+        "category": "Contentia",
         "icon": "$(debug-restart)"
       },
       {
-        "command": "laika.setAccessToken",
+        "command": "contentia.setAccessToken",
         "title": "Set Access Token",
-        "category": "Laika",
+        "category": "Contentia",
         "icon": "$(key)"
       },
       {
-        "command": "laika.copyKey",
+        "command": "contentia.copyKey",
         "title": "Copy Key",
-        "category": "Laika"
+        "category": "Contentia"
       },
       {
-        "command": "laika.loadMore",
+        "command": "contentia.loadMore",
         "title": "Load More",
-        "category": "Laika"
+        "category": "Contentia"
       },
       {
-        "command": "laika.open",
+        "command": "contentia.open",
         "title": "Open",
-        "category": "Laika"
+        "category": "Contentia"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "laika.refresh",
-          "when": "view == laika.storage || view == laika.documents",
+          "command": "contentia.refresh",
+          "when": "view == contentia.storage || view == contentia.documents",
           "group": "navigation@1"
         },
         {
-          "command": "laika.addConnection",
-          "when": "view == laika.storage",
+          "command": "contentia.addConnection",
+          "when": "view == contentia.storage",
           "group": "navigation@2"
         },
         {
-          "command": "laika.restartServers",
-          "when": "view == laika.storage",
+          "command": "contentia.restartServers",
+          "when": "view == contentia.storage",
           "group": "navigation@3"
         }
       ],
       "view/item/context": [
         {
-          "command": "laika.setAccessToken",
+          "command": "contentia.setAccessToken",
           "when": "viewItem == connection-remote",
           "group": "inline"
         },
         {
-          "command": "laika.copyKey",
+          "command": "contentia.copyKey",
           "when": "viewItem == folder || viewItem == object || viewItem == record"
         }
       ],
       "commandPalette": [
         {
-          "command": "laika.copyKey",
+          "command": "contentia.copyKey",
           "when": "false"
         },
         {
-          "command": "laika.loadMore",
+          "command": "contentia.loadMore",
           "when": "false"
         },
         {
-          "command": "laika.open",
+          "command": "contentia.open",
           "when": "false"
         }
       ]
     },
     "configuration": {
-      "title": "Laika CMS",
+      "title": "Contentia",
       "properties": {
-        "laika.connections": {
+        "contentia.connections": {
           "type": "array",
           "default": [],
-          "markdownDescription": "Laika content sources. A `local` connection starts `laika local serve` through the workspace's own `laikacli`; a `remote` connection talks to a deployed Laika API server.",
+          "markdownDescription": "Contentia content sources. A `local` connection starts `contentia local serve` through the workspace's own `@contentia/cli`; a `remote` connection talks to a deployed Contentia API server.",
           "items": {
             "type": "object",
             "required": [
@@ -161,7 +161,7 @@
               "backend": {
                 "type": "string",
                 "default": "fs",
-                "markdownDescription": "`local` only: storage backend to serve (see `laika local list-backends`)."
+                "markdownDescription": "`local` only: storage backend to serve (see `contentia local list-backends`)."
               },
               "options": {
                 "type": "object",
@@ -178,10 +178,10 @@
             }
           }
         },
-        "laika.cli.path": {
+        "contentia.cli.path": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Path to the `laikacli` entry point. Empty: use the workspace's `node_modules/.bin/laika`, then `npx laikacli`. A `.js` path runs with `node`."
+          "markdownDescription": "Path to the `@contentia/cli` entry point. Empty: use the workspace's `node_modules/.bin/contentia`, then `npx contentia`. A `.js` path runs with `node`."
         }
       }
     }
@@ -197,8 +197,8 @@
   "devDependencies": {
     "@types/node": "catalog:types",
     "@types/vscode": "^1.90.0",
-    "laikacli": "workspace:*",
-    "laikacms": "workspace:*",
+    "@contentia/cli": "workspace:*",
+    "contentia": "workspace:*",
     "rimraf": "catalog:tools",
     "tsup": "catalog:tools",
     "typescript": "catalog:tools",

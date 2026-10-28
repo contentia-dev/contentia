@@ -1,13 +1,13 @@
 import { BODY_EXPORT, bodyOf } from '../bodies.js';
 import { isSafeIdentifier } from '../identifier.js';
-import type { LaikaNamespace } from '../protocol.js';
+import type { ContentiaNamespace } from '../protocol.js';
 
 /**
  * The concrete data for one content item, as returned by `readItem` (or handed
  * to `ingest`).
  */
 export interface RenderInput {
-  readonly namespace: LaikaNamespace;
+  readonly namespace: ContentiaNamespace;
   readonly key: string;
   /** Top-level content fields (become named exports when safe identifiers). */
   readonly content: Record<string, unknown>;
@@ -38,7 +38,7 @@ export interface RenderOptions {
  * Returns `[exportName, value]` pairs. Only safe-identifier export names are
  * kept, and later entries never clobber `$key`/`$type`.
  */
-function metaEntries(namespace: LaikaNamespace, meta: Record<string, unknown>): Array<[string, unknown]> {
+function metaEntries(namespace: ContentiaNamespace, meta: Record<string, unknown>): Array<[string, unknown]> {
   const entries: Array<[string, unknown]> = [];
   const seen = new Set<string>();
   const push = (name: string, value: unknown): void => {

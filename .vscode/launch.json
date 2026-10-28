@@ -2,10 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // Runs apps/vscode against the playground fixture, whose node_modules/.bin/laika
-      // links to the local apps/cli build. LAIKA_CLI_PATH makes any other folder you
+      // Runs apps/vscode against the playground fixture, whose node_modules/.bin/contentia
+      // links to the local apps/cli build. CONTENTIA_CLI_PATH makes any other folder you
       // open in the dev host use the local CLI too.
-      "name": "Laika VS Code extension",
+      "name": "Contentia VS Code extension",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -13,10 +13,10 @@
         "${workspaceFolder}/apps/vscode/fixtures/playground"
       ],
       "env": {
-        "LAIKA_CLI_PATH": "${workspaceFolder}/apps/cli/dist/cli.js"
+        "CONTENTIA_CLI_PATH": "${workspaceFolder}/apps/cli/dist/cli.js"
       },
       "outFiles": ["${workspaceFolder}/apps/vscode/dist/**/*.cjs"],
-      "preLaunchTask": "laika: build extension and cli"
+      "preLaunchTask": "contentia: build extension and cli"
     }
   ]
 }

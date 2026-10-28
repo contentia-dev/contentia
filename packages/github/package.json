@@ -1,10 +1,10 @@
 {
-  "name": "@laikacms/github",
+  "name": "@contentia/github",
   "version": "2.0.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "GitHub-backed StorageRepository for Laika CMS. Stores content in a GitHub repository; authenticates as a GitHub App via installation tokens.",
+  "description": "GitHub-backed StorageRepository for Contentia. Stores content in a GitHub repository; authenticates as a GitHub App via installation tokens.",
   "keywords": [
     "headless-cms",
     "content-management",
@@ -17,13 +17,13 @@
     "email": "sem@laikacms.com",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
     "email": "sem@laikacms.com",
-    "url": "https://github.com/laikacms/laikacms/issues"
+    "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -54,7 +54,7 @@
     "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"
   },
   "dependencies": {
-    "laikacms": "workspace:*",
+    "contentia": "workspace:*",
     "@octokit/auth-app": "catalog:octokit",
     "@octokit/rest": "catalog:octokit",
     "effect": "catalog:default",

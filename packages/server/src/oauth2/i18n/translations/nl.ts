@@ -1,11 +1,11 @@
 /**
- * Dutch translations for the Laika CMS OAuth2 login pages
+ * Dutch translations for the Contentia OAuth2 login pages
  */
 import { type Translation } from './en.js';
 
 export const nl: Translation = {
   auth: {
-    pageTitle: 'Inloggen - Laika CMS',
+    pageTitle: 'Inloggen - Contentia',
     emailLabel: 'E-mail',
     emailPlaceholder: 'E-mail',
     passwordLabel: 'Wachtwoord',
@@ -23,13 +23,13 @@ export const nl: Translation = {
     authenticationFailed: 'Authenticatie mislukt',
   },
   totp: {
-    pageTitle: 'Tweefactorauthenticatie - Laika CMS',
+    pageTitle: 'Tweefactorauthenticatie - Contentia',
     title: 'Tweefactorauthenticatie',
     description: 'Voer de 6-cijferige code in van je authenticator app',
     inputLabel: 'Eenmalige code',
     inputPlaceholder: '000000',
     verifyButton: 'Verifiëren',
-    setupPageTitle: 'Tweefactorauthenticatie instellen - Laika CMS',
+    setupPageTitle: 'Tweefactorauthenticatie instellen - Contentia',
     setupTitle: 'Tweefactorauthenticatie instellen',
     setupStep1: 'Download een authenticator app zoals Google Authenticator, Authy of 1Password',
     setupStep2: 'Scan de QR-code hieronder of voer de sleutel handmatig in',
@@ -41,7 +41,7 @@ export const nl: Translation = {
     qrCodeAlt: 'QR-code voor {{issuer}}',
   },
   passkey: {
-    pageTitle: 'Passkey instellen - Laika CMS',
+    pageTitle: 'Passkey instellen - Contentia',
     title: 'Passkey instellen',
     description: 'Passkeys zijn een veiligere en gemakkelijkere manier om in te loggen.',
     nameLabel: 'Passkey naam (optioneel)',
@@ -57,16 +57,16 @@ export const nl: Translation = {
     registrationFailed: 'Registratie mislukt',
   },
   passwordReset: {
-    forgotPageTitle: 'Wachtwoord vergeten - Laika CMS',
+    forgotPageTitle: 'Wachtwoord vergeten - Contentia',
     forgotTitle: 'Wachtwoord vergeten',
     forgotDescription: 'Voer je e-mailadres in en we sturen je een link om je wachtwoord te resetten.',
     sendResetLink: 'Resetlink versturen',
     backToLogin: 'Terug naar inloggen',
-    checkEmailPageTitle: 'Controleer je e-mail - Laika CMS',
+    checkEmailPageTitle: 'Controleer je e-mail - Contentia',
     checkEmailTitle: 'Controleer je e-mail',
     checkEmailDescription:
       'Als er een account bestaat met dat e-mailadres, hebben we je een link gestuurd om je wachtwoord te resetten. Controleer je inbox en spammap.',
-    resetPageTitle: 'Wachtwoord resetten - Laika CMS',
+    resetPageTitle: 'Wachtwoord resetten - Contentia',
     resetTitle: 'Wachtwoord resetten',
     resetDescription: 'Voer hieronder je nieuwe wachtwoord in.',
     newPasswordLabel: 'Nieuw wachtwoord',
@@ -75,7 +75,7 @@ export const nl: Translation = {
     confirmPasswordPlaceholder: 'Bevestig nieuw wachtwoord',
     passwordHint: 'Minimaal 8 tekens',
     resetButton: 'Wachtwoord resetten',
-    successPageTitle: 'Wachtwoord succesvol gereset - Laika CMS',
+    successPageTitle: 'Wachtwoord succesvol gereset - Contentia',
     successTitle: 'Wachtwoord succesvol gereset',
     successDescription: 'Je wachtwoord is succesvol gereset. Je kunt nu inloggen met je nieuwe wachtwoord.',
     signInLink: 'Inloggen',
@@ -104,10 +104,10 @@ export const nl: Translation = {
     goBackButton: 'Terug',
   },
   logout: {
-    pageTitle: 'Uitgelogd - Laika CMS',
+    pageTitle: 'Uitgelogd - Contentia',
     title: 'Je bent uitgelogd',
     description: 'Je bent succesvol uitgelogd van je huidige sessie.',
-    allPageTitle: 'Overal uitgelogd - Laika CMS',
+    allPageTitle: 'Overal uitgelogd - Contentia',
     allTitle: 'Overal uitgelogd',
     allDescription: 'Je bent succesvol uitgelogd van al je sessies op alle apparaten.',
     backToLogin: 'Terug naar inloggen',

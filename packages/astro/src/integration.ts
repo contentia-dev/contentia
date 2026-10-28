@@ -3,7 +3,7 @@
  *
  * Three jobs, none of which a loader can do on its own:
  *
- * 1. Serve Laika's JSON:API from the dev server, so the Decap admin can read
+ * 1. Serve Contentia's JSON:API from the dev server, so the Decap admin can read
  *    and write your content locally.
  * 2. Turn a content change into a targeted `refreshContent()`, so an edit shows
  *    up without restarting the dev server.
@@ -14,7 +14,7 @@
  * cannot survive into a build *by construction* rather than by a runtime check.
  *
  * `api.mode: 'route'` is the separate, opt-in case: a real Astro route that
- * survives into an SSR deployment. It needs no authentication — the `laikacms`
+ * survives into an SSR deployment. It needs no authentication — the `contentia`
  * sub-API builders take an `authorize` callback and nothing else — and defaults
  * to serving only published content, which is precisely what a built site
  * already gives away. See `api-access.ts` for why "the content is public" does
@@ -23,24 +23,24 @@
 
 import path from 'node:path';
 
-import { DEFAULT_LOCAL_API_BASE_PATH, mountLocalApi } from '@laikacms/vite-plugin';
+import { DEFAULT_LOCAL_API_BASE_PATH, mountLocalApi } from '@contentia/vite-plugin';
 import type { AstroIntegration } from 'astro';
-import { runTask } from 'laikacms/compat';
-import type { ChangeSummary, Unsubscribe } from 'laikacms/storage';
+import { runTask } from 'contentia/compat';
+import type { ChangeSummary, Unsubscribe } from 'contentia/storage';
 import type { ApiAccess } from './api-access.js';
 
 import { jsonSchemaToTypeExpression } from './json-schema-to-types.js';
 import { DEFAULT_BODY_FIELD, stripBodyField } from './mapping.js';
 import {
+  type ContentiaRepositories,
+  type ContentiaRepositoryOptions,
   DEFAULT_CONTENT_DIR,
-  type LaikaRepositories,
-  type LaikaRepositoryOptions,
   resolveCatalogProvider,
   resolveRepositories,
 } from './repositories.js';
 
-export interface LaikaApiOptions {
-  /** Where the JSON:API is mounted. Defaults to `/__laika`. */
+export interface ContentiaApiOptions {
+  /** Where the JSON:API is mounted. Defaults to `/__contentia`. */
   basePath?: string;
   /**
    * `'dev'` (default) serves the API from the dev server only, read-write, for
@@ -59,43 +59,43 @@ export interface LaikaApiOptions {
   access?: ApiAccess;
 }
 
-export interface LaikaRefreshOptions {
+export interface ContentiaRefreshOptions {
   /** Which loaders to refresh. Defaults to every loader. */
   loaders?: string[];
   /** How long to coalesce a burst of changes. Defaults to 50ms. */
   debounceMs?: number;
 }
 
-export interface LaikaIntegrationOptions extends LaikaRepositoryOptions {
+export interface ContentiaIntegrationOptions extends ContentiaRepositoryOptions {
   /**
    * Mount the unauthenticated JSON:API on the dev server, so the Decap admin
    * reads and writes your content locally. `true` (default) uses the defaults
-   * in {@link LaikaApiOptions}. Never mounted in a build.
+   * in {@link ContentiaApiOptions}. Never mounted in a build.
    */
-  api?: boolean | LaikaApiOptions;
+  api?: boolean | ContentiaApiOptions;
   /** Refresh content when the repository changes. `true` (default) enables it. */
-  refresh?: boolean | LaikaRefreshOptions;
-  /** Emit `.astro/integrations/@laikacms-astro/types.d.ts`. Defaults to `true`. */
+  refresh?: boolean | ContentiaRefreshOptions;
+  /** Emit `.astro/integrations/@contentia-astro/types.d.ts`. Defaults to `true`. */
   types?: boolean;
 }
 
 const DEFAULT_DEBOUNCE_MS = 50;
 
-export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
+export function contentia(options: ContentiaIntegrationOptions = {}): AstroIntegration {
   const api = normalize(options.api, {});
   const refresh = normalize(options.refresh, {});
 
-  let repositories: LaikaRepositories | undefined;
+  let repositories: ContentiaRepositories | undefined;
   let root = process.cwd();
   let unsubscribe: Unsubscribe | undefined;
 
-  const repos = (): LaikaRepositories => {
+  const repos = (): ContentiaRepositories => {
     repositories ??= resolveRepositories(options, root);
     return repositories;
   };
 
   return {
-    name: '@laikacms/astro',
+    name: '@contentia/astro',
     hooks: {
       'astro:config:setup': ({ config, addWatchFile, injectRoute, updateConfig, logger }) => {
         root = config.root.pathname;
@@ -118,11 +118,11 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
         // served writing the four-line route themselves.
         if (options.repositories !== undefined || options.storage !== undefined) {
           throw new Error(
-            '@laikacms/astro: api.mode "route" builds its repositories inside the server bundle, '
+            '@contentia/astro: api.mode "route" builds its repositories inside the server bundle, '
               + 'so it cannot use a `repositories` or `storage` instance created in astro.config. '
               + 'Either configure the route with `dir`/`catalog`, or write the route yourself:\n\n'
               + '  // src/pages' + basePath + '/[...path].ts\n'
-              + "  import { createApiHandler } from '@laikacms/astro/api';\n"
+              + "  import { createApiHandler } from '@contentia/astro/api';\n"
               + '  const handler = createApiHandler({ repositories, basePath: ' + JSON.stringify(basePath)
               + " , access: 'published' });\n"
               + '  export const prerender = false;\n'
@@ -133,11 +133,11 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
         updateConfig({ vite: { plugins: [apiConfigPlugin(options, api, root)] } });
         injectRoute({
           pattern: `${basePath}/[...path]`,
-          entrypoint: '@laikacms/astro/api-route',
+          entrypoint: '@contentia/astro/api-route',
           prerender: false,
         });
         logger.info(
-          `Laika JSON:API route at ${basePath} (access: ${api.access ?? 'published'}).`,
+          `Contentia JSON:API route at ${basePath} (access: ${api.access ?? 'published'}).`,
         );
       },
 
@@ -146,7 +146,7 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
           // Astro would otherwise fail deep in the build with NoAdapterInstalled,
           // naming a route the user never wrote. Failing here names the option.
           throw new Error(
-            '@laikacms/astro: api.mode "route" needs an on-demand rendered route, but this project '
+            '@contentia/astro: api.mode "route" needs an on-demand rendered route, but this project '
               + 'builds to static output. Install an adapter and set output: "server", or drop '
               + 'api.mode to serve the API from the dev server only.',
           );
@@ -154,12 +154,12 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
 
         if (options.types === false) return;
         injectTypes({ filename: 'types.d.ts', content: TYPES });
-        logger.debug('Emitted Laika types.');
+        logger.debug('Emitted Contentia types.');
 
         const live = await liveCollectionTypes(options, repos(), logger);
         if (live !== undefined) {
           injectTypes({ filename: 'live-collections.d.ts', content: live });
-          logger.debug('Emitted Laika live-collection types.');
+          logger.debug('Emitted Contentia live-collection types.');
         }
       },
 
@@ -167,7 +167,7 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
         if (api !== false) {
           const basePath = api.basePath ?? DEFAULT_LOCAL_API_BASE_PATH;
           mountLocalApi(server, repos(), { basePath });
-          logger.info(`Laika JSON:API mounted at ${basePath}`);
+          logger.info(`Contentia JSON:API mounted at ${basePath}`);
         }
 
         if (refresh === false) return;
@@ -179,7 +179,7 @@ export function laika(options: LaikaIntegrationOptions = {}): AstroIntegration {
         unsubscribe = subscribe(repos(), refresh, changes => {
           void refreshContent({
             ...(refresh.loaders !== undefined ? { loaders: refresh.loaders } : {}),
-            context: { laika: { changes } },
+            context: { contentia: { changes } },
           });
         }, logger);
       },
@@ -206,8 +206,8 @@ function normalize<T extends object>(value: boolean | T | undefined, defaults: T
  * and each `refreshContent` re-runs every loader.
  */
 function subscribe(
-  repositories: LaikaRepositories,
-  options: LaikaRefreshOptions,
+  repositories: ContentiaRepositories,
+  options: ContentiaRefreshOptions,
   emit: (changes: ChangeSummary[]) => void,
   logger: { warn(message: string): void },
 ): Unsubscribe | undefined {
@@ -255,8 +255,8 @@ function subscribe(
  * augmentation would be harmless but misleading in `.astro/`.
  */
 async function liveCollectionTypes(
-  options: LaikaIntegrationOptions,
-  repositories: LaikaRepositories,
+  options: ContentiaIntegrationOptions,
+  repositories: ContentiaRepositories,
   logger: { debug(message: string): void },
 ): Promise<string | undefined> {
   let members: string[];
@@ -300,13 +300,13 @@ async function liveCollectionTypes(
 
   if (members.length === 0) return undefined;
 
-  return `declare module '@laikacms/astro/live-collections' {\n`
+  return `declare module '@contentia/astro/live-collections' {\n`
     + `  /**\n`
-    + `   * Generated by @laikacms/astro from the Laika catalog — do not edit;\n`
+    + `   * Generated by @contentia/astro from the Contentia catalog — do not edit;\n`
     + `   * change your CMS config instead. Augment this module in your own code\n`
     + `   * to override a collection whose widgets resolved to \`unknown\`.\n`
     + `   */\n`
-    + `  interface LaikaLiveCollections {\n`
+    + `  interface ContentiaLiveCollections {\n`
     + `${members.join('\n')}\n`
     + `  }\n`
     + `}\n`;
@@ -317,12 +317,12 @@ function propertyName(name: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
 }
 
-const TYPES = `declare module '@laikacms/astro' {
+const TYPES = `declare module '@contentia/astro' {
   /**
-   * Extra data the Laika integration attaches to a content refresh. Loaders
+   * Extra data the Contentia integration attaches to a content refresh. Loaders
    * read it to apply exactly the keys that changed.
    */
-  interface LaikaRefreshContext {
+  interface ContentiaRefreshContext {
     changes: Array<{ key: string, deleted: boolean }>;
   }
 }
@@ -336,11 +336,11 @@ const TYPES = `declare module '@laikacms/astro' {
  * see the guard in `astro:config:setup`.
  */
 function apiConfigPlugin(
-  options: LaikaIntegrationOptions,
-  api: LaikaApiOptions,
+  options: ContentiaIntegrationOptions,
+  api: ContentiaApiOptions,
   root: string,
 ): { name: string, resolveId(id: string): string | undefined, load(id: string): string | undefined } {
-  const virtualId = 'virtual:@laikacms/astro/api';
+  const virtualId = 'virtual:@contentia/astro/api';
   const resolvedId = `\0${virtualId}`;
 
   const config = {
@@ -354,12 +354,12 @@ function apiConfigPlugin(
   };
 
   return {
-    name: '@laikacms/astro:api-config',
+    name: '@contentia/astro:api-config',
     resolveId: id => (id === virtualId ? resolvedId : undefined),
     load: id =>
       id === resolvedId
-        ? `import { createApiHandler } from '@laikacms/astro/api';\n`
-          + `import { resolveRepositories } from '@laikacms/astro';\n`
+        ? `import { createApiHandler } from '@contentia/astro/api';\n`
+          + `import { resolveRepositories } from '@contentia/astro';\n`
           + `const config = ${JSON.stringify(config)};\n`
           + `export const handler = createApiHandler({\n`
           + `  repositories: resolveRepositories(config, config.root),\n`

@@ -5,10 +5,10 @@
  * Compatible with Google Authenticator, Authy, and other TOTP apps.
  * Works in both Cloudflare Workers and Node.js environments.
  *
- * @module @laikacms/server/oauth2/totp
+ * @module @contentia/server/oauth2/totp
  */
 
-import { constantTimeEqual } from 'laikacms/crypto';
+import { constantTimeEqual } from 'contentia/crypto';
 import { generateQRCodeDataURI } from '../qrcode/svg.js';
 
 // ============================================================================

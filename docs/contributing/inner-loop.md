@@ -17,8 +17,8 @@ rebuilds/retests the packages affected by your change (see `turbo.json`).
 | `pnpm dev`          | `turbo watch dev` — watch-mode build across the workspace.                     |
 | `pnpm coverage`     | `turbo run test` with v8 coverage reporters.                                   |
 
-Per-package equivalents work too, e.g. `pnpm --filter laikacms test` or
-`pnpm --filter @laikacms/server typecheck`.
+Per-package equivalents work too, e.g. `pnpm --filter contentia test` or
+`pnpm --filter @contentia/server typecheck`.
 
 Before pushing, run at minimum:
 
@@ -31,10 +31,10 @@ the hook will pass too.
 
 ## Where code lives
 
-Each core package (`laikacms`, `@laikacms/server`) is organized by layer under `src/`:
+Each core package (`contentia`, `@contentia/server`) is organized by layer under `src/`:
 
 ```
-packages/laikacms/src/
+packages/contentia/src/
   domain/      interfaces — StorageRepository, DocumentsRepository, ...
   impl/        implementations — storage-fs, storage-r2, documents-drizzle, ...
   api/         HTTP surface — storage-api, documents-api, catalog-api, ...
@@ -43,13 +43,13 @@ packages/laikacms/src/
 ```
 
 Tests live next to the code they cover as `*.test.ts` (e.g.
-`packages/laikacms/src/api/storage-api/authorize.test.ts`), run by `vitest run` from that package's
+`packages/contentia/src/api/storage-api/authorize.test.ts`), run by `vitest run` from that package's
 root.
 
 ## Adding a new domain/impl/api triple
 
 Follow the shape of an existing one — e.g. `domain/storage`, `impl/storage-fs`, `api/storage-api`
-under `packages/laikacms/src`:
+under `packages/contentia/src`:
 
 1. **Domain**: define the interface as an abstract class or interface in `domain/<name>`. No
    Node-specific APIs, no concrete backend deps (see [House style](./house-style)).
@@ -58,7 +58,7 @@ under `packages/laikacms/src`:
 3. **API** (if it needs an HTTP surface): expose it in `api/<name>-api`, depending on the domain
    package, not a specific implementation.
 4. Export the new subpaths from the package's `package.json` `exports` map, matching the pattern of
-   an existing subpath (e.g. `laikacms/storage-fs`).
+   an existing subpath (e.g. `contentia/storage-fs`).
 5. Add `*.test.ts` files alongside the new code.
 
 Cross-cutting rules: **domain** packages declare no internal dependencies beyond `shared`;

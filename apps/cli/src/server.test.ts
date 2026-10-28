@@ -3,8 +3,8 @@ import * as Fiber from 'effect/Fiber';
 import * as Layer from 'effect/Layer';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { LaikaTask } from 'laikacms/core';
-import { InMemoryStorageRepository } from 'laikacms/storage/testing';
+import { ContentiaTask } from 'contentia/core';
+import { InMemoryStorageRepository } from 'contentia/storage/testing';
 
 import { bearerTokenMatches } from './auth.js';
 import { resolveServeBackend } from './commands.js';
@@ -48,7 +48,7 @@ describe('layerStorageServer', () => {
 
   const serve = async (authToken?: string): Promise<string> => {
     const repository = new InMemoryStorageRepository();
-    await LaikaTask.runPromise(repository.createObject({ key: 'posts/hello', content: { title: 'Hi' } }));
+    await ContentiaTask.runPromise(repository.createObject({ key: 'posts/hello', content: { title: 'Hi' } }));
     return new Promise<string>((resolve, reject) => {
       const fiber = Effect.runFork(Layer.launch(layerStorageServer({
         repository,
@@ -81,13 +81,15 @@ describe('resolveServeBackend', () => {
   const some = (value: string) => ({ _tag: 'Some', value }) as const;
 
   it('defaults to the fs driver rooted at --root', () => {
-    expect(resolveServeBackend('laika', { backend: none, backendOptions: none, root: '/c', defaultExtension: 'yaml' }))
+    expect(
+      resolveServeBackend('contentia', { backend: none, backendOptions: none, root: '/c', defaultExtension: 'yaml' }),
+    )
       .toEqual({ backend: 'fs', options: { root: '/c', defaultExtension: 'yaml' } });
   });
 
   it('uses --backend with its parsed --backend-options', () => {
     expect(
-      resolveServeBackend('laika', {
+      resolveServeBackend('contentia', {
         backend: some('s3'),
         backendOptions: some('{"bucket":"b"}'),
         root: '/ignored',
@@ -98,13 +100,18 @@ describe('resolveServeBackend', () => {
 
   it('rejects --backend-options without --backend instead of silently serving fs', () => {
     expect(() =>
-      resolveServeBackend('laika', { backend: none, backendOptions: some('{}'), root: '/c', defaultExtension: 'md' })
+      resolveServeBackend('contentia', {
+        backend: none,
+        backendOptions: some('{}'),
+        root: '/c',
+        defaultExtension: 'md',
+      })
     ).toThrow('--backend-options needs --backend');
   });
 
   it('rejects options that are not a JSON object', () => {
     expect(() =>
-      resolveServeBackend('laika', {
+      resolveServeBackend('contentia', {
         backend: some('s3'),
         backendOptions: some('[1]'),
         root: '/c',

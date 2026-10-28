@@ -6,11 +6,11 @@ App installation token, behind a Bearer-token check you supply. It runs on Cloud
 Node.js, Bun, Deno, or anywhere else [Hono](https://hono.dev) runs.
 
 ```bash
-pnpm add @laikacms/git-gateway hono
+pnpm add @contentia/git-gateway hono
 ```
 
 ```typescript
-import { gitGateway } from '@laikacms/git-gateway';
+import { gitGateway } from '@contentia/git-gateway';
 ```
 
 `gitGateway()` returns a Hono app to mount in your own.
@@ -23,7 +23,7 @@ import { gitGateway } from '@laikacms/git-gateway';
 | `github`       | `{ appId, privateKey, installationId, owner, repo, apiBase? }` | GitHub App credentials. `apiBase` defaults to `https://api.github.com` (useful for GHE).                                                      |
 | `allowedRoles` | `string[]` (optional)                                          | When set, the user returned by `verifyToken` must have at least one matching role.                                                            |
 | `logger`       | `{ error, warn, info?, debug? }` (optional)                    | Pluggable structured logger (pino, bunyan, etc.). Only `error` and `warn` are required; `info` and `debug` are optional. Defaults to a no-op. |
-| `userAgent`    | `string` (optional)                                            | Custom User-Agent for outgoing GitHub API requests. Defaults to `@laikacms/git-gateway`.                                                      |
+| `userAgent`    | `string` (optional)                                            | Custom User-Agent for outgoing GitHub API requests. Defaults to `@contentia/git-gateway`.                                                     |
 
 ## Endpoints
 
@@ -42,7 +42,7 @@ The `/github/*` proxy allows only the same subset of endpoints as Netlify's gate
 Mount it inside an existing Hono app:
 
 ```ts
-import { gitGateway } from '@laikacms/git-gateway';
+import { gitGateway } from '@contentia/git-gateway';
 import { Hono } from 'hono';
 
 const app = new Hono<{ Bindings: Env }>();

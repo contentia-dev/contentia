@@ -1,19 +1,19 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { collectStream, runTask } from 'laikacms/compat';
+import { collectStream, runTask } from 'contentia/compat';
 
-import { laika } from './laika.js';
+import { contentia } from './contentia.js';
 
 const app = new Hono();
 
 // Decap JSON:API
-app.all('/api/decap/*', c => laika.fetch(c.req.raw));
+app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
 
 // Blog index
 app.get('/', async c => {
   const { items: records } = await collectStream(
-    laika.documents.listRecords({
+    contentia.documents.listRecords({
       pagination: { page: 1, perPage: 100 },
       folder: 'posts',
       depth: 1,
@@ -66,7 +66,7 @@ app.get('/blog/:slug', async c => {
   const { slug } = c.req.param();
 
   try {
-    const post = await runTask(laika.documents.getDocument(`posts/${slug}`));
+    const post = await runTask(contentia.documents.getDocument(`posts/${slug}`));
     const data = post.content as Record<string, unknown>;
     const title = typeof data.title === 'string' ? data.title : slug;
     const body = typeof data.body === 'string' ? data.body : '';

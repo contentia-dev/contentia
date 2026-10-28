@@ -1,8 +1,8 @@
-import type { StorageSerializerRegistry } from 'laikacms/storage';
-import { jsonSerializer } from 'laikacms/storage-serializers-json';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
+import type { StorageSerializerRegistry } from 'contentia/storage';
+import { jsonSerializer } from 'contentia/storage-serializers-json';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { rawSerializer } from 'contentia/storage-serializers-raw';
+import { yamlSerializer } from 'contentia/storage-serializers-yaml';
 
 /**
  * Same registry the `serve` command uses. Drivers fall back to this when the

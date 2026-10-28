@@ -14,9 +14,9 @@ directory = "./public"
 # ── R2 bucket ─────────────────────────────────────────────────────────────────
 # Create a bucket first: wrangler r2 bucket create starter-workers-blog-content
 [[r2_buckets]]
-binding = "LAIKACMS_BUCKET"
+binding = "CONTENTIA_BUCKET"
 bucket_name = "starter-workers-blog-content"
 
 [vars]
 # Optional: override the bearer token Decap uses in dev mode.
-# DEV_TOKEN = "dev-local-laika-token"
+# DEV_TOKEN = "dev-local-contentia-token"

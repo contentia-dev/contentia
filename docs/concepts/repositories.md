@@ -1,10 +1,10 @@
-# Laika CMS Repository Architecture
+# Contentia Repository Architecture
 
-This document explains how repositories work in Laika CMS.
+This document explains how repositories work in Contentia.
 
 ## Overview
 
-Laika CMS uses a **repository pattern** to abstract data storage and retrieval. There are three main
+Contentia uses a **repository pattern** to abstract data storage and retrieval. There are three main
 types of repositories:
 
 - **Document Repository** (blue) - Handles structured content/documents (JSON, YAML, etc.)
@@ -172,7 +172,7 @@ flowchart TB
 
 ### Routing Repository Pattern
 
-The **Routing Repository** is a key pattern in Laika CMS that enables:
+The **Routing Repository** is a key pattern in Contentia that enables:
 
 - **Multi-backend support**: Route requests to different storage backends based on configuration
 - **Fallback chains**: Try multiple repositories in sequence
@@ -250,8 +250,8 @@ This allows:
 
 The `*-jsonapi-proxy` repositories (storage, documents, assets) send every request through an Effect
 `HttpClient` (`effect/unstable/http`) owned by a shared
-[`JsonApiHttpTransport`](../reference/api/laikacms/json-api/classes/JsonApiHttpTransport)
-(`laikacms/json-api`). Each repository accepts an optional `httpClient` in its constructor options;
+[`JsonApiHttpTransport`](../reference/api/contentia/json-api/classes/JsonApiHttpTransport)
+(`contentia/json-api`). Each repository accepts an optional `httpClient` in its constructor options;
 when omitted, a process-wide default backed by `globalThis.fetch` is used, which already reuses
 connections on Node ≥ 18 (undici's pooled fetch) and on Cloudflare Workers (runtime-managed).
 
@@ -259,7 +259,7 @@ To tune TCP/TLS session reuse on Node, build one client at the composition root 
 every proxy repository so they draw from a single connection pool:
 
 ```ts
-import { httpClientFromFetch } from 'laikacms/json-api';
+import { httpClientFromFetch } from 'contentia/json-api';
 import { Agent, fetch as undiciFetch } from 'undici';
 
 const dispatcher = new Agent({ keepAliveTimeout: 30_000, connections: 128 });

@@ -1,6 +1,6 @@
 import * as Result from 'effect/Result';
 
-import type { LaikaResult } from 'laikacms/core';
+import type { ContentiaResult } from 'contentia/core';
 import {
   ConflictError,
   ForbiddenError,
@@ -10,7 +10,7 @@ import {
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
   VersionMismatchError,
-} from 'laikacms/core';
+} from 'contentia/core';
 
 /** Authentication for the GitLab REST API. Exactly one of `token`/`oauthToken`/`jobToken` is used. */
 export interface GitlabAuth {
@@ -54,7 +54,7 @@ export interface GitlabDirEntry {
 }
 
 const DEFAULT_API_URL = 'https://gitlab.com/api/v4';
-const DEFAULT_USER_AGENT = '@laikacms/gitlab';
+const DEFAULT_USER_AGENT = '@contentia/gitlab';
 
 /** UTF-8-safe base64 encode without `Buffer`. */
 const textToBase64 = (text: string): string => {
@@ -103,7 +103,7 @@ interface RawCommit {
 /**
  * Talks the GitLab REST v4 API over `fetch`. Stateless — no token caching is
  * needed since PAT/OAuth tokens are long-lived (unlike GitHub App installation
- * tokens). All errors are mapped onto Laika error types.
+ * tokens). All errors are mapped onto Contentia error types.
  *
  * Project paths are accepted in either form (`12345` or `group/project`); the
  * implementation URL-encodes whatever you pass.
@@ -172,7 +172,7 @@ export class GitlabDataSource {
   /** Fetch a file's content + blob id. */
   async getFileContents(
     relativePath: string,
-  ): Promise<LaikaResult<{ content: string, sha: string, path: string, lastCommitId: string }>> {
+  ): Promise<ContentiaResult<{ content: string, sha: string, path: string, lastCommitId: string }>> {
     const target = trimSlashes(relativePath);
     const url = this.url(`/repository/files/${encodeURIComponent(target)}`, { ref: this.branch });
     let response: Response;
@@ -196,7 +196,7 @@ export class GitlabDataSource {
   /** Metadata for a file: blob id + first/last commit dates. */
   async getFileMeta(
     relativePath: string,
-  ): Promise<LaikaResult<{ sha: string, lastCommitId: string, createdAt: Date, updatedAt: Date }>> {
+  ): Promise<ContentiaResult<{ sha: string, lastCommitId: string, createdAt: Date, updatedAt: Date }>> {
     const file = await this.getFileContents(relativePath);
     if (Result.isFailure(file)) return Result.fail(file.failure);
     const commits = await this.getFirstAndLastCommit(relativePath);
@@ -263,7 +263,7 @@ export class GitlabDataSource {
    * directory; returns a {@link NotFoundError} only when the parent cannot be
    * resolved at all. Pages through `X-Next-Page` until exhausted.
    */
-  async listDirectory(relativePath: string): Promise<LaikaResult<GitlabDirEntry[]>> {
+  async listDirectory(relativePath: string): Promise<ContentiaResult<GitlabDirEntry[]>> {
     const path = trimSlashes(relativePath);
     const out: GitlabDirEntry[] = [];
     let page = 1;
@@ -320,7 +320,7 @@ export class GitlabDataSource {
       commitMessage?: string,
       author?: { name: string, email: string },
     } = {},
-  ): Promise<LaikaResult<{ path: string }>> {
+  ): Promise<ContentiaResult<{ path: string }>> {
     const target = trimSlashes(relativePath);
     const url = this.url(`/repository/files/${encodeURIComponent(target)}`);
     const baseBody = {
@@ -354,7 +354,7 @@ export class GitlabDataSource {
     url: string,
     body: Record<string, unknown>,
     contextPath: string,
-  ): Promise<LaikaResult<void>> {
+  ): Promise<ContentiaResult<void>> {
     let response: Response;
     try {
       response = await this.send(method, url, { body });
@@ -378,7 +378,7 @@ export class GitlabDataSource {
   async deleteFile(
     relativePath: string,
     options: { commitMessage?: string, author?: { name: string, email: string } } = {},
-  ): Promise<LaikaResult<{ path: string }>> {
+  ): Promise<ContentiaResult<{ path: string }>> {
     const target = trimSlashes(relativePath);
     const url = this.url(`/repository/files/${encodeURIComponent(target)}`);
     let response: Response;
@@ -417,8 +417,8 @@ export class GitlabDataSource {
     return entry.type;
   }
 
-  /** Map a non-2xx HTTP status onto the matching LaikaError. */
-  private mapStatus<T>(status: number, contextPath: string): LaikaResult<T> {
+  /** Map a non-2xx HTTP status onto the matching ContentiaError. */
+  private mapStatus<T>(status: number, contextPath: string): ContentiaResult<T> {
     switch (status) {
       case 401:
         return Result.fail(

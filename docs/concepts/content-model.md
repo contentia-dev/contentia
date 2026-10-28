@@ -1,6 +1,6 @@
 # Content Model
 
-This page explains the vocabulary the LaikaCMS protocol imposes on your content — and, just as
+This page explains the vocabulary the Contentia protocol imposes on your content — and, just as
 importantly, what it _doesn't_. For the exact, load-bearing definitions of each term, see the
 [Glossary](../reference/glossary).
 
@@ -24,17 +24,17 @@ set of allowed characters: a valid key depends on the source's data model.
 
 The protocol knows only atoms, folders, keys, metadata, and summaries. The `content` field on an
 object is your own arbitrary JSON and is **never interpreted** by the protocol. That is what lets
-the same core drive a blog, a product catalogue, or a settings store without changes — "Laika minus
-the CMS is basically a protocol."
+the same core drive a blog, a product catalogue, or a settings store without changes — "Contentia
+minus the CMS is basically a protocol."
 
-The contracts make no assumptions about the shape of application entities and do not force a Laika
-CMS field set onto them. The storage contract is the simplest: it needs a key and content, and makes
-no assumptions about application metadata. More specialized contracts require only the metadata
-needed for their behavior.
+The contracts make no assumptions about the shape of application entities and do not force a
+CMS-specific field set onto them. The storage contract is the simplest: it needs a key and content,
+and makes no assumptions about application metadata. More specialized contracts require only the
+metadata needed for their behavior.
 
 ## The `body` convention
 
-Content in laikacms is always an object — you cannot store a raw string directly. When all you have
+Content in contentia is always an object — you cannot store a raw string directly. When all you have
 is a raw string (plain text, markdown, HTML, …), the convention is to wrap it in a `body` field:
 
 ```json
@@ -56,7 +56,7 @@ file, for example:
 
 This is just a convention: the protocol itself never interprets the `content` object. Serializers,
 however, build on it —
-[`rawSerializer`](../reference/api/laikacms/serializers/raw/variables/rawSerializer) persists
+[`rawSerializer`](../reference/api/contentia/serializers/raw/variables/rawSerializer) persists
 exactly the `body` field as plain text, and the markdown serializer writes `body` as the document
 body with the remaining fields as frontmatter.
 
@@ -70,7 +70,7 @@ retain their natural fields:
 { "temperatureDegrees": 24 }
 ```
 
-## Mapping an application onto Laika CMS
+## Mapping an application onto Contentia
 
 Suppose an application contains cats, pages about cats, and cat images. Their infrastructure might
 be YAML records, Markdown files, and images stored on GitHub:
@@ -89,7 +89,7 @@ Each concept maps to the narrowest suitable contract:
 - settings use the settings contract.
 
 The original entities remain application-owned. A cat can stay
-`{ name: 'Hailey', age: 11, colors: ['white', 'brown', 'black'] }`; Laika CMS only wraps it with the
+`{ name: 'Hailey', age: 11, colors: ['white', 'brown', 'black'] }`; Contentia only wraps it with the
 addressing and repository behavior required to transport it.
 
 A Markdown file is parsed into body, frontmatter, and document metadata. For example:

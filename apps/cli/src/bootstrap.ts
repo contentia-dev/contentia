@@ -10,7 +10,7 @@ import type { CmsSelection } from './cms/types.js';
 
 // Add starters here only after their source has passed the standalone
 // install/typecheck/build smoke test. The other curated starters are still
-// being migrated to the consolidated LaikaCMS 3.x package layout.
+// being migrated to the consolidated Contentia 3.x package layout.
 export const STARTERS = ['starter-astro-blog'] as const;
 export type StarterName = typeof STARTERS[number];
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
@@ -69,18 +69,18 @@ interface GitTreeEntry {
 const downloadStarter = async (starter: StarterName, destination: string): Promise<void> => {
   const prefix = `starters/${starter}/`;
   const response = await fetch(
-    'https://api.github.com/repos/laikacms/laikacms/git/trees/develop?recursive=1',
-    { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'laikacli' } },
+    'https://api.github.com/repos/contentia-dev/contentia/git/trees/develop?recursive=1',
+    { headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'contentia' } },
   );
   if (!response.ok) throw new Error(`Could not download ${starter}: GitHub returned ${response.status}`);
   const payload = await response.json() as { tree?: GitTreeEntry[] };
   const files = (payload.tree ?? []).filter(entry => entry.type === 'blob' && entry.path.startsWith(prefix));
-  if (files.length === 0) throw new Error(`Could not find ${starter} in the LaikaCMS repository`);
+  if (files.length === 0) throw new Error(`Could not find ${starter} in the Contentia repository`);
   await Promise.all(files.map(async entry => {
     const relative = entry.path.slice(prefix.length);
     const target = path.join(destination, relative);
     const fileResponse = await fetch(entry.url, {
-      headers: { Accept: 'application/vnd.github.raw+json', 'User-Agent': 'laikacli' },
+      headers: { Accept: 'application/vnd.github.raw+json', 'User-Agent': 'contentia' },
     });
     if (!fileResponse.ok) throw new Error(`Could not download ${entry.path}: GitHub returned ${fileResponse.status}`);
     await mkdir(path.dirname(target), { recursive: true });

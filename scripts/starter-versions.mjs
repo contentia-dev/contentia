@@ -1,11 +1,11 @@
 /**
- * Shared logic for keeping starters/ pinned to the current LaikaCMS releases.
+ * Shared logic for keeping starters/ pinned to the current Contentia releases.
  *
  * Starters under starters/ are download-and-go: a user copies the folder and
  * runs `npm install`, so their package.json must reference PUBLISHED semver
  * ranges — never workspace:/catalog:/link:/file: protocols, which only resolve
  * inside this monorepo. To keep those ranges honest, every dependency that
- * names a workspace package (laikacms, @laikacms/*) is rewritten to a caret
+ * names a workspace package (contentia, @contentia/*) is rewritten to a caret
  * range against that package's current version.
  *
  * `sync-starter-versions.mjs` applies the rewrites (run from the `version`

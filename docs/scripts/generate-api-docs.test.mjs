@@ -16,7 +16,7 @@ afterEach(() => {
 
 function writeExports(exports) {
   mkdirSync(packageDir, { recursive: true });
-  writeFileSync(join(packageDir, 'package.json'), JSON.stringify({ name: 'laikacms', exports }));
+  writeFileSync(join(packageDir, 'package.json'), JSON.stringify({ name: 'contentia', exports }));
 }
 
 describe('entryPointsFromExports', () => {
@@ -27,8 +27,8 @@ describe('entryPointsFromExports', () => {
     });
 
     expect([...entryPointsFromExports(packageDir)]).toEqual([
-      [join(packageDir, 'src/index.ts'), 'laikacms'],
-      [join(packageDir, 'src/shared/core/index.ts'), 'laikacms/core'],
+      [join(packageDir, 'src/index.ts'), 'contentia'],
+      [join(packageDir, 'src/shared/core/index.ts'), 'contentia/core'],
     ]);
   });
 
@@ -38,7 +38,7 @@ describe('entryPointsFromExports', () => {
       './storage-fs': { types: './dist/impl/storage-fs/index.d.ts' },
     });
 
-    expect([...entryPointsFromExports(packageDir).values()]).toEqual(['laikacms/storage/fs']);
+    expect([...entryPointsFromExports(packageDir).values()]).toEqual(['contentia/storage/fs']);
   });
 
   it('skips wildcard and non-type exports', () => {
@@ -59,21 +59,21 @@ describe('entryPointsFromPackages', () => {
   }
 
   it('collects every published package, named by its own package name', () => {
-    writePackage('laikacms', { name: 'laikacms', exports: { './core': { types: './dist/core/index.d.ts' } } });
+    writePackage('contentia', { name: 'contentia', exports: { './core': { types: './dist/core/index.d.ts' } } });
     writePackage('github', {
-      name: '@laikacms/github',
+      name: '@contentia/github',
       exports: { './storage-gh': { types: './dist/storage-gh/index.d.ts' } },
     });
 
     expect([...entryPointsFromPackages(packageDir)]).toEqual([
-      [join(packageDir, 'github/src/storage-gh/index.ts'), '@laikacms/github/storage-gh'],
-      [join(packageDir, 'laikacms/src/core/index.ts'), 'laikacms/core'],
+      [join(packageDir, 'contentia/src/core/index.ts'), 'contentia/core'],
+      [join(packageDir, 'github/src/storage-gh/index.ts'), '@contentia/github/storage-gh'],
     ]);
   });
 
   it('skips private packages and directories without a package.json', () => {
     writePackage('internal', {
-      name: '@laikacms/internal',
+      name: '@contentia/internal',
       private: true,
       exports: { '.': { types: './dist/index.d.ts' } },
     });

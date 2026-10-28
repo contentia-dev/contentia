@@ -1,6 +1,6 @@
-# @laikacms/server/ai
+# @contentia/server/ai
 
-[![npm](https://img.shields.io/npm/v/@laikacms/server)](https://www.npmjs.com/package/@laikacms/server)
+[![npm](https://img.shields.io/npm/v/@contentia/server)](https://www.npmjs.com/package/@contentia/server)
 
 The chat and session endpoints behind Decap CMS's editor assistant. One `fetch(request)` handler
 that authenticates a Bearer token, streams a model response through the Vercel AI SDK, and persists
@@ -10,7 +10,7 @@ This module is the server half of a two-part arrangement:
 
 | Half       | Where it lives                                                      | Job                                                          |
 | ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Server** | here (`@laikacms/server/ai`)                                        | auth, model call, session persistence                        |
+| **Server** | here (`@contentia/server/ai`)                                       | auth, model call, session persistence                        |
 | **Client** | `@laikacms/decap-cms-llm-dulla` (the `Dulla` transport in the fork) | implements the CMS's `LlmTransport`, executes document tools |
 
 The CMS itself ships no transport and no AI dependency: it defines an `LlmTransport` interface, a
@@ -18,7 +18,7 @@ chat panel, and a translate action. `Dulla` is the implementation that points th
 
 ## Optional dependency
 
-`ai` (and any `@ai-sdk/*` provider) is an **optional peer** of `@laikacms/server`. Install it only
+`ai` (and any `@ai-sdk/*` provider) is an **optional peer** of `@contentia/server`. Install it only
 if you mount these endpoints:
 
 ```bash
@@ -28,9 +28,9 @@ pnpm add ai @ai-sdk/anthropic
 ## Usage
 
 ```typescript
-import { decapAi } from '@laikacms/server/ai';
-import { anthropic } from '@laikacms/server/ai/providers';
-import { resolveBearer } from 'laikacms/auth';
+import { decapAi } from '@contentia/server/ai';
+import { anthropic } from '@contentia/server/ai/providers';
+import { resolveBearer } from 'contentia/auth';
 
 const ai = decapAi({
   model: anthropic('claude-3-5-sonnet-20241022'),
@@ -101,5 +101,5 @@ All `DecapAiConfig` fields — the ones already in the Usage example above and t
 | `systemPrompt`            | `string`                           | built-in English prompt | **Replaces** the default prompt entirely — the built-in `getDocumentData`/`updateDocument` tool guidance is discarded when this is set. To extend the default rather than replace it, use `messages` instead (see below). |
 | `maxOutputTokens`         | `number`                           | `4096`                  | Maximum tokens the model may emit per response.                                                                                                                                                                           |
 | `temperature`             | `number`                           | `0.7`                   | Sampling temperature.                                                                                                                                                                                                     |
-| `messages`                | `Translation`                      | English bundle          | Localized error strings and system prompt. Import from `@laikacms/server/ai/i18n/en` to extend: `messages: { ...en, systemPrompt: 'Your prefix.\n\n' + en.systemPrompt }`.                                                |
+| `messages`                | `Translation`                      | English bundle          | Localized error strings and system prompt. Import from `@contentia/server/ai/i18n/en` to extend: `messages: { ...en, systemPrompt: 'Your prefix.\n\n' + en.systemPrompt }`.                                               |
 | `logger`                  | `{ error(...args): void }`         | _(none)_                | Receives internal diagnostic output.                                                                                                                                                                                      |

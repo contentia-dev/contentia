@@ -2,7 +2,7 @@
 
 The Locks API provides advisory entry locking for admin UIs. It sits on top of the Documents
 repository's lock methods (ADR-007) and is mounted by
-[`laikaApi`](../api/server/api/functions/laikaApi) at the configured base path.
+[`contentiaApi`](../api/server/api/functions/contentiaApi) at the configured base path.
 
 > **Advisory only.** A lock does not prevent writes. It signals to the editor UI that another
 > session is editing this entry, so the client can warn before someone clobbers a concurrent edit.

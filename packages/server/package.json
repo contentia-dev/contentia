@@ -1,12 +1,12 @@
 {
-  "name": "@laikacms/server",
+  "name": "@contentia/server",
   "version": "6.0.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "HTTP surface for Laika CMS: a single-endpoint JSON:API router over the laikacms repositories, and a self-contained OAuth 2.0 authorization server.",
+  "description": "HTTP surface for Contentia: a single-endpoint JSON:API router over the contentia repositories, and a self-contained OAuth 2.0 authorization server.",
   "keywords": [
-    "laikacms",
+    "contentia",
     "headless-cms",
     "json-api",
     "oauth2"
@@ -16,13 +16,13 @@
     "email": "sem@laikacms.com",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
     "email": "sem@laikacms.com",
-    "url": "https://github.com/laikacms/laikacms/issues"
+    "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -104,7 +104,7 @@
   },
   "dependencies": {
     "effect": "catalog:default",
-    "laikacms": "workspace:*"
+    "contentia": "workspace:*"
   },
   "peerDependencies": {
     "@ai-sdk/anthropic": "^4.0.16",

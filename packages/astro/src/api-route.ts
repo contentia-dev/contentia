@@ -11,7 +11,7 @@
  */
 
 // @ts-expect-error - resolved at build time by the plugin the integration registers.
-import { handler } from 'virtual:@laikacms/astro/api';
+import { handler } from 'virtual:@contentia/astro/api';
 
 export const prerender = false;
 

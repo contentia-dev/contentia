@@ -1,13 +1,13 @@
 # Local Mode Dev Editing
 
-Local mode lets the Decap admin read and write content against a real LaikaCMS JSON:API mounted
+Local mode lets the Decap admin read and write content against a real Contentia JSON:API mounted
 directly on the Vite dev server — no separate API process, no cloud account, no credentials. It is
 the fastest path from `vite dev` to a live edit in the Decap UI.
 
 The mode has two parts:
 
-1. **`localApi` plugin option** — the Vite plugin mounts LaikaCMS's own JSON:API under `/__laika`
-   while `vite dev` is running.
+1. **`localApi` plugin option** — the Vite plugin mounts Contentia's own JSON:API under
+   `/__contentia` while `vite dev` is running.
 2. **`resolveLaikaBackend`** — the Decap backend helper selects the local API in dev and the real
    remote backend in production, with no manual switching.
 
@@ -15,7 +15,7 @@ The mode has two parts:
 
 ## Prerequisites
 
-You need the `@laikacms/vite-plugin` (Slice 1) and the `@laikacms/decap-cms` fork (for
+You need the `@contentia/vite-plugin` (Slice 1) and the `@laikacms/decap-cms` fork (for
 `resolveLaikaBackend` and `createLaikaBackend`). The
 [FileSystem + Decap quickstart](./quickstart-fs) covers both installs in full.
 
@@ -27,22 +27,22 @@ Add `localApi: true` to the plugin in `vite.config.ts`:
 
 ```ts
 // vite.config.ts
-import { laikacms } from '@laikacms/vite-plugin';
+import { contentia } from '@contentia/vite-plugin';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [laikacms({ dir: 'content', localApi: true })],
+  plugins: [contentia({ dir: 'content', localApi: true })],
 });
 ```
 
 With `localApi: true`, the plugin mounts these routes on the Vite dev server:
 
-| Route                | Purpose                                                  |
-| -------------------- | -------------------------------------------------------- |
-| `/__laika/storage`   | Storage repository JSON:API                              |
-| `/__laika/documents` | Documents repository JSON:API                            |
-| `/__laika/assets`    | Assets repository JSON:API (media uploads land locally)  |
-| `/__laika/session`   | Stub identity responder for the Decap backend login flow |
+| Route                    | Purpose                                                  |
+| ------------------------ | -------------------------------------------------------- |
+| `/__contentia/storage`   | Storage repository JSON:API                              |
+| `/__contentia/documents` | Documents repository JSON:API                            |
+| `/__contentia/assets`    | Assets repository JSON:API (media uploads land locally)  |
+| `/__contentia/session`   | Stub identity responder for the Decap backend login flow |
 
 These are unauthenticated by design and only ever reachable through the running dev server — nothing
 in the `build` phase or `configurePreviewServer` mounts them, so a production build has no route to
@@ -55,7 +55,7 @@ them by construction.
 To change the base path, pass an options object instead:
 
 ```ts
-laikacms({ dir: 'content', localApi: { basePath: '/__laika' } });
+contentia({ dir: 'content', localApi: { basePath: '/__contentia' } });
 ```
 
 ---
@@ -76,16 +76,16 @@ import { init } from '@laikacms/decap-cms/laika-app/bare';
 
 init({
   config: {
-    // In `vite dev`: local config → targets /__laika with a dummy dev token
+    // In `vite dev`: local config → targets /__contentia with a dummy dev token
     // (DevAuthenticationPage logs in automatically, no OAuth prompt).
     // In a production build: `remote` is returned unchanged → the full OAuth2 flow.
     backend: resolveLaikaBackend({
-      // Optional — omit to use the defaults (basePath '/__laika', devToken 'laika-local-dev').
+      // Optional — omit to use the defaults (basePath '/__contentia', devToken 'contentia-local-dev').
       // basePath must match the plugin's `localApi.basePath`.
-      local: { basePath: '/__laika' },
+      local: { basePath: '/__contentia' },
       remote: {
         name: 'laika',
-        base_url: 'https://your-laika-api.example.com',
+        base_url: 'https://your-contentia-api.example.com',
         api_root: '/api',
       },
     }),
@@ -94,7 +94,7 @@ init({
 });
 ```
 
-`remote` is the same `backend:` block you would otherwise write in `config.yml` for the laika
+`remote` is the same `backend:` block you would otherwise write in `config.yml` for the contentia
 backend (see [Authentication](./auth) for the full production OAuth2 setup, e.g. `app_id`).
 
 ### Vite-bundled admin is required
@@ -114,7 +114,7 @@ remote backend even in dev.
 ## 3. Run locally
 
 ```bash
-# Start the Vite dev server (mounts /__laika endpoints)
+# Start the Vite dev server (mounts /__contentia endpoints)
 npx vite dev
 ```
 
@@ -124,7 +124,7 @@ every save goes to the local repository.
 
 > **Same-origin:** when the admin is served through `vite dev` at the same origin as the API, no
 > CORS configuration is needed. If you serve the admin separately (e.g. on a different port), add a
-> `cors` option to your `laikaApi` call as shown in the quickstart.
+> `cors` option to your `contentiaApi` call as shown in the quickstart.
 
 ---
 
@@ -132,8 +132,8 @@ every save goes to the local repository.
 
 ```
 vite dev
-├── laika: imports — inlined at build time from the filesystem repository
-└── /__laika/*   — live JSON:API (storage + documents + assets + session)
+├── contentia: imports — inlined at build time from the filesystem repository
+└── /__contentia/*   — live JSON:API (storage + documents + assets + session)
        ↑
        admin/index.ts → resolveLaikaBackend → local backend (DevAuthenticationPage)
                                               reads import.meta.env.DEV = true

@@ -1,12 +1,12 @@
-import type { AssetsRepository } from 'laikacms/assets';
-import { buildAssetsApi } from 'laikacms/assets/api';
-import { AuthenticationError, ForbiddenError, Header, NotFoundError, TemplateLiteral as TL, Url } from 'laikacms/core';
-import { addTimingJitter } from 'laikacms/crypto';
-import type { DocumentsRepository } from 'laikacms/documents';
-import { buildJsonApi as buildDocumentsApi } from 'laikacms/documents/api';
-import { allowAll, errorToJsonApiMapper, isLaikaError } from 'laikacms/json-api';
-import type { StorageRepository } from 'laikacms/storage';
-import { buildJsonApi as buildStorageApi } from 'laikacms/storage/api';
+import type { AssetsRepository } from 'contentia/assets';
+import { buildAssetsApi } from 'contentia/assets/api';
+import { AuthenticationError, ForbiddenError, Header, NotFoundError, TemplateLiteral as TL, Url } from 'contentia/core';
+import { addTimingJitter } from 'contentia/crypto';
+import type { DocumentsRepository } from 'contentia/documents';
+import { buildJsonApi as buildDocumentsApi } from 'contentia/documents/api';
+import { allowAll, errorToJsonApiMapper, isContentiaError } from 'contentia/json-api';
+import type { StorageRepository } from 'contentia/storage';
+import { buildJsonApi as buildStorageApi } from 'contentia/storage/api';
 import { buildLocksApi } from './locks.js';
 import type { LockManager } from './locks.js';
 
@@ -24,7 +24,7 @@ export {
 } from './scopes.js';
 export type { GranularScope, Scope, ScopePolicyOptions } from './scopes.js';
 
-// PAT / bearer-resolution seam (implementation in laikacms/auth). Re-exported
+// PAT / bearer-resolution seam (implementation in contentia/auth). Re-exported
 // so a api consumer can wire scoped bearers (OAuth session + PAT) into
 // authenticateAccessToken from one import, and get user.scopes for the policy
 // above. See decap-cms docs/contributing/learnings/dcb-002-authorization-model.
@@ -34,7 +34,7 @@ export {
   mintPersonalAccessToken,
   requireScope,
   resolveBearer,
-} from 'laikacms/auth';
+} from 'contentia/auth';
 export type {
   AuthContext,
   MintPatDeps,
@@ -43,19 +43,19 @@ export type {
   PatRecord,
   ResolveBearerDeps,
   SessionVerificationResult,
-} from 'laikacms/auth';
+} from 'contentia/auth';
 
 import type { Scope } from './scopes.js';
 
 /**
- * CORS configuration for `laikaApi`.
+ * CORS configuration for `contentiaApi`.
  *
  * Required when the admin UI is served from a different origin than the API
  * (e.g. `npx serve admin/` on :5000 while the API runs on :3000).
  *
  * @example
  * ```ts
- * laikaApi({
+ * contentiaApi({
  *   // …
  *   cors: { origins: ['http://localhost:5000'] },
  * });
@@ -98,7 +98,7 @@ export const SECURITY_DEFAULTS = {
  *
  * Authentication (the `authenticate*` callbacks) answers "who is this?" and
  * returns a `User`. Authorization ("what may they do?") is a separate concern,
- * decided entirely by the required {@link LaikaApiOptions.authorize} callback — a
+ * decided entirely by the required {@link ContentiaApiOptions.authorize} callback — a
  * `User` carries no access/permission fields itself.
  *
  * Consumers extend this with whatever identity/claim fields their `authorize`
@@ -106,7 +106,7 @@ export const SECURITY_DEFAULTS = {
  *
  * @example
  * ```typescript
- * declare module '@laikacms/server/api' {
+ * declare module '@contentia/server/api' {
  *   interface User {
  *     roles: string[];
  *     organizationId: string;
@@ -139,7 +139,7 @@ export type CmsDomain = 'documents' | 'storage' | 'assets' | 'session' | 'locks'
 export type CmsOperation = 'read' | 'create' | 'update' | 'delete' | 'publish' | 'unpublish';
 
 /**
- * The argument passed to {@link LaikaApiOptions.authorize}. Carries the principal,
+ * The argument passed to {@link ContentiaApiOptions.authorize}. Carries the principal,
  * the raw {@link Request}, and the request pre-parsed into resource/operation so
  * a tenant policy can decide access without re-parsing the URL itself.
  *
@@ -164,7 +164,7 @@ export interface AuthorizeContext {
   itemId?: string;
 }
 
-export interface LaikaApiOptions {
+export interface ContentiaApiOptions {
   documents: DocumentsRepository;
   storage: StorageRepository;
   /**
@@ -224,7 +224,7 @@ export interface LaikaApiOptions {
    * "being edited by …" banner). Takes precedence over the documents
    * repository's own lock methods.
    *
-   * Use `InProcessLockManager` from `laikacms/locks/in-process` for
+   * Use `InProcessLockManager` from `contentia/locks/in-process` for
    * single-node deployments (dev + most production setups). Omit for
    * multi-node deployments until a shared lock backend is available.
    *
@@ -233,9 +233,9 @@ export interface LaikaApiOptions {
    *
    * @example
    * ```ts
-   * import { InProcessLockManager } from 'laikacms/locks/in-process';
+   * import { InProcessLockManager } from 'contentia/locks/in-process';
    *
-   * laikaApi({
+   * contentiaApi({
    *   // …
    *   locks: new InProcessLockManager(),
    * });
@@ -251,7 +251,7 @@ export interface LaikaApiOptions {
   cors?: CorsOptions | undefined;
 }
 
-export interface LaikaApi {
+export interface ContentiaApi {
   fetch(request: Request): Promise<Response>;
   authenticateRequest(request: Request): Promise<Response | User>;
 }
@@ -374,7 +374,7 @@ function parseAuthzTarget(
   return { operation, collection, itemId };
 }
 
-export const laikaApi = (options: LaikaApiOptions): LaikaApi => {
+export const contentiaApi = (options: ContentiaApiOptions): ContentiaApi => {
   const { documents, storage, assets, authenticateAccessToken, authenticateApiToken, basePath, cors } = options;
 
   const base = Url.normalize(basePath ?? '');
@@ -447,7 +447,7 @@ export const laikaApi = (options: LaikaApiOptions): LaikaApi => {
       }
     } catch (e) {
       options.logger?.error('Authentication failed:', e);
-      const error = isLaikaError(e) ? e : new AuthenticationError('Authentication failed');
+      const error = isContentiaError(e) ? e : new AuthenticationError('Authentication failed');
       await addTimingJitter();
       return new Response(
         JSON.stringify(errorToJsonApiMapper(error)),

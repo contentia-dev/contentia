@@ -1,7 +1,7 @@
-import { buildAssetsOpenApi } from 'laikacms/assets-api';
-import { buildCatalogOpenApi } from 'laikacms/catalog-api';
-import { buildDocumentsOpenApi } from 'laikacms/documents-api';
-import { buildStorageOpenApi } from 'laikacms/storage-api';
+import { buildAssetsOpenApi } from 'contentia/assets-api';
+import { buildCatalogOpenApi } from 'contentia/catalog-api';
+import { buildDocumentsOpenApi } from 'contentia/documents-api';
+import { buildStorageOpenApi } from 'contentia/storage-api';
 import { describe, expect, it } from 'vitest';
 
 const specs = [

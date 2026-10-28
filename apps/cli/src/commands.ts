@@ -19,7 +19,7 @@ import { watchFile } from './watch.js';
 
 const createDirectory = Flag.directory('directory').pipe(
   Flag.withAlias('d'),
-  Flag.withDescription('Directory to create (default: ./my-laika-app, wizard asks)'),
+  Flag.withDescription('Directory to create (default: ./my-contentia-app, wizard asks)'),
   Flag.optional,
 );
 const createStarter = Flag.string('starter').pipe(
@@ -96,7 +96,7 @@ const resolve = <A>(
   fallback: A,
 ) => flag._tag === 'Some' ? Effect.succeed(flag.value) : interactive ? prompt : Effect.succeed(fallback);
 
-export const makeCreateCommand = (name = 'create', binName = 'laika') =>
+export const makeCreateCommand = (name = 'create', binName = 'contentia') =>
   Command.make(
     name,
     {
@@ -115,7 +115,7 @@ export const makeCreateCommand = (name = 'create', binName = 'laika') =>
     flags =>
       Effect.gen(function*() {
         // The wizard is the default path: prompts fill in whatever flags left
-        // out, so `laika create` alone walks through every choice. `--yes` (or
+        // out, so `contentia create` alone walks through every choice. `--yes` (or
         // no TTY) keeps it scriptable.
         const interactive = !flags.yes && process.stdin.isTTY === true && process.stdout.isTTY === true;
 
@@ -131,8 +131,8 @@ export const makeCreateCommand = (name = 'create', binName = 'laika') =>
         const directory = yield* resolve(
           flags.directory,
           interactive,
-          Prompt.text({ message: 'Where should the app be created?', default: './my-laika-app' }),
-          './my-laika-app',
+          Prompt.text({ message: 'Where should the app be created?', default: './my-contentia-app' }),
+          './my-contentia-app',
         );
         const title = yield* resolve(
           flags.title,
@@ -260,7 +260,7 @@ export const makeCreateCommand = (name = 'create', binName = 'laika') =>
       }),
   ).pipe(
     Command.withDescription(
-      'Bootstrap a LaikaCMS application from a starter — an interactive wizard that also picks the CMS and its backends, widgets, and locales (use flags or --yes to skip prompts).',
+      'Bootstrap a Contentia application from a starter — an interactive wizard that also picks the CMS and its backends, widgets, and locales (use flags or --yes to skip prompts).',
     ),
   );
 
@@ -318,9 +318,9 @@ const defaultExtension = Flag.string('default-extension').pipe(
 
 const authToken = Flag.string('auth-token').pipe(
   Flag.withDescription(
-    `Require 'Authorization: Bearer <token>' on every request (or set LAIKA_AUTH_TOKEN)`,
+    `Require 'Authorization: Bearer <token>' on every request (or set CONTENTIA_AUTH_TOKEN)`,
   ),
-  Flag.withFallbackConfig(Config.string('LAIKA_AUTH_TOKEN')),
+  Flag.withFallbackConfig(Config.string('CONTENTIA_AUTH_TOKEN')),
   Flag.optional,
 );
 
@@ -331,9 +331,9 @@ const serveBackend = Flag.string('backend').pipe(
 
 const serveBackendOptions = Flag.string('backend-options').pipe(
   Flag.withDescription(
-    'JSON-encoded options for --backend (or set LAIKA_BACKEND_OPTIONS, which keeps credentials out of the process list)',
+    'JSON-encoded options for --backend (or set CONTENTIA_BACKEND_OPTIONS, which keeps credentials out of the process list)',
   ),
-  Flag.withFallbackConfig(Config.string('LAIKA_BACKEND_OPTIONS')),
+  Flag.withFallbackConfig(Config.string('CONTENTIA_BACKEND_OPTIONS')),
   Flag.optional,
 );
 
@@ -386,9 +386,9 @@ export const resolveServeBackend = (
  * The JSON:API storage server command. Serves the local filesystem by default,
  * or any backend from the driver registry via `--backend`. The name and the bin
  * label used in log/error messages are parameterised so embedders can mount the
- * command under their own spelling (the `laika` CLI uses `laika local serve`).
+ * command under their own spelling (the `contentia` CLI uses `contentia local serve`).
  */
-export const makeServeCommand = (name = 'serve', binName = 'laika local') =>
+export const makeServeCommand = (name = 'serve', binName = 'contentia local') =>
   Command.make(
     name,
     {
@@ -436,7 +436,7 @@ export const makeServeCommand = (name = 'serve', binName = 'laika local') =>
       ),
   ).pipe(
     Command.withDescription(
-      'Serve a storage backend (the local filesystem by default) as a JSON:API storage server for Laika CMS dev workflows.',
+      'Serve a storage backend (the local filesystem by default) as a JSON:API storage server for Contentia dev workflows.',
     ),
   );
 
@@ -530,7 +530,7 @@ const resolveConfigCodegen = (
   return Effect.succeed(adapter.config);
 };
 
-export const makeGenerateCommand = (name = 'generate', binName = 'laika local') =>
+export const makeGenerateCommand = (name = 'generate', binName = 'contentia local') =>
   Command.make(
     name,
     { cms: generateCms, input: generateInput, output: generateOutput, watch: generateWatch },
@@ -776,7 +776,7 @@ const logEvent = (event: MigrateEvent): void => {
   }
 };
 
-export const makeMigrateCommand = (name = 'migrate', binName = 'laika local') =>
+export const makeMigrateCommand = (name = 'migrate', binName = 'contentia local') =>
   Command.make(
     name,
     {
@@ -841,7 +841,7 @@ export const makeListBackendsCommand = (name = 'list-backends') =>
   Command.make(name, {}, () =>
     Effect.gen(function*() {
       for (const driver of storageDrivers) {
-        const pkg = driver.packageName === 'laikacms'
+        const pkg = driver.packageName === 'contentia'
           ? '(built-in)'
           : `${driver.packageName}@${driver.version} (subpath ${driver.subpath})`;
         yield* Effect.sync(() =>

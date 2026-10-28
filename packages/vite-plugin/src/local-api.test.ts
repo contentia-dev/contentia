@@ -13,12 +13,12 @@ import {
   type LocalApiServer,
   mountLocalApi,
 } from './local-api.js';
-import { laikacms } from './plugin.js';
+import { contentia } from './plugin.js';
 
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-local-api-'));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-local-api-'));
 });
 
 afterEach(async () => {
@@ -302,9 +302,9 @@ describe('mountLocalApi — assets', () => {
   });
 });
 
-describe('laikacms() plugin — localApi wiring', () => {
+describe('contentia() plugin — localApi wiring', () => {
   it('is off by default and mounts nothing', () => {
-    const plugin = laikacms({
+    const plugin = contentia({
       storage: createFsStorage({ dir: path.join(tmpDir, 'content') }),
       typegen: false,
       hmr: false,
@@ -318,7 +318,7 @@ describe('laikacms() plugin — localApi wiring', () => {
   });
 
   it('mounts under the dev-server hook when enabled', () => {
-    const plugin = laikacms({
+    const plugin = contentia({
       storage: createFsStorage({ dir: path.join(tmpDir, 'content') }),
       typegen: false,
       hmr: false,
@@ -338,7 +338,7 @@ describe('laikacms() plugin — localApi wiring', () => {
   });
 
   it('is wired only under configureServer — no configurePreviewServer hook exists', () => {
-    const plugin = laikacms({
+    const plugin = contentia({
       storage: createFsStorage({ dir: path.join(tmpDir, 'content') }),
       typegen: false,
       hmr: false,
@@ -349,15 +349,15 @@ describe('laikacms() plugin — localApi wiring', () => {
   });
 });
 
-describe('@laikacms/vite-plugin dependency boundary', () => {
-  it('does not depend on @laikacms/server', async () => {
+describe('@contentia/vite-plugin dependency boundary', () => {
+  it('does not depend on @contentia/server', async () => {
     const pkgPath = path.resolve(import.meta.dirname, '../package.json');
     const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8')) as {
       dependencies?: Record<string, string>,
       devDependencies?: Record<string, string>,
     };
-    expect(pkg.dependencies?.['@laikacms/server']).toBeUndefined();
-    expect(pkg.devDependencies?.['@laikacms/server']).toBeUndefined();
-    expect(pkg.dependencies?.laikacms).toBeDefined();
+    expect(pkg.dependencies?.['@contentia/server']).toBeUndefined();
+    expect(pkg.devDependencies?.['@contentia/server']).toBeUndefined();
+    expect(pkg.dependencies?.contentia).toBeDefined();
   });
 });

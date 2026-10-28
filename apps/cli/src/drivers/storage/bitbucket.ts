@@ -1,4 +1,4 @@
-import type { StorageRepository } from 'laikacms/storage';
+import type { StorageRepository } from 'contentia/storage';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -64,7 +64,7 @@ const readOptions = (raw: Record<string, unknown>): BitbucketOptions => {
 
 export const bitbucketDriver: StorageDriver = {
   name: 'bitbucket',
-  packageName: '@laikacms/bitbucket',
+  packageName: '@contentia/bitbucket',
   version: '2.0.0',
   subpath: 'storage-bb',
   description: 'Bitbucket Cloud repository (commits per write, via app password/OAuth2)',

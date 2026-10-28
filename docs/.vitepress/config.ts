@@ -13,9 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 type SidebarNode = { text: string, link?: string, items?: SidebarNode[] };
 const apiSidebarFile = resolve(__dirname, '..', 'reference', 'api', 'typedoc-sidebar.json');
 // Module (and namespace) index pages are the links ending in `/`; symbol pages end in `.md`.
-// Labels are rebuilt from the tree, not the link: page paths drop the `@laikacms/` scope. A node
-// without a link is a path segment shared by several modules (`laikacms` > `core`), except the
-// `Namespaces` group, whose children join with `.` (`laikacms/core.LaikaTask`).
+// Labels are rebuilt from the tree, not the link: page paths drop the `@contentia/` scope. A node
+// without a link is a path segment shared by several modules (`contentia` > `core`), except the
+// `Namespaces` group, whose children join with `.` (`contentia/core.ContentiaTask`).
 const apiIndexItems = (nodes: SidebarNode[], prefix = '', separator = '/'): { text: string, link: string }[] =>
   nodes.flatMap(node => {
     const name = prefix ? `${prefix}${separator}${node.text}` : node.text;
@@ -44,12 +44,12 @@ const adapterSidebarItems = existsSync(adapterSidebarFile)
   )
   : [];
 
-const websiteUrl = 'https://laikacms.com/';
+const websiteUrl = 'https://contentia.dev/';
 
 export default defineConfig({
-  title: 'Laika',
+  title: 'Contentia',
   description: 'A modular, runtime-agnostic content API for your own custom or existing UIs.',
-  // Served at laikacms.com/docs/ alongside the marketing site (see the
+  // Served at contentia.dev/docs/ alongside the marketing site (see the
   // laika-cloud repo, ADR-0028). `pnpm build:site` at the workspace root
   // assembles apps/website/dist + this dist into one Cloudflare Pages deploy.
   base,
@@ -74,7 +74,7 @@ export default defineConfig({
   ignoreDeadLinks: [/\/apps\//],
   // Same typefaces as apps/website: Archivo (display), IBM Plex Sans (body), IBM Plex Mono (code).
   head: [
-    ['link', { rel: 'icon', href: '/docs/laika-icon.png' }],
+    ['link', { rel: 'icon', href: '/docs/contentia-icon.png' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     [
@@ -87,9 +87,9 @@ export default defineConfig({
     ],
   ],
   themeConfig: {
-    // The website's lockup: round icon + "Laika".
-    logo: '/laika-icon.png',
-    siteTitle: 'Laika',
+    // The website's lockup: round icon + "Contentia".
+    logo: '/contentia-icon.png',
+    siteTitle: 'Contentia',
     // The site title leads back to the marketing site, not the docs root. Absolute URL on purpose:
     // root-relative links get the `/docs/` base prepended.
     logoLink: { link: websiteUrl, target: '_self' },
@@ -205,15 +205,15 @@ export default defineConfig({
         ],
       },
     ],
-    socialLinks: [{ icon: 'github', link: 'https://github.com/laikacms/laikacms' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/contentia-dev/contentia' }],
     search: { provider: 'local' },
     editLink: {
-      pattern: 'https://github.com/laikacms/laikacms/edit/develop/docs/:path',
+      pattern: 'https://github.com/contentia-dev/contentia/edit/develop/docs/:path',
       text: 'Edit this page on GitHub',
     },
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © Laika contributors',
+      copyright: 'Copyright © Contentia contributors',
     },
   },
 });

@@ -1,5 +1,5 @@
 {
-  "laika.connections": [
+  "contentia.connections": [
     {
       "name": "Playground content",
       "type": "local",

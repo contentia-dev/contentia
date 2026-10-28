@@ -1,7 +1,8 @@
 # Authentication
 
-How callers prove who they are to `laikaApi(...)`: browser sessions, machine-to-machine API keys,
-SSR guards, structured logging, the bundled OAuth2 server, and the multi-tenant hosted gateway.
+How callers prove who they are to `contentiaApi(...)`: browser sessions, machine-to-machine API
+keys, SSR guards, structured logging, the bundled OAuth2 server, and the multi-tenant hosted
+gateway.
 
 ## Machine-to-machine auth with `authenticateApiToken`
 
@@ -19,9 +20,9 @@ this callback instead of `authenticateAccessToken`:
 > leak through server logs, CDN logs, and browser history.
 
 ```ts
-import { laikaApi } from '@laikacms/server/api';
+import { contentiaApi } from '@contentia/server/api';
 
-const api = laikaApi({
+const api = contentiaApi({
   documents,
   storage,
   authenticateAccessToken: async token => {
@@ -82,13 +83,13 @@ attach to the [`User`](../../reference/api/server/api/interfaces/User) and check
 Augment the `User` interface with whatever your policy needs:
 
 ```ts
-declare module '@laikacms/server/api' {
+declare module '@contentia/server/api' {
   interface User {
     roles: string[];
   }
 }
 
-const api = laikaApi({
+const api = contentiaApi({
   documents,
   storage,
   authenticateAccessToken: yourValidator, // returns { id, email, roles, … }
@@ -117,10 +118,10 @@ authenticateApiToken: async key => {
 ### Scope-based authorization with `createScopePolicy`
 
 For the common pattern of granting access based on fine-grained scopes (rather than flat roles),
-`@laikacms/server/api` ships
+`@contentia/server/api` ships
 [`createScopePolicy()`](../../reference/api/server/api/functions/createScopePolicy) — a drop-in
 `authorize` factory that maps every CMS request to a required scope and checks the principal's
-granted scopes. The scope vocabulary lives in `laikacms/auth`:
+granted scopes. The scope vocabulary lives in `contentia/auth`:
 
 | Scope           | Grants                                                              |
 | --------------- | ------------------------------------------------------------------- |
@@ -133,9 +134,9 @@ granted scopes. The scope vocabulary lives in `laikacms/auth`:
 | `resource:*`    | Implies every action on that resource (e.g. `content:*`)            |
 
 ```ts
-import { createScopePolicy, laikaApi } from '@laikacms/server/api';
+import { contentiaApi, createScopePolicy } from '@contentia/server/api';
 
-const api = laikaApi({
+const api = contentiaApi({
   documents,
   storage,
   authenticateAccessToken: async token => {
@@ -157,12 +158,12 @@ const api = laikaApi({
 | [`requiredScopeFor`](../../reference/api/server/api/functions/requiredScopeFor) | `(ctx: AuthorizeContext) => Scope \| null`    | Override the request → required-scope mapping. Return `null` to allow unconditionally. |
 | `scopesOf`                                                                      | `(ctx: AuthorizeContext) => readonly Scope[]` | How to read the principal's granted scopes. Defaults to `ctx.user.scopes ?? []`.       |
 
-`hasScope(granted, required)` from `laikacms/auth` resolves wildcards: `admin`/`*` satisfies
+`hasScope(granted, required)` from `contentia/auth` resolves wildcards: `admin`/`*` satisfies
 anything, and `resource:*` satisfies any `resource:action` on that resource. Use it directly if you
 need a custom policy that still honours the wildcard semantics:
 
 ```ts
-import { hasScope } from 'laikacms/auth';
+import { hasScope } from 'contentia/auth';
 
 authorize: ctx => {
   if (ctx.operation === 'read') return true;
@@ -173,15 +174,15 @@ authorize: ctx => {
 ### PAT bearer verification with `resolveBearer`
 
 When you issue Personal Access Tokens (PATs) as well as session tokens, use
-[`resolveBearer`](../../reference/api/laikacms/auth/functions/resolveBearer) from `laikacms/auth` as
-the single seam in `authenticateAccessToken`. It detects a `lk_pat_…` prefix, looks up the PAT
+[`resolveBearer`](../../reference/api/contentia/auth/functions/resolveBearer) from `contentia/auth`
+as the single seam in `authenticateAccessToken`. It detects a `lk_pat_…` prefix, looks up the PAT
 record by hash, checks revocation/expiry, and falls back to your session verifier for all other
 bearers — returning a unified
-[`AuthContext`](../../reference/api/laikacms/auth/interfaces/AuthContext) with the principal and
+[`AuthContext`](../../reference/api/contentia/auth/interfaces/AuthContext) with the principal and
 their granted scopes:
 
 ```ts
-import { resolveBearer } from 'laikacms/auth';
+import { resolveBearer } from 'contentia/auth';
 
 authenticateAccessToken: async token => {
   const ctx = await resolveBearer(token, {
@@ -204,11 +205,11 @@ bad input — throw or return the error from `authenticateAccessToken` yourself.
 
 ## SSR auth guard with `authenticateRequest`
 
-`laikaApi(...)` returns a [`LaikaApi`](../../reference/api/server/api/interfaces/LaikaApi) object
-with two methods:
+`contentiaApi(...)` returns a
+[`ContentiaApi`](../../reference/api/server/api/interfaces/ContentiaApi) object with two methods:
 
 ```ts
-interface LaikaApi {
+interface ContentiaApi {
   fetch(request: Request): Promise<Response>;
   authenticateRequest(request: Request): Promise<Response | User>;
 }
@@ -221,7 +222,7 @@ duplicating auth logic:
 
 ```ts
 // SvelteKit — src/routes/admin/+page.server.ts
-import { api } from '$lib/decap'; // your laikaApi(...) instance
+import { api } from '$lib/decap'; // your contentiaApi(...) instance
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -239,11 +240,11 @@ boundary (Next.js App Router, TanStack Start, Hono middleware, etc.).
 
 Pass any `logger` compatible with the `Console` interface (`error`, `warn`, `info`, `debug`) to
 receive structured diagnostic output from
-[`laikaApi`](../../reference/api/server/api/functions/laikaApi). The option is optional — if
+[`contentiaApi`](../../reference/api/server/api/functions/contentiaApi). The option is optional — if
 omitted, no output is produced.
 
 ```ts
-const api = laikaApi({
+const api = contentiaApi({
   documents,
   storage,
   authenticateAccessToken: yourValidator,
@@ -258,30 +259,30 @@ unified log stream from a single option.
 ## Production auth with `decap-oauth2`
 
 Rather than building an OAuth2 server from scratch, use the bundled
-[`laikaOauth2`](../../reference/api/server/oauth2/functions/laikaOauth2) helper. It is a
+[`contentiaOauth2`](../../reference/api/server/oauth2/functions/contentiaOauth2) helper. It is a
 self-contained PKCE authorization server with email/password login, optional passkey (WebAuthn), and
-optional TOTP 2FA. You wire it alongside the `laikaApi(...)` handler in the same Express or Hono
+optional TOTP 2FA. You wire it alongside the `contentiaApi(...)` handler in the same Express or Hono
 app.
 
 ```bash
-pnpm add @laikacms/server
+pnpm add @contentia/server
 ```
 
 **Hono example**
 
 ```ts
-import { laikaApi } from '@laikacms/server/api';
-import { laikaOauth2 } from '@laikacms/server/oauth2';
+import { contentiaApi } from '@contentia/server/api';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
+import { CatalogAssetsRepository } from 'contentia/assets-catalog';
+import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { R2StorageRepository } from 'contentia/storage-r2';
 import { Hono } from 'hono';
-import { CatalogAssetsRepository } from 'laikacms/assets-catalog';
-import { DecapCatalogProvider } from 'laikacms/catalog-decap';
-import { CatalogDocumentsRepository } from 'laikacms/documents-catalog';
-import { R2StorageRepository } from 'laikacms/storage-r2';
 
 const CLIENT_ID = process.env.DECAP_CLIENT_ID!;
 const OAUTH_BASE = '/oauth2';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   basePath: OAUTH_BASE,
   clientId: CLIENT_ID,
   // Required: allowlist of redirect URIs that may receive an authorization code.
@@ -308,12 +309,12 @@ const oauth2 = laikaOauth2({
 // Build the Decap API handler — its validator checks the OAuth2 session token.
 const storage = new R2StorageRepository(/* … */);
 const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
-const laika = laikaApi({
+const contentia = contentiaApi({
   documents: new CatalogDocumentsRepository(storage, settings),
   storage,
   assets: new CatalogAssetsRepository(storage, settings),
   basePath: '/api/decap',
-  // Reject by throwing — laikaApi turns thrown errors into a 401.
+  // Reject by throwing — contentiaApi turns thrown errors into a 401.
   async authenticateAccessToken(token) {
     const session = await db.sessions.findByAccessToken(token);
     if (!session) throw new Error('Invalid session');
@@ -327,19 +328,19 @@ const laika = laikaApi({
 
 const app = new Hono();
 app.all(`${OAUTH_BASE}/*`, c => oauth2.fetch(c.req.raw));
-app.all('/api/decap/*', c => laika.fetch(c.req.raw));
+app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
 
 export default app;
 ```
 
 **Express example** (uses the [manual bridge](./frameworks#express--plain-httpserver--manual-bridge)
-for `laika`):
+for `contentia`):
 
 ```ts
-import { laikaOauth2 } from '@laikacms/server/oauth2';
+import { contentiaOauth2 } from '@contentia/server/oauth2';
 import express from 'express';
 
-const oauth2 = laikaOauth2({
+const oauth2 = contentiaOauth2({
   basePath: '/oauth2',
   clientId: CLIENT_ID,
   allowedRedirectUris: ['https://cms.example.com/admin/'],
@@ -366,8 +367,8 @@ app.all('/oauth2/*', async (req, res) => {
   webResponse.headers.forEach((value, key) => res.setHeader(key, value));
   res.send(Buffer.from(await webResponse.arrayBuffer()));
 });
-// Mount laika with the same bridge (see Express bridge section)
-app.all('/api/decap/*', (req, res) => bridgeToLaika(req, res, laika));
+// Mount contentia with the same bridge (see Express bridge section)
+app.all('/api/decap/*', (req, res) => bridgeToContentia(req, res, contentia));
 ```
 
 **Point Decap at the OAuth2 server**
@@ -393,16 +394,16 @@ Use this same `decapConfig` when building the admin shell (see
 
 **Optional extensions**
 
-| Feature        | Option key in `laikaOauth2(…)`       | Notes                                            |
+| Feature        | Option key in `contentiaOauth2(…)`   | Notes                                            |
 | -------------- | ------------------------------------ | ------------------------------------------------ |
 | Passkey        | `passkey: { enabled: true, … }`      | WebAuthn registration + authentication flows     |
 | TOTP 2FA       | `totp: { … }`                        | TOTP enrollment and per-login verification       |
 | CAPTCHA        | `captcha: { enabled: true, … }`      | Any provider (reCAPTCHA, hCaptcha, Turnstile, …) |
 | Password reset | `passwordReset: { … }`               | Email-based reset link flow                      |
-| i18n           | `translations: nl` (or other locale) | Import from `@laikacms/server/oauth2/i18n`       |
+| i18n           | `translations: nl` (or other locale) | Import from `@contentia/server/oauth2/i18n`      |
 
 See
-[`packages/server/src/oauth2/README.md`](https://github.com/laikacms/laikacms/blob/develop/packages/server/src/oauth2/README.md)
+[`packages/server/src/oauth2/README.md`](https://github.com/contentia-dev/contentia/blob/develop/packages/server/src/oauth2/README.md)
 for the full [`OAuthConfig`](../../reference/api/server/oauth2/interfaces/OAuthConfig) option
 reference.
 
@@ -412,5 +413,5 @@ reference.
 
 If multiple sites share one editing experience, host a gateway Worker separately and point each
 site's Decap admin at it. Auth is per-tenant via GitHub OAuth (or other). Storage is the tenant's
-own GitHub repo. The `laika-gateway` app and the `@laikacms/git-gateway` package were moved out of
-this monorepo in June 2026; they now live in their own repositories.
+own GitHub repo. The `contentia-gateway` app and the `@contentia/git-gateway` package were moved out
+of this monorepo in June 2026; they now live in their own repositories.

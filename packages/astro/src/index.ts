@@ -1,14 +1,14 @@
 export {
-  laika,
-  laika as default,
-  type LaikaApiOptions,
-  type LaikaIntegrationOptions,
-  type LaikaRefreshOptions,
+  contentia,
+  contentia as default,
+  type ContentiaApiOptions,
+  type ContentiaIntegrationOptions,
+  type ContentiaRefreshOptions,
 } from './integration.js';
 export {
+  type ContentiaRepositories,
+  type ContentiaRepositoryOptions,
   DEFAULT_CONTENT_DIR,
   defaultSerializers,
-  type LaikaRepositories,
-  type LaikaRepositoryOptions,
   resolveRepositories,
 } from './repositories.js';

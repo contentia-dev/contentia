@@ -18,10 +18,10 @@ import {
 } from './passkey.js';
 
 // ---------------------------------------------------------------------------
-// Mock laikacms/crypto — constantTimeEqualBuffer is the only import
+// Mock contentia/crypto — constantTimeEqualBuffer is the only import
 // ---------------------------------------------------------------------------
 
-vi.mock('laikacms/crypto', () => ({
+vi.mock('contentia/crypto', () => ({
   constantTimeEqualBuffer: vi.fn().mockImplementation(async (a: Uint8Array, b: Uint8Array) => {
     if (a.length !== b.length) return false;
     let diff = 0;

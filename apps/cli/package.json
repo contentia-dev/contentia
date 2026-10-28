@@ -1,11 +1,11 @@
 {
-  "name": "laikacli",
+  "name": "@contentia/cli",
   "version": "0.2.1",
-  "description": "The Laika CMS command-line interface (`laikacli`, short alias `laika`): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
+  "description": "The Contentia command-line interface (`contentia` bin; `npx contentia` also works via the core package): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
   "keywords": [
     "headless-cms",
     "content-management",
-    "laikacms",
+    "contentia",
     "cli",
     "storage",
     "local",
@@ -13,8 +13,8 @@
   ],
   "author": "Sem Postma <sem@laikacms.com>",
   "license": "MIT",
-  "homepage": "https://github.com/laikacms/laikacms",
-  "repository": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -22,8 +22,7 @@
     "README.md"
   ],
   "bin": {
-    "laikacli": "./dist/cli.js",
-    "laika": "./dist/cli.js"
+    "contentia": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -62,7 +61,7 @@
     "@types/js-yaml": "catalog:types",
     "@types/node": "catalog:types",
     "hono": "catalog:server",
-    "laikacms": "workspace:*",
+    "contentia": "workspace:*",
     "rimraf": "catalog:tools",
     "tsup": "catalog:tools",
     "typescript": "catalog:tools",

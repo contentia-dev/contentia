@@ -1,5 +1,5 @@
-import { type LaikaRepositories, listKeys, readItem } from '../backend.js';
-import { type LaikaId, type LaikaNamespace, parseLaikaId, toSource } from '../protocol.js';
+import { type ContentiaRepositories, listKeys, readItem } from '../backend.js';
+import { type ContentiaId, type ContentiaNamespace, parseContentiaId, toSource } from '../protocol.js';
 import type { ContentChangeChannel } from './channel.js';
 import { emitDeclarations, genericFallbackModule, type TypeScriptLoader, wrapAmbientModule } from './compiler-emit.js';
 import { renderItemModule } from './renderer.js';
@@ -12,19 +12,19 @@ import { TypegenWriter } from './writer.js';
  * an in-memory implementation.
  */
 export interface TypegenReader {
-  listKeys(namespace: LaikaNamespace): Promise<readonly string[]>;
-  readItem(id: LaikaId): Promise<{ content: Record<string, unknown>, meta: Record<string, unknown> }>;
+  listKeys(namespace: ContentiaNamespace): Promise<readonly string[]>;
+  readItem(id: ContentiaId): Promise<{ content: Record<string, unknown>, meta: Record<string, unknown> }>;
 }
 
 /** Binds the documented backend.ts contract to a {@link TypegenReader}. */
-export function createBackendReader(repos: LaikaRepositories): TypegenReader {
+export function createBackendReader(repos: ContentiaRepositories): TypegenReader {
   return {
     listKeys: namespace => Promise.resolve(listKeys(repos, namespace)),
     readItem: id => Promise.resolve(readItem(repos, id)),
   };
 }
 
-export interface LaikaTypegenOptions {
+export interface ContentiaTypegenOptions {
   /** Project root Vite serves from; all output is written under here. */
   readonly viteRoot: string;
   /** Append `as const` so literal types are preserved. Default `false`. */
@@ -32,13 +32,13 @@ export interface LaikaTypegenOptions {
   /** Declare the `Body` export for items with prose. Mirrors the plugin's `mdx` option. */
   readonly mdx?: boolean;
   /** Namespaces to enumerate on a full regenerate. Default `['doc', 'store']`. */
-  readonly namespaces?: readonly LaikaNamespace[];
+  readonly namespaces?: readonly ContentiaNamespace[];
   /** Debounce window (ms) for coalescing incremental writes. Default `30`. */
   readonly debounceMs?: number;
   /** Override the reader (tests / custom hosts). Defaults to backend.ts. */
   readonly reader?: TypegenReader;
   /** Repositories used when no `reader` is supplied. */
-  readonly repos?: LaikaRepositories;
+  readonly repos?: ContentiaRepositories;
   /** Channel to subscribe to for incremental regeneration. */
   readonly channel?: ContentChangeChannel;
   /** Override `typescript` loading (tests simulate it being unavailable). */
@@ -48,7 +48,7 @@ export interface LaikaTypegenOptions {
 }
 
 interface ItemRecord {
-  readonly namespace: LaikaNamespace;
+  readonly namespace: ContentiaNamespace;
   readonly key: string;
   readonly collection: string;
   readonly block: string | null;
@@ -77,15 +77,15 @@ function toTypeName(collection: string): string {
 
 /**
  * Stateful typegen engine. Holds the per-item declaration blocks in memory and
- * (re)writes the aggregate `.laika/vite-generated/types.d.ts` plus per-collection union
+ * (re)writes the aggregate `.contentia/vite-generated/types.d.ts` plus per-collection union
  * aliases. Safe to use one-shot (build / cold dev, no channel) or incrementally
  * (dev, driven by a {@link ContentChangeChannel}).
  */
-export class LaikaTypegen {
+export class ContentiaTypegen {
   private readonly items = new Map<string, ItemRecord>();
   private readonly writer: TypegenWriter;
   private readonly debounceMs: number;
-  private readonly namespaces: readonly LaikaNamespace[];
+  private readonly namespaces: readonly ContentiaNamespace[];
   private readonly channelUnsub?: () => void;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
@@ -99,14 +99,14 @@ export class LaikaTypegen {
    */
   private pending: Promise<void> = Promise.resolve();
 
-  constructor(private readonly options: LaikaTypegenOptions) {
+  constructor(private readonly options: ContentiaTypegenOptions) {
     this.writer = new TypegenWriter(options.viteRoot);
     this.debounceMs = options.debounceMs ?? 30;
     this.namespaces = options.namespaces ?? ['doc', 'store'];
     if (options.channel) {
       this.channelUnsub = options.channel.subscribe(event => {
         this.pending = this.handleEvent(event).catch(error => {
-          this.log(`laika typegen: channel event handling failed: ${String(error)}`);
+          this.log(`contentia typegen: channel event handling failed: ${String(error)}`);
         });
       });
     }
@@ -116,7 +116,7 @@ export class LaikaTypegen {
     this.options.logger?.(message);
   }
 
-  private resolveReader(repos?: LaikaRepositories): TypegenReader | undefined {
+  private resolveReader(repos?: ContentiaRepositories): TypegenReader | undefined {
     if (this.options.reader) {
       return this.options.reader;
     }
@@ -125,7 +125,7 @@ export class LaikaTypegen {
   }
 
   private async computeBlock(
-    id: LaikaId,
+    id: ContentiaId,
     content: Record<string, unknown>,
     meta: Record<string, unknown>,
   ): Promise<string | null> {
@@ -141,16 +141,16 @@ export class LaikaTypegen {
   }
 
   private async handleEvent(
-    event: { namespace: LaikaNamespace, key: string, kind: 'upsert' | 'delete' },
+    event: { namespace: ContentiaNamespace, key: string, kind: 'upsert' | 'delete' },
   ): Promise<void> {
-    const id: LaikaId = { namespace: event.namespace, key: event.key };
+    const id: ContentiaId = { namespace: event.namespace, key: event.key };
     if (event.kind === 'delete') {
       await this.remove(id);
       return;
     }
     const reader = this.resolveReader();
     if (!reader) {
-      this.log('laika typegen: channel upsert ignored (no reader/repos configured)');
+      this.log('contentia typegen: channel upsert ignored (no reader/repos configured)');
       return;
     }
     const { content, meta } = await reader.readItem(id);
@@ -161,7 +161,11 @@ export class LaikaTypegen {
    * Ingest one item's concrete `{ content, meta }` (e.g. from a Vite `load`
    * hook). Computes its declaration block and schedules a debounced write.
    */
-  async ingest(id: string | LaikaId, content: Record<string, unknown>, meta: Record<string, unknown>): Promise<void> {
+  async ingest(
+    id: string | ContentiaId,
+    content: Record<string, unknown>,
+    meta: Record<string, unknown>,
+  ): Promise<void> {
     const resolved = this.resolveId(id);
     const block = await this.computeBlock(resolved, content, meta);
     this.items.set(toSource(resolved), {
@@ -174,18 +178,18 @@ export class LaikaTypegen {
   }
 
   /** Read one item via the reader and ingest it. */
-  async regenerateItem(id: string | LaikaId, repos?: LaikaRepositories): Promise<void> {
+  async regenerateItem(id: string | ContentiaId, repos?: ContentiaRepositories): Promise<void> {
     const resolved = this.resolveId(id);
     const reader = this.resolveReader(repos);
     if (!reader) {
-      throw new Error('laika typegen: regenerateItem requires a reader or repos');
+      throw new Error('contentia typegen: regenerateItem requires a reader or repos');
     }
     const { content, meta } = await reader.readItem(resolved);
     await this.ingest(resolved, content, meta);
   }
 
   /** Drop an item's types and schedule a write. */
-  async remove(id: string | LaikaId): Promise<void> {
+  async remove(id: string | ContentiaId): Promise<void> {
     const resolved = this.resolveId(id);
     this.items.delete(toSource(resolved));
     await this.schedule();
@@ -196,10 +200,10 @@ export class LaikaTypegen {
    * regenerate all blocks, then flush synchronously. Works with no channel
    * (build + cold dev).
    */
-  async regenerateAll(repos?: LaikaRepositories): Promise<void> {
+  async regenerateAll(repos?: ContentiaRepositories): Promise<void> {
     const reader = this.resolveReader(repos);
     if (!reader) {
-      throw new Error('laika typegen: regenerateAll requires a reader or repos');
+      throw new Error('contentia typegen: regenerateAll requires a reader or repos');
     }
     this.items.clear();
     for (const namespace of this.namespaces) {
@@ -207,25 +211,25 @@ export class LaikaTypegen {
       try {
         keys = await reader.listKeys(namespace);
       } catch (error) {
-        this.log(`laika typegen: listKeys(${namespace}) failed: ${String(error)}`);
+        this.log(`contentia typegen: listKeys(${namespace}) failed: ${String(error)}`);
         continue;
       }
       for (const key of keys) {
-        const id: LaikaId = { namespace, key };
+        const id: ContentiaId = { namespace, key };
         try {
           const { content, meta } = await reader.readItem(id);
           const block = await this.computeBlock(id, content, meta);
           this.items.set(toSource(id), { namespace, key, collection: collectionOf(key), block });
         } catch (error) {
-          this.log(`laika typegen: readItem(${toSource(id)}) failed: ${String(error)}`);
+          this.log(`contentia typegen: readItem(${toSource(id)}) failed: ${String(error)}`);
         }
       }
     }
     await this.flush();
   }
 
-  private resolveId(id: string | LaikaId): LaikaId {
-    return typeof id === 'string' ? parseLaikaId(id) : id;
+  private resolveId(id: string | ContentiaId): ContentiaId {
+    return typeof id === 'string' ? parseContentiaId(id) : id;
   }
 
   /**
@@ -262,12 +266,12 @@ export class LaikaTypegen {
       .filter((item): item is ItemRecord & { block: string } => item.block !== null)
       .sort((a, b) => toSource(a).localeCompare(toSource(b)))
       .map(item => item.block);
-    const header = '// Generated by @laikacms/vite-plugin. Do not edit.\n\n';
+    const header = '// Generated by @contentia/vite-plugin. Do not edit.\n\n';
     return `${header}${blocks.join('\n')}${blocks.length > 0 ? '\n' : ''}${genericFallbackModule()}`;
   }
 
   private buildCollections(): Map<string, string> {
-    const groups = new Map<string, { specifiers: string[], namespaces: Set<LaikaNamespace> }>();
+    const groups = new Map<string, { specifiers: string[], namespaces: Set<ContentiaNamespace> }>();
     for (const item of this.items.values()) {
       const file = toFileName(item.collection);
       const specifier = toSource({ namespace: item.namespace, key: item.key });
@@ -285,10 +289,10 @@ export class LaikaTypegen {
       const typeName = toTypeName(file);
       const union = specifiers.map(s => `  | typeof import('${s}')`).join('\n');
       const globLines = [...namespaces].sort().map(
-        ns => `//   import.meta.glob<${typeName}>('laika:${ns}/${file}/*', { eager: true })`,
+        ns => `//   import.meta.glob<${typeName}>('contentia:${ns}/${file}/*', { eager: true })`,
       );
       const content = [
-        '// Generated by @laikacms/vite-plugin. Do not edit.',
+        '// Generated by @contentia/vite-plugin. Do not edit.',
         '//',
         `// Union of every item in the "${file}" collection, computed by the TypeScript`,
         '// compiler so a missing field on one item becomes optional across the union.',
@@ -319,7 +323,7 @@ export class LaikaTypegen {
     await this.writer.pruneCollections(new Set(collections.keys()));
 
     await this.writer.ensureEnvReference();
-    await this.writer.ensureLaikaGitignore();
+    await this.writer.ensureContentiaGitignore();
     await this.writer.ensureRootGitignore();
   }
 
@@ -342,15 +346,15 @@ export class LaikaTypegen {
   }
 }
 
-const registry = new Map<string, LaikaTypegen>();
+const registry = new Map<string, ContentiaTypegen>();
 
 /** Reuse (or lazily create) a typegen instance keyed by `viteRoot`. */
-function getOrCreateTypegen(options: LaikaTypegenOptions): LaikaTypegen {
+function getOrCreateTypegen(options: ContentiaTypegenOptions): ContentiaTypegen {
   const existing = registry.get(options.viteRoot);
   if (existing) {
     return existing;
   }
-  const created = new LaikaTypegen(options);
+  const created = new ContentiaTypegen(options);
   registry.set(options.viteRoot, created);
   return created;
 }
@@ -359,27 +363,27 @@ function getOrCreateTypegen(options: LaikaTypegenOptions): LaikaTypegen {
  * Create a typegen handle. When `options.channel` is provided it subscribes and
  * regenerates incrementally; it also works one-shot with no channel.
  */
-export function createTypegen(options: LaikaTypegenOptions): LaikaTypegen {
-  const created = new LaikaTypegen(options);
+export function createTypegen(options: ContentiaTypegenOptions): ContentiaTypegen {
+  const created = new ContentiaTypegen(options);
   registry.set(options.viteRoot, created);
   return created;
 }
 
 /** One-shot / registry-backed full regenerate. */
-export async function regenerateAll(repos: LaikaRepositories, options: LaikaTypegenOptions): Promise<void> {
+export async function regenerateAll(repos: ContentiaRepositories, options: ContentiaTypegenOptions): Promise<void> {
   await getOrCreateTypegen(options).regenerateAll(repos);
 }
 
 /** Incremental single-item regenerate against the registry instance. */
 export async function regenerateItem(
-  repos: LaikaRepositories,
-  id: string | LaikaId,
-  options: LaikaTypegenOptions,
+  repos: ContentiaRepositories,
+  id: string | ContentiaId,
+  options: ContentiaTypegenOptions,
 ): Promise<void> {
   await getOrCreateTypegen(options).regenerateItem(id, repos);
 }
 
 /** Remove a single item from the registry instance. */
-export async function removeItem(id: string | LaikaId, options: LaikaTypegenOptions): Promise<void> {
+export async function removeItem(id: string | ContentiaId, options: ContentiaTypegenOptions): Promise<void> {
   await getOrCreateTypegen(options).remove(id);
 }

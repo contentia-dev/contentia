@@ -30,7 +30,7 @@ describe('cms registry', () => {
 });
 
 describe('decapAdapter.generateModule', () => {
-  it('generates the default selection against the bare, non-laika app', () => {
+  it('generates the default selection against the bare, non-contentia app', () => {
     const source = decapAdapter.generateModule(decapAdapter.defaultSelection);
     expect(source).toContain(`import { CMS, init } from '@laikacms/decap-cms/laika-app/bare';`);
     expect(source).toContain(`import en from '@laikacms/decap-cms/locales/en';`);
@@ -43,7 +43,7 @@ describe('decapAdapter.generateModule', () => {
     expect(source).toContain(`CMS.registerWidget({ ...richtextWidget, name: 'markdown' });`);
     expect(source).toContain(`CMS.registerRichtextFormat(markdownFormat);`);
     expect(source).toContain(`export { CMS, init };`);
-    // never the laika-styled app (…/laika-app, no /bare) or the batteries-included
+    // never the contentia-styled app (…/laika-app, no /bare) or the batteries-included
     // classic root bundle (…/decap-cms, no subpath) — only the bare entry is allowed
     expect(source).not.toContain(`/laika-app';`);
     expect(source).not.toContain(`decap-cms';`);

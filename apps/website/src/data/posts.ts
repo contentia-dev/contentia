@@ -1,7 +1,7 @@
 /**
  * Blog posts, newest first.
  *
- * The posts are Laika documents under `content/posts/` (see content.config.ts).
+ * The posts are Contentia documents under `content/posts/` (see content.config.ts).
  * The listing, the post pages and the RSS feed all read them through here, so
  * they agree on the order.
  */

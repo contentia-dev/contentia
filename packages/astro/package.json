@@ -1,17 +1,17 @@
 {
-  "name": "@laikacms/astro",
+  "name": "@contentia/astro",
   "version": "6.0.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "Astro integration for Laika CMS: Content Layer loaders for astro:content, live collections for runtime reads, and a dev-server JSON:API backed by a repository of your choice.",
+  "description": "Astro integration for Contentia: Content Layer loaders for astro:content, live collections for runtime reads, and a dev-server JSON:API backed by a repository of your choice.",
   "keywords": [
     "astro",
     "astro-integration",
     "astro-loader",
     "content-layer",
     "headless-cms",
-    "laikacms",
+    "contentia",
     "content-management"
   ],
   "author": {
@@ -19,13 +19,13 @@
     "email": "sem@laikacms.com",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
     "email": "sem@laikacms.com",
-    "url": "https://github.com/laikacms/laikacms/issues"
+    "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -81,9 +81,9 @@
     "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"
   },
   "dependencies": {
-    "@laikacms/vite-plugin": "workspace:*",
+    "@contentia/vite-plugin": "workspace:*",
     "@types/json-schema": "catalog:types",
-    "laikacms": "workspace:*"
+    "contentia": "workspace:*"
   },
   "peerDependencies": {
     "astro": ">=7"

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { runTask } from 'laikacms/compat';
-import { LaikaTask } from 'laikacms/core';
-import { NotImplementedError } from 'laikacms/core/errors';
-import type { StorageObject } from 'laikacms/storage';
-import { InMemoryStorageRepository } from 'laikacms/storage/testing';
+import { runTask } from 'contentia/compat';
+import { ContentiaTask } from 'contentia/core';
+import { NotImplementedError } from 'contentia/core/errors';
+import type { StorageObject } from 'contentia/storage';
+import { InMemoryStorageRepository } from 'contentia/storage/testing';
 
 import { createObjectsSyncSource, objectsLoader } from './objects-loader.js';
 import { createFakeLoaderContext } from './testing/loader-context.js';
@@ -83,8 +83,8 @@ describe('createObjectsSyncSource — getRecord', () => {
 
   it('rethrows errors that are not NotFoundError', async () => {
     class BrokenStorage extends InMemoryStorageRepository {
-      override getObject(_key: string): LaikaTask.LaikaTask<StorageObject> {
-        return LaikaTask.fail(new Error('unexpected internal error'));
+      override getObject(_key: string): ContentiaTask.ContentiaTask<StorageObject> {
+        return ContentiaTask.fail(new Error('unexpected internal error'));
       }
     }
     const source = createObjectsSyncSource(new BrokenStorage(), 'data', {});
@@ -125,7 +125,7 @@ describe('createObjectsSyncSource — ownsKey', () => {
 describe('objectsLoader — smoke', () => {
   it('builds a loader object without crashing when called with no options', () => {
     const loader = objectsLoader();
-    expect(loader).toHaveProperty('name', 'laikacms:objects');
+    expect(loader).toHaveProperty('name', 'contentia:objects');
     expect(typeof loader.load).toBe('function');
   });
 

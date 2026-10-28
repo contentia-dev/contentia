@@ -1,18 +1,18 @@
-# Laika
+# Contentia
 
 <p align="center">
   <strong>A modular, runtime-agnostic content API</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/laikacms/laikacms/blob/develop/LICENSE"><img src="https://img.shields.io/github/license/laikacms/laikacms" alt="License"></a>
-  <a href="https://github.com/laikacms/laikacms/pulse"><img src="https://img.shields.io/github/commit-activity/m/laikacms/laikacms/develop" alt="Commit Activity"></a>
-  <a href="https://github.com/laikacms/laikacms/commits/develop"><img src="https://img.shields.io/github/last-commit/laikacms/laikacms/develop" alt="Last Commit"></a>
+  <a href="https://github.com/contentia-dev/contentia/blob/develop/LICENSE"><img src="https://img.shields.io/github/license/contentia-dev/contentia" alt="License"></a>
+  <a href="https://github.com/contentia-dev/contentia/pulse"><img src="https://img.shields.io/github/commit-activity/m/contentia-dev/contentia/develop" alt="Commit Activity"></a>
+  <a href="https://github.com/contentia-dev/contentia/commits/develop"><img src="https://img.shields.io/github/last-commit/contentia-dev/contentia/develop" alt="Last Commit"></a>
 </p>
 <p align="center">
   <img src="https://img.shields.io/badge/node-24.x-brightgreen" alt="Node.js">
   <img src="https://img.shields.io/badge/pnpm-10.4.1-orange" alt="pnpm">
-  <a href="https://github.com/laikacms/laikacms/network/dependencies"><img src="https://img.shields.io/librariesio/github/laikacms/laikacms" alt="Dependencies"></a>
+  <a href="https://github.com/contentia-dev/contentia/network/dependencies"><img src="https://img.shields.io/librariesio/github/contentia-dev/contentia" alt="Dependencies"></a>
 </p>
 
 ---
@@ -23,18 +23,18 @@ UI, and swap storage backends without rewriting code.
 ## Quick Start
 
 ```bash
-pnpm add laikacms
+pnpm add contentia
 ```
 
 ```typescript
-import { allowAll } from 'laikacms/json-api';
-import { buildJsonApi } from 'laikacms/storage-api';
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
+import { allowAll } from 'contentia/json-api';
+import { buildJsonApi } from 'contentia/storage-api';
+import { FileSystemStorageRepository } from 'contentia/storage-fs';
+import { rawSerializer } from 'contentia/storage-serializers-raw';
 
 const repo = new FileSystemStorageRepository('./content', { md: rawSerializer }, 'md');
 // `allowAll` = "this surface is intentionally open". Swap it for a real policy
-// (or use `laikaApi`) before this is reachable from an untrusted network.
+// (or use `contentiaApi`) before this is reachable from an untrusted network.
 const api = buildJsonApi({ repo, authorize: allowAll });
 
 export default { fetch: api.fetch };
@@ -42,17 +42,17 @@ export default { fetch: api.fetch };
 
 > **⚠️ You must state a policy** — `buildJsonApi` requires an `authorize` callback; there is no
 > implicit default. It is invoked per action with the action's args + the `Request`, and returns
-> `true`/`false`/a `LaikaError`. `allowAll` above is the explicit opt-out for a surface you know is
-> unreachable by untrusted callers. `authorize` decides _what_ a caller may do — it does not
-> authenticate them; use `laikaApi` for built-in Bearer auth. See
+> `true`/`false`/a `ContentiaError`. `allowAll` above is the explicit opt-out for a surface you know
+> is unreachable by untrusted callers. `authorize` decides _what_ a caller may do — it does not
+> authenticate them; use `contentiaApi` for built-in Bearer auth. See
 > [Getting Started](./docs/guides/getting-started.md) for both.
 
 ## Cloudflare Workers
 
 ```typescript
-import { buildJsonApi } from 'laikacms/storage-api';
-import { R2StorageRepository } from 'laikacms/storage-r2';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
+import { buildJsonApi } from 'contentia/storage-api';
+import { R2StorageRepository } from 'contentia/storage-r2';
+import { rawSerializer } from 'contentia/storage-serializers-raw';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -64,15 +64,15 @@ export default {
 
 ## Packages
 
-This repository carries the two core packages. The storage/asset adapters (`@laikacms/aws`,
-`@laikacms/github`, …), `laikacli`, `@laikacms/git-gateway`, the `portable-text-*` mappers, and the
-example apps were moved out into their own repositories in June 2026 — see
+This repository carries the two core packages. The storage/asset adapters (`@contentia/aws`,
+`@contentia/github`, …), `@contentia/cli`, `@contentia/git-gateway`, the `portable-text-*` mappers,
+and the example apps were moved out into their own repositories in June 2026 — see
 [Imports](./docs/reference/imports.md) for how to install each one.
 
-| Package            | Description                                                                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `laikacms`         | Core domain, APIs, default implementations, serializers, shared utilities (subpath exports: `laikacms/storage-api`, `laikacms/storage-fs`, `laikacms/storage-r2`, `laikacms/core`, …) |
-| `@laikacms/server` | Decap CMS integrations: backend, OAuth2, widgets, server adapters.                                                                                                                    |
+| Package             | Description                                                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contentia`         | Core domain, APIs, default implementations, serializers, shared utilities (subpath exports: `contentia/storage-api`, `contentia/storage-fs`, `contentia/storage-r2`, `contentia/core`, …) |
+| `@contentia/server` | Decap CMS integrations: backend, OAuth2, widgets, server adapters.                                                                                                                        |
 
 See [docs/reference/imports.md](./docs/reference/imports.md) for every import path and its install
 command, including the packages that now live in separate repositories.
@@ -94,10 +94,10 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Releasing
 
-The two core packages (`laikacms`, `@laikacms/server`) are released together at the same version
+The two core packages (`contentia`, `@contentia/server`) are released together at the same version
 (changesets `fixed` group). Internal `workspace:*` references are pinned to the exact version on
-publish. Packages that were moved out of this repo (the adapters, `laikacli`,
-`@laikacms/git-gateway`, …) are now released from their own repositories.
+publish. Packages that were moved out of this repo (the adapters, `@contentia/cli`,
+`@contentia/git-gateway`, …) are now released from their own repositories.
 
 ```
 pnpm changeset
@@ -107,8 +107,8 @@ pnpm changeset publish
 
 ## History
 
-Laika predates LLMs. I started it in 2016 with the schema-to-form generator I used for client CMS
-systems. Once I could model a client's content schema with a higher-order schema, I had a
+Contentia predates LLMs. I started it in 2016 with the schema-to-form generator I used for client
+CMS systems. Once I could model a client's content schema with a higher-order schema, I had a
 content-model editor—a Turing-complete schema-to-form generator, if you will. That started the
 rabbit hole toward a perfectly loosely coupled CMS.
 
@@ -121,20 +121,20 @@ worth using.
 
 Without a team or a big budget, I could not have turned these ideas into a useful library. Claude
 made that possible. It allowed me to build a large project from one mental model instead of
-splitting it across a team, which I believe has led to an amazing result. Some parts of Laika may
-look strange at first. They have been designed, created, discarded, and rebuilt repeatedly until the
-core became truly headless, backend-agnostic, and modular.
+splitting it across a team, which I believe has led to an amazing result. Some parts of Contentia
+may look strange at first. They have been designed, created, discarded, and rebuilt repeatedly until
+the core became truly headless, backend-agnostic, and modular.
 
 Claude made it possible to revive the project and fix the assumptions that stopped the earlier
 version from shipping.
 
 This matters more now than it did then, and it is becoming more relevant. Writing code is cheaper,
-and LLMs need homogeneous access to information from different sources. Laika is more than a CMS
+and LLMs need homogeneous access to information from different sources. Contentia is more than a CMS
 core: it is a protocol for making content from those sources addressable through one surface.
 
-If you do not trust AI-assisted code, don't use Laika for now. I am choosing highly creative and
+If you do not trust AI-assisted code, don't use Contentia for now. I am choosing highly creative and
 fast growth over stability at this stage. Stability will come from production use, open-source
-contributions, sponsorship, and the commercial success of projects using Laika.
+contributions, sponsorship, and the commercial success of projects using Contentia.
 
 Read the [roadmap](./ROADMAP.md), [security policy](./SECURITY.md),
 [changelog](./docs/CHANGELOG.md), and [contribution guide](./CONTRIBUTING.md) before adopting it.

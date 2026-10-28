@@ -1,10 +1,10 @@
 /**
- * English translations for the Laika CMS OAuth2 login pages
+ * English translations for the Contentia OAuth2 login pages
  */
 
 export const en = {
   auth: {
-    pageTitle: 'Sign In - Laika CMS',
+    pageTitle: 'Sign In - Contentia',
     emailLabel: 'Email',
     emailPlaceholder: 'Email',
     passwordLabel: 'Password',
@@ -22,13 +22,13 @@ export const en = {
     authenticationFailed: 'Authentication failed',
   },
   totp: {
-    pageTitle: 'Two-Factor Authentication - Laika CMS',
+    pageTitle: 'Two-Factor Authentication - Contentia',
     title: 'Two-Factor Authentication',
     description: 'Enter the 6-digit code from your authenticator app',
     inputLabel: 'One-time code',
     inputPlaceholder: '000000',
     verifyButton: 'Verify',
-    setupPageTitle: 'Set Up Two-Factor Authentication - Laika CMS',
+    setupPageTitle: 'Set Up Two-Factor Authentication - Contentia',
     setupTitle: 'Set Up Two-Factor Authentication',
     setupStep1: 'Download an authenticator app like Google Authenticator, Authy, or 1Password',
     setupStep2: 'Scan the QR code below or enter the key manually',
@@ -40,7 +40,7 @@ export const en = {
     qrCodeAlt: 'QR Code for {{issuer}}',
   },
   passkey: {
-    pageTitle: 'Set Up Passkey - Laika CMS',
+    pageTitle: 'Set Up Passkey - Contentia',
     title: 'Set Up a Passkey',
     description: 'Passkeys are a more secure and convenient way to sign in.',
     nameLabel: 'Passkey Name (optional)',
@@ -56,16 +56,16 @@ export const en = {
     registrationFailed: 'Registration failed',
   },
   passwordReset: {
-    forgotPageTitle: 'Forgot Password - Laika CMS',
+    forgotPageTitle: 'Forgot Password - Contentia',
     forgotTitle: 'Forgot Password',
     forgotDescription: "Enter your email address and we'll send you a link to reset your password.",
     sendResetLink: 'Send Reset Link',
     backToLogin: 'Back to login',
-    checkEmailPageTitle: 'Check Your Email - Laika CMS',
+    checkEmailPageTitle: 'Check Your Email - Contentia',
     checkEmailTitle: 'Check Your Email',
     checkEmailDescription:
       "If an account exists with that email address, we've sent you a link to reset your password. Please check your inbox and spam folder.",
-    resetPageTitle: 'Reset Password - Laika CMS',
+    resetPageTitle: 'Reset Password - Contentia',
     resetTitle: 'Reset Password',
     resetDescription: 'Enter your new password below.',
     newPasswordLabel: 'New Password',
@@ -74,7 +74,7 @@ export const en = {
     confirmPasswordPlaceholder: 'Confirm new password',
     passwordHint: 'Must be at least 8 characters',
     resetButton: 'Reset Password',
-    successPageTitle: 'Password Reset Successful - Laika CMS',
+    successPageTitle: 'Password Reset Successful - Contentia',
     successTitle: 'Password Reset Successful',
     successDescription: 'Your password has been reset successfully. You can now sign in with your new password.',
     signInLink: 'Sign in',
@@ -103,10 +103,10 @@ export const en = {
     goBackButton: 'Go Back',
   },
   logout: {
-    pageTitle: 'Logged Out - Laika CMS',
+    pageTitle: 'Logged Out - Contentia',
     title: "You've Been Logged Out",
     description: 'You have been successfully logged out of your current session.',
-    allPageTitle: 'Logged Out Everywhere - Laika CMS',
+    allPageTitle: 'Logged Out Everywhere - Contentia',
     allTitle: 'Logged Out Everywhere',
     allDescription: 'You have been successfully logged out of all your sessions on all devices.',
     backToLogin: 'Back to login',

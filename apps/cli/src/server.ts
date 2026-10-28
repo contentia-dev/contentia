@@ -8,9 +8,9 @@ import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest';
 import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse';
 import { createServer } from 'node:http';
 
-import { allowAll } from 'laikacms/json-api';
-import type { StorageRepository } from 'laikacms/storage';
-import { buildJsonApi } from 'laikacms/storage-api';
+import { allowAll } from 'contentia/json-api';
+import type { StorageRepository } from 'contentia/storage';
+import { buildJsonApi } from 'contentia/storage-api';
 
 import { bearerTokenMatches } from './auth.js';
 
@@ -51,7 +51,7 @@ const checkAuth = (
 
 /**
  * Build the Layer for the catch-all route that forwards every request into
- * laikacms's JSON:API handler. The handler is `(Request) => Promise<Response>`,
+ * contentia's JSON:API handler. The handler is `(Request) => Promise<Response>`,
  * so we convert at the boundary with `HttpServerRequest.toWeb` /
  * `HttpServerResponse.fromWeb`.
  */

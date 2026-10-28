@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
  * lives in its own subdirectory so concurrent migrations against different
  * versions don't collide.
  */
-const CACHE_ROOT = path.join(os.homedir(), '.laika-cms', 'backends');
+const CACHE_ROOT = path.join(os.homedir(), '.contentia', 'backends');
 
 const flattenPackageName = (pkg: string): string => pkg.replace(/^@/, '').replace(/\//g, '__');
 
@@ -55,7 +55,7 @@ const enrichResolveError = (pkg: string, err: unknown): Error => {
   const code = (err as { code?: string }).code;
   if (code === 'ERR_UNSUPPORTED_DIR_IMPORT') {
     return new Error(
-      `laikacli: failed to import ${pkg}: ${err.message}\n`
+      `contentia: failed to import ${pkg}: ${err.message}\n`
         + `(this usually means the package's published dist contains a `
         + `bare directory import; rebuild it with moduleResolution "nodenext")`,
     );
@@ -109,11 +109,11 @@ const promptAndInstall = async (
 ): Promise<void> => {
   const dir = cacheDirFor(pkg, version);
   const accepted = await prompter(
-    `laikacli: backend "${pkg}@${version}" is not installed. Install it now into ${dir}? [y/N] `,
+    `contentia: backend "${pkg}@${version}" is not installed. Install it now into ${dir}? [y/N] `,
   );
   if (!accepted) {
     throw new Error(
-      `laikacli: backend "${pkg}@${version}" is required but not installed. `
+      `contentia: backend "${pkg}@${version}" is required but not installed. `
         + `Re-run and accept the install prompt, or install it manually with: `
         + `npm install ${pkg}@${version}`,
     );
@@ -127,7 +127,7 @@ const promptAndInstall = async (
     await fs.writeFile(
       pkgJson,
       JSON.stringify(
-        { name: 'laika-cms-backend-cache', version: '0.0.0', private: true },
+        { name: 'contentia-backend-cache', version: '0.0.0', private: true },
         null,
         2,
       ) + '\n',
@@ -135,14 +135,14 @@ const promptAndInstall = async (
     );
   }
 
-  process.stderr.write(`laikacli: installing ${pkg}@${version} into ${dir}...\n`);
+  process.stderr.write(`contentia: installing ${pkg}@${version} into ${dir}...\n`);
   const result = spawnSync('npm', ['install', `${pkg}@${version}`, '--no-save', '--silent'], {
     cwd: dir,
     stdio: 'inherit',
   });
   if (result.status !== 0) {
     throw new Error(
-      `laikacli: failed to install ${pkg}@${version} (npm exit ${result.status}).`,
+      `contentia: failed to install ${pkg}@${version} (npm exit ${result.status}).`,
     );
   }
 };
@@ -178,7 +178,7 @@ export interface ResolveOptions {
  *   2. the dedicated per-pinned-version cache directory,
  *   3. a fresh `npm install` into the cache (after y/N confirmation).
  *
- * Built-in implementations (`packageName === 'laikacms'`) skip the install path
+ * Built-in implementations (`packageName === 'contentia'`) skip the install path
  * entirely — they always resolve through (1) because they ship with the same
  * package that hosts this CLI.
  */
@@ -196,7 +196,7 @@ export const resolveBackendPackage = async (
 
   if (options.noInstall) {
     throw new Error(
-      `laikacli: backend "${pkg}@${version}" is not installed and --no-install was passed.`,
+      `contentia: backend "${pkg}@${version}" is not installed and --no-install was passed.`,
     );
   }
 
@@ -206,6 +206,6 @@ export const resolveBackendPackage = async (
   if (installed) return installed;
 
   throw new Error(
-    `laikacli: ${pkg}@${version} installed but ${subpath} could not be imported.`,
+    `contentia: ${pkg}@${version} installed but ${subpath} could not be imported.`,
   );
 };

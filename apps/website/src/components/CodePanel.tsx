@@ -39,8 +39,8 @@ export function CodePanel({ file, label, repositories }: CodePanelProps) {
     setPulse(p => p + 1);
   }, [active]);
 
-  const code = `import { buildJsonApi } from "laikacms/storage-api";
-import { allowAll } from "laikacms/json-api";
+  const code = `import { buildJsonApi } from "contentia/storage-api";
+import { allowAll } from "contentia/json-api";
 import { ${b.cls} } from "${b.path}";
 
 const repo = ${b.ctor};

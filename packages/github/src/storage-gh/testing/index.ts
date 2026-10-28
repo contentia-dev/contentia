@@ -1,5 +1,5 @@
 import type { Octokit } from '@octokit/rest';
-import type { StorageContractCase } from 'laikacms/storage/testing';
+import type { StorageContractCase } from 'contentia/storage/testing';
 
 import { GithubStorageRepository } from '../github-storage-repository.js';
 

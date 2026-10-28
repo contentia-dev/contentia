@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 
-import { LaikaTask } from 'laikacms/core';
+import { ContentiaTask } from 'contentia/core';
 
 import type { ConnectionManager } from './connections.js';
 import type { Entry } from './explorer/listing.js';
 
-export const SCHEME = 'laika';
+export const SCHEME = 'contentia';
 
 type Source = 'storage' | 'documents';
 
@@ -27,7 +27,7 @@ export const contentUri = (connection: string, source: Source, entry: Entry): vs
   });
 
 /** Renders storage objects and documents as pretty-printed JSON. */
-export class LaikaContentProvider implements vscode.TextDocumentContentProvider {
+export class ContentiaContentProvider implements vscode.TextDocumentContentProvider {
   private readonly emitter = new vscode.EventEmitter<vscode.Uri>();
   readonly onDidChange = this.emitter.event;
 
@@ -38,16 +38,16 @@ export class LaikaContentProvider implements vscode.TextDocumentContentProvider 
     const name = params.get('connection') ?? '';
     const key = params.get('key') ?? '';
     const connection = this.connections.get(name);
-    if (!connection) throw new Error(`Unknown Laika connection "${name}"`);
+    if (!connection) throw new Error(`Unknown Contentia connection "${name}"`);
 
     let value: unknown;
     if (params.get('source') === 'documents') {
       const repo = await connection.documents();
       value = params.get('published') === 'true'
-        ? await LaikaTask.runPromise(repo.getDocument(key))
-        : await LaikaTask.runPromise(repo.getUnpublished(key));
+        ? await ContentiaTask.runPromise(repo.getDocument(key))
+        : await ContentiaTask.runPromise(repo.getUnpublished(key));
     } else {
-      value = await LaikaTask.runPromise((await connection.storage()).getObject(key));
+      value = await ContentiaTask.runPromise((await connection.storage()).getObject(key));
     }
     return `${JSON.stringify(value, null, 2)}\n`;
   }

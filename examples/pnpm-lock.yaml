@@ -66,11 +66,11 @@ importers:
 
   .:
     dependencies:
-      laikacms:
+      contentia:
         specifier: workspace:*
-        version: link:../packages/laikacms
+        version: link:../packages/contentia
 
-  ../packages/laikacms:
+  ../packages/contentia:
     dependencies:
       '@hono/node-server':
         specifier: catalog:server

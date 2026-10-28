@@ -5,26 +5,26 @@ note: >-
   repository.
 items:
   - name: MongoDB
-    sub: '@laikacms/mongodb'
+    sub: '@contentia/mongodb'
     icon: { si: mongodb }
   - name: CouchDB
-    sub: '@laikacms/couchdb'
+    sub: '@contentia/couchdb'
     icon: { si: apachecouchdb }
   - name: Firestore
-    sub: '@laikacms/firestore'
+    sub: '@contentia/firestore'
     icon: { si: firebase }
   - name: Convex
-    sub: '@laikacms/convex'
+    sub: '@contentia/convex'
     icon: { si: convex }
   - name: SurrealDB
-    sub: '@laikacms/surrealdb'
+    sub: '@contentia/surrealdb'
     icon: { si: surrealdb }
   - name: ArangoDB
-    sub: '@laikacms/arangodb'
+    sub: '@contentia/arangodb'
     icon: { si: arangodb }
   - name: Gel
-    sub: '@laikacms/gel'
+    sub: '@contentia/gel'
     icon: { svg: graph }
   - name: ClickHouse
-    sub: '@laikacms/clickhouse'
+    sub: '@contentia/clickhouse'
     icon: { si: clickhouse }

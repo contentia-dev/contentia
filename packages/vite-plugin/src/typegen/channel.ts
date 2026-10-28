@@ -1,4 +1,4 @@
-import type { LaikaNamespace } from '../protocol.js';
+import type { ContentiaNamespace } from '../protocol.js';
 
 /**
  * A single content-change notification. `kind` is `upsert` when an item was
@@ -6,7 +6,7 @@ import type { LaikaNamespace } from '../protocol.js';
  * (drop its types).
  */
 export interface ContentChangeEvent {
-  readonly namespace: LaikaNamespace;
+  readonly namespace: ContentiaNamespace;
   readonly key: string;
   readonly kind: 'upsert' | 'delete';
 }

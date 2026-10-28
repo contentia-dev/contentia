@@ -1,6 +1,6 @@
-// PKCE OAuth 2.0 implementation for Laika CMS
+// PKCE OAuth 2.0 implementation for Contentia
 // Security hardened for post-quantum computing resistance
-import { Header, TemplateLiteral as TL, Url } from 'laikacms/core';
+import { Header, TemplateLiteral as TL, Url } from 'contentia/core';
 import {
   addTimingJitter,
   constantTimeEqual,
@@ -8,7 +8,7 @@ import {
   PASSWORD_CONSTANTS,
   sha256,
   verifyPassword,
-} from 'laikacms/crypto';
+} from 'contentia/crypto';
 import { type PasswordResetConfig, requestPasswordReset, resetPassword } from './email/email.js';
 import { type OAuthMessages } from './i18n/index.js';
 import type { GateInput, UnsafeReason } from './safety-gate.js';
@@ -75,7 +75,7 @@ import { buildCspWithLogo } from './templates/html.js';
  * BREAKING (v4): was `'Decap CMS'`. Set `totp.issuer: 'Decap CMS'` to keep
  * enrollments created before the rename matching.
  */
-export const DEFAULT_TOTP_ISSUER = 'Laika CMS';
+export const DEFAULT_TOTP_ISSUER = 'Contentia';
 
 // Security constants for post-quantum resistance
 const SECURITY_CONSTANTS = {
@@ -112,7 +112,7 @@ export interface AuthorizationCode {
  *
  * @example
  * ```typescript
- * declare module '@laikacms/server/oauth2' {
+ * declare module '@contentia/server/oauth2' {
  *   interface User {
  *     role: 'admin' | 'editor';
  *     organizationId: string;
@@ -337,10 +337,10 @@ export interface OAuthConfig {
   /**
    * Localized messages for user-facing strings.
    * If not provided, defaults to English messages.
-   * Import translations from '@laikacms/server/oauth2/i18n' or provide custom messages.
+   * Import translations from '@contentia/server/oauth2/i18n' or provide custom messages.
    * @example
    * ```typescript
-   * import { nl } from '@laikacms/server/oauth2/i18n';
+   * import { nl } from '@contentia/server/oauth2/i18n';
    * const config: OAuthConfig = {
    *   translations: nl,
    *   // ... other options
@@ -1268,7 +1268,7 @@ async function handleRefreshTokenGrant(
   return buildTokenResponse(newSession, accessTokenExpiration, refreshTokenExpiration);
 }
 
-export interface LaikaOauth2 {
+export interface ContentiaOauth2 {
   fetch(request: Request): Promise<Response>;
   /**
    * Resolve the safety-gate checks that need an await — the ones that ask
@@ -1282,9 +1282,9 @@ export interface LaikaOauth2 {
   ready(): Promise<void>;
 }
 
-export function laikaOauth2(
+export function contentiaOauth2(
   options: OAuthConfig,
-): LaikaOauth2 {
+): ContentiaOauth2 {
   // Refuse to start on a runtime that cannot uphold what this package promises.
   // Synchronous reasons are decided here, before a single endpoint exists;
   // reasons that need an await (asking crypto.subtle whether it truly
@@ -1470,7 +1470,7 @@ async function handleTotpSetupPage(
   }
 
   // Generate TOTP secret and QR code using setupOAuthTOTP.
-  // BREAKING (v4): this default changed from 'Decap CMS' to 'Laika CMS'. The
+  // BREAKING (v4): this default changed from 'Decap CMS' to 'Contentia'. The
   // issuer is the label shown in the user's authenticator app and is baked into
   // every already-enrolled otpauth:// URI, so a deployment that relied on the
   // old default must now set `totp.issuer: 'Decap CMS'` explicitly to keep

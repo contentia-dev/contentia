@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
+import { FileSystemStorageRepository } from 'contentia/storage-fs';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -24,7 +24,7 @@ const readOptions = (raw: Record<string, unknown>): FsOptions => {
 
 export const fsDriver: StorageDriver = {
   name: 'fs',
-  packageName: 'laikacms',
+  packageName: 'contentia',
   version: '*',
   subpath: 'storage-fs',
   description: 'Local filesystem (a directory of markdown/yaml/json files)',

@@ -1,26 +1,26 @@
 # Decap CMS Integration
 
-[Decap CMS](https://decapcms.org/) is a Git-based admin UI for content. Laika ships a
-Decap-compatible backend (`@laikacms/server`) so you can pair that admin with any Laika storage
+[Decap CMS](https://decapcms.org/) is a Git-based admin UI for content. Contentia ships a
+Decap-compatible backend (`@contentia/server`) so you can pair that admin with any Contentia storage
 repository — filesystem, R2, S3, WebDAV, and more.
 
-Laika works with upstream Decap CMS and maintains a standalone
+Contentia works with upstream Decap CMS and maintains a standalone
 [`@laikacms/decap-cms` fork](https://github.com/laikacms/decap-cms). The fork follows the same
-separation of an agnostic core from opinionated outer packages and can be used without Laika. It is
-a general-purpose continuation of Decap CMS, not an admin UI coupled exclusively to this project.
+separation of an agnostic core from opinionated outer packages and can be used without Contentia. It
+is a general-purpose continuation of Decap CMS, not an admin UI coupled exclusively to this project.
 See [the fork overview](./fork) for its documentation and the boundary between the admin UI and the
-Laika backend.
+Contentia backend.
 
 Two integration shapes are supported, in increasing order of complexity:
 
-| Pattern                                                  | When to use                                            | Backend host                                                                           | Auth                             |
-| -------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------- |
-| **[Hosted gateway](./auth#hosted-gateway-multi-tenant)** | Multiple sites sharing one Decap admin + Laika backend | A separate Worker / server you operate (the `laika-gateway` app moved to its own repo) | GitHub OAuth (or other provider) |
-| **[Standalone Worker](./standalone-worker)**             | You want full control of storage, auth, and routing    | Your own Hono/Worker app                                                               | JWT (or your scheme)             |
+| Pattern                                                  | When to use                                                | Backend host                                                                               | Auth                             |
+| -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------- |
+| **[Hosted gateway](./auth#hosted-gateway-multi-tenant)** | Multiple sites sharing one Decap admin + Contentia backend | A separate Worker / server you operate (the `contentia-gateway` app moved to its own repo) | GitHub OAuth (or other provider) |
+| **[Standalone Worker](./standalone-worker)**             | You want full control of storage, auth, and routing        | Your own Hono/Worker app                                                                   | JWT (or your scheme)             |
 
 The primary documented integration path is the **Standalone Worker (BYO storage)** wiring: you
-construct a [`StorageRepository`](../../reference/api/laikacms/storage/classes/StorageRepository),
-wrap it in the Catalog document/asset repos, and expose them through `laikaApi(...)`. Everything
+construct a [`StorageRepository`](../../reference/api/contentia/storage/classes/StorageRepository),
+wrap it in the Catalog document/asset repos, and expose them through `contentiaApi(...)`. Everything
 else (admin shell, OAuth2, framework bridges) builds on top of that handler.
 
 ## In this section
@@ -32,8 +32,8 @@ else (admin shell, OAuth2, framework bridges) builds on top of that handler.
 - **[Local Mode Dev Editing](./local-mode)** — enable `localApi: true` in the Vite plugin and wire
   `resolveLaikaBackend` so Decap edits go to a local JSON:API during `vite dev` and the remote
   backend in production, with no manual switching.
-- **[Standalone Worker (BYO storage)](./standalone-worker)** — wire `laikaApi(...)` by hand over any
-  storage repository; seeding the server-side config; WebDAV storage.
+- **[Standalone Worker (BYO storage)](./standalone-worker)** — wire `contentiaApi(...)` by hand over
+  any storage repository; seeding the server-side config; WebDAV storage.
 - **[Serving the Decap admin shell](./admin-shell)** — compile and serve the admin browser bundle.
 - **[Authentication](./auth)** — machine-to-machine API keys, SSR guards, logging, the
   `decap-oauth2` server, and the multi-tenant hosted gateway.
@@ -41,6 +41,6 @@ else (admin shell, OAuth2, framework bridges) builds on top of that handler.
   editor component.
 - **[Framework setup notes](./frameworks)** — per-framework request bridges (Express, Next.js,
   SvelteKit, Astro, Nuxt, AdonisJS, FoalTS, and more).
-- **[AI assistant](../ai-assistant)** — mount `@laikacms/server/ai` for the editor's chat and
+- **[AI assistant](../ai-assistant)** — mount `@contentia/server/ai` for the editor's chat and
   session endpoints; [`DecapAiConfig`](../../reference/api/server/ai/interfaces/DecapAiConfig)
   options, session callbacks, and authorization.

@@ -1,5 +1,5 @@
 ---
-"laikacms": minor
+"contentia": minor
 ---
 
 `DocumentsJsonApiProxyRepository` gains `applyOperations()`, which batches multiple document

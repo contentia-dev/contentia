@@ -303,7 +303,7 @@ export const defaultAuthorizationPageTemplate: HtmlTemplate = html`<!DOCTYPE htm
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In - Laika CMS</title>
+  <title>Sign In - Contentia</title>
   <style>
     *,
     *:before,
@@ -487,7 +487,7 @@ const FORGOT_PASSWORD_SECTION_FRAGMENT = (url: string, text: string) => `
 
 // Default English messages for backward compatibility
 const defaultAuthMessages: AuthTranslation = {
-  pageTitle: 'Sign In - Laika CMS',
+  pageTitle: 'Sign In - Contentia',
   emailLabel: 'Email',
   emailPlaceholder: 'Email',
   passwordLabel: 'Password',

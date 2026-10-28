@@ -1,5 +1,5 @@
 backend:
-  name: laika
+  name: contentia
   api_url: /api/decap
 media_folder: uploads
 public_folder: /uploads

@@ -1,25 +1,25 @@
 # CLI
 
-`laikacli` scaffolds new projects and runs local development workflows: a dev storage server, typed
-codegen from your CMS config, and content migrations between backends.
+`@contentia/cli` scaffolds new projects and runs local development workflows: a dev storage server,
+typed codegen from your CMS config, and content migrations between backends.
 
 The package installs two commands that point at the same entry point:
 
-- **`laikacli`**: matches the package name, so `npx laikacli` and `pnpm dlx laikacli` work without
-  installing anything.
-- **`laika`**: the short name, available once the package is installed.
+- **`@contentia/cli`**: matches the package name, so `npx contentia` and `pnpm dlx contentia` work
+  without installing anything.
+- **`contentia`**: the short name, available once the package is installed.
 
 ## Install
 
 ```sh
-pnpm add -D laikacli   # or npm i -D / yarn add -D / bun add -d
+pnpm add -D @contentia/cli   # or npm i -D / yarn add -D / bun add -d
 ```
 
 Or run without installing:
 
 ```sh
-npx laikacli create
-pnpm dlx laikacli local serve
+npx contentia create
+pnpm dlx contentia local serve
 ```
 
 The CLI needs Node.js.
@@ -27,11 +27,11 @@ The CLI needs Node.js.
 ## At a glance
 
 ```sh
-laika create                       # wizard: starter, directory, title, CMS backends/widgets/locales
-laika local serve                  # serve a content folder over JSON:API on :3030
-laika local generate --watch       # config.yaml -> typed config.gen.ts, kept fresh on save
-laika local migrate -s ./a -d ./b  # copy all content from one storage backend to another
-laika local list-backends          # show the storage backends migrate can use
+contentia create                       # wizard: starter, directory, title, CMS backends/widgets/locales
+contentia local serve                  # serve a content folder over JSON:API on :3030
+contentia local generate --watch       # config.yaml -> typed config.gen.ts, kept fresh on save
+contentia local migrate -s ./a -d ./b  # copy all content from one storage backend to another
+contentia local list-backends          # show the storage backends migrate can use
 ```
 
 | Command               | What it does                                                         |
@@ -42,16 +42,16 @@ laika local list-backends          # show the storage backends migrate can use
 | `local migrate`       | Copy every folder and object from one storage backend to another     |
 | `local list-backends` | List every storage backend `migrate` can use and its package version |
 
-Every command accepts `--help` for its full flag reference, e.g. `laika local migrate --help`.
+Every command accepts `--help` for its full flag reference, e.g. `contentia local migrate --help`.
 
 ## `create`
 
-`laika create` is the supported way to start a Laika app. On a terminal it walks you through each
-choice:
+`contentia create` is the supported way to start a Contentia app. On a terminal it walks you through
+each choice:
 
 1. **Starter**: the template to copy (skipped while only one starter is available).
-2. **Directory**: where to create the app (default `./my-laika-app`). It must be empty or not exist
-   yet.
+2. **Directory**: where to create the app (default `./my-contentia-app`). It must be empty or not
+   exist yet.
 3. **Site title**: written into the starter (default `My Blog`).
 4. **Package manager**: `pnpm`, `npm`, `yarn` or `bun` (default `pnpm`).
 5. **CMS**: the admin UI the app ships with (skipped while Decap is the only option).
@@ -68,22 +68,22 @@ Every question can be answered with a flag. Questions you leave out are still as
 `--yes` or the terminal is not interactive (CI, piped input); then the default is used.
 
 ```sh
-laika create --directory ./my-blog --title "My Blog" --package-manager npm \
-  --backends laika,github --widgets string,datetime,richtext,image --locales nl,de
+contentia create --directory ./my-blog --title "My Blog" --package-manager npm \
+  --backends contentia,github --widgets string,datetime,richtext,image --locales nl,de
 
-laika create --yes            # accept every default, no prompts
-laika create --skip-install   # scaffold only; install dependencies yourself
+contentia create --yes            # accept every default, no prompts
+contentia create --skip-install   # scaffold only; install dependencies yourself
 ```
 
 | Flag                 | Description                                                                            |
 | -------------------- | -------------------------------------------------------------------------------------- |
-| `--directory` / `-d` | Target directory (default: `./my-laika-app`)                                           |
+| `--directory` / `-d` | Target directory (default: `./my-contentia-app`)                                       |
 | `--starter`          | Starter template (default: `starter-astro-blog`)                                       |
 | `--name`             | `name` field in the new `package.json` (default: the directory name)                   |
 | `--title`            | Site title (default: `My Blog`)                                                        |
 | `--package-manager`  | `pnpm`, `npm`, `yarn` or `bun` (default: `pnpm`)                                       |
 | `--cms`              | CMS to scaffold (default: `decap`)                                                     |
-| `--backends`         | Comma-separated CMS backends to register (default: `laika`)                            |
+| `--backends`         | Comma-separated CMS backends to register (default: `contentia`)                        |
 | `--widgets`          | Comma-separated widgets to register (default: `string,datetime,richtext`)              |
 | `--locales`          | Comma-separated extra admin UI locales (default: none; `en` is always included)        |
 | `--skip-install`     | Create the app without installing dependencies                                         |
@@ -91,10 +91,10 @@ laika create --skip-install   # scaffold only; install dependencies yourself
 
 ### Decap choices
 
-**Backends** decide where the admin UI reads and writes content: `laika` (the default, talks to a
-Laika API server), `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`, `azure`, `git-gateway`,
-`aws-cognito-github-proxy`, `proxy` (a local decap-server, for development) and `test-repo` (in
-memory, for demos).
+**Backends** decide where the admin UI reads and writes content: `contentia` (the default, talks to
+a Contentia API server), `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`, `azure`,
+`git-gateway`, `aws-cognito-github-proxy`, `proxy` (a local decap-server, for development) and
+`test-repo` (in memory, for demos).
 
 **Widgets** are the field types you can use in collections: `string`, `text`, `boolean`, `number`,
 `datetime`, `select`, `object`, `list`, `relation`, `code`, `file`, `image`, `map`, `colorstring`,
@@ -115,33 +115,33 @@ When pnpm skips dependency build scripts during install, `create` prints a warni
 ## `local serve`
 
 Serves content as a JSON:API storage API, the same API a production
-[API server](../guides/api-server.md) exposes. Point the Decap `laika` backend, a frontend, or any
-JSON:API client at it while you develop. By default it serves a folder of content files; `--backend`
-serves any storage backend `migrate` can use instead.
+[API server](../guides/api-server.md) exposes. Point the Decap `contentia` backend, a frontend, or
+any JSON:API client at it while you develop. By default it serves a folder of content files;
+`--backend` serves any storage backend `migrate` can use instead.
 
 ```sh
-laika local serve                                   # serve the current directory on 127.0.0.1:3030
-laika local serve --root ./content --port 4000
-laika local serve --auth-token "$LAIKA_DEV_TOKEN"   # require a bearer token
-laika local serve --backend webdav --backend-options '{"url":"https://dav.example.com"}'
+contentia local serve                                   # serve the current directory on 127.0.0.1:3030
+contentia local serve --root ./content --port 4000
+contentia local serve --auth-token "$CONTENTIA_DEV_TOKEN"   # require a bearer token
+contentia local serve --backend webdav --backend-options '{"url":"https://dav.example.com"}'
 ```
 
-| Flag                  | Alias | Description                                                                           |
-| --------------------- | ----- | ------------------------------------------------------------------------------------- |
-| `--root`              | `-r`  | Directory to serve when no `--backend` is given (default: the current directory)      |
-| `--default-extension` | —     | File extension given to newly created objects in `--root` (default: `md`)             |
-| `--backend`           | —     | Storage backend to serve instead of `--root`; see `laika local list-backends`         |
-| `--backend-options`   | —     | JSON options for `--backend`. Falls back to the `LAIKA_BACKEND_OPTIONS` env var       |
-| `--port`              | `-p`  | Port to listen on; `0` picks a free one (default: `3030`)                             |
-| `--host`              | `-H`  | Host to listen on (default: `127.0.0.1`)                                              |
-| `--auth-token`        | —     | Require `Authorization: Bearer <token>`. Falls back to the `LAIKA_AUTH_TOKEN` env var |
-| `--json`              | —     | Print machine-readable events on stdout instead of log lines (see below)              |
+| Flag                  | Alias | Description                                                                               |
+| --------------------- | ----- | ----------------------------------------------------------------------------------------- |
+| `--root`              | `-r`  | Directory to serve when no `--backend` is given (default: the current directory)          |
+| `--default-extension` | —     | File extension given to newly created objects in `--root` (default: `md`)                 |
+| `--backend`           | —     | Storage backend to serve instead of `--root`; see `contentia local list-backends`         |
+| `--backend-options`   | —     | JSON options for `--backend`. Falls back to the `CONTENTIA_BACKEND_OPTIONS` env var       |
+| `--port`              | `-p`  | Port to listen on; `0` picks a free one (default: `3030`)                                 |
+| `--host`              | `-H`  | Host to listen on (default: `127.0.0.1`)                                                  |
+| `--auth-token`        | —     | Require `Authorization: Bearer <token>`. Falls back to the `CONTENTIA_AUTH_TOKEN` env var |
+| `--json`              | —     | Print machine-readable events on stdout instead of log lines (see below)                  |
 
 Files ending in `.md`/`.markdown`, `.yaml`/`.yml` and `.json` are parsed into structured content.
 CORS is enabled for every origin, so a dev frontend on another port can call it directly.
 
-Backend options often hold credentials. Pass them through `LAIKA_BACKEND_OPTIONS` (and the token
-through `LAIKA_AUTH_TOKEN`) rather than as flags, so they don't show up in the process list.
+Backend options often hold credentials. Pass them through `CONTENTIA_BACKEND_OPTIONS` (and the token
+through `CONTENTIA_AUTH_TOKEN`) rather than as flags, so they don't show up in the process list.
 
 ### `--json` output
 
@@ -150,7 +150,7 @@ start the server with `--port 0` and wait for the `listening` event to learn the
 
 ```json
 {"event":"listening","url":"http://127.0.0.1:54321","backend":"fs"}
-{"event":"error","message":"laikacli: unknown storage backend \"nope\". Available: ..."}
+{"event":"error","message":"contentia: unknown storage backend \"nope\". Available: ..."}
 ```
 
 `--json` also never prompts to install a missing backend package; it fails with an `error` event
@@ -167,9 +167,9 @@ config as an `as const` value. Your code gets the parsed config at runtime and l
 every collection and field name at compile time, so a renamed field shows up as a type error.
 
 ```sh
-laika local generate                               # find the config, write config.gen.ts next to it
-laika local generate --watch                       # regenerate on every save
-laika local generate -i src/config.yml -o src/cms/config.gen.ts
+contentia local generate                               # find the config, write config.gen.ts next to it
+contentia local generate --watch                       # regenerate on every save
+contentia local generate -i src/config.yml -o src/cms/config.gen.ts
 ```
 
 Without `--input`, the CLI looks for `config.yml`, `config.yaml`, `src/config.yml` and
@@ -183,7 +183,7 @@ Without `--input`, the CLI looks for `config.yml`, `config.yaml`, `src/config.ym
 | `--cms`    | —     | Which CMS config format to read (default: `decap`)                            |
 
 Commit the generated file or regenerate it in your build; either works. A common setup runs
-`laika local generate --watch` next to your dev server.
+`contentia local generate --watch` next to your dev server.
 
 ## `local migrate`
 
@@ -199,13 +199,13 @@ There are three ways to describe the two sides.
 **Filesystem shortcut**, for copying between local folders:
 
 ```sh
-laika local migrate -s ./content -d ./backup
+contentia local migrate -s ./content -d ./backup
 ```
 
 **Named backends**, with options as a JSON object:
 
 ```sh
-laika local migrate \
+contentia local migrate \
   --source-backend fs --source-options '{"root":"./content"}' \
   --destination-backend s3 \
   --destination-options '{"bucket":"site-content","endpoint":"https://<account>.r2.cloudflarestorage.com"}'
@@ -228,7 +228,7 @@ destination:
     owner: acme
     repo: content
     branch: main
-    commitAuthor: { name: Laika Migration, email: bot@example.com }
+    commitAuthor: { name: Contentia Migration, email: bot@example.com }
 migrate:
   from: blog         # only copy this folder and everything below it
   overwrite: false
@@ -236,8 +236,8 @@ migrate:
 ```
 
 ```sh
-GITHUB_TOKEN=ghp_... laika local migrate --config migrate.yaml --dry-run
-laika local migrate --config migrate.yaml
+GITHUB_TOKEN=ghp_... contentia local migrate --config migrate.yaml --dry-run
+contentia local migrate --config migrate.yaml
 ```
 
 Settings in the file's `migrate` block take precedence over the matching command-line flags.
@@ -278,7 +278,7 @@ Settings in the file's `migrate` block take precedence over the matching command
 
 `fs`, `jsonapi-proxy`, `webdav` and `github-cdn` are built in. The other backends need an extra
 package. When it isn't installed in your project, `migrate` asks before installing the pinned
-version into `~/.laika-cms/backends`, so your project's dependencies stay untouched. Without a
+version into `~/.contentia/backends`, so your project's dependencies stay untouched. Without a
 terminal, or with `--no-install`, it fails with the install command to run yourself.
 
 ## `local list-backends`
@@ -286,7 +286,7 @@ terminal, or with `--no-install`, it fails with the install command to run yours
 Prints every storage backend `migrate` accepts, with its package and pinned version.
 
 ```sh
-laika local list-backends
+contentia local list-backends
 ```
 
 ## Storage backends
@@ -317,7 +317,7 @@ Notes:
   `installationId`, and the private key as `privateKey` (PEM string) or `privateKeyPath`.
 
   ```sh
-  laika local migrate -s ./content --destination-backend github --destination-options \
+  contentia local migrate -s ./content --destination-backend github --destination-options \
     '{"appId":"123","installationId":"456","privateKeyPath":"./app.pem","owner":"acme","repo":"content","branch":"main"}'
   ```
 
@@ -328,7 +328,12 @@ Notes:
 Everything the CLI does is also exported from the package, for use in your own scripts:
 
 ```ts
-import { bootstrapApplication, generateConfig, layerStorageServer, runMigrate } from 'laikacli';
+import {
+  bootstrapApplication,
+  generateConfig,
+  layerStorageServer,
+  runMigrate,
+} from '@contentia/cli';
 
 // Run a migration from a script, with your own progress handling
 const result = await runMigrate({

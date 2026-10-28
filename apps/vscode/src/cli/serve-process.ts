@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 
 import type { CliInvocation } from './resolve-cli.js';
 
-/** Mirrors `ServeEvent` in laikacli's `serve --json` output. */
+/** Mirrors `ServeEvent` in contentia's `serve --json` output. */
 type ServeEvent =
   | { readonly event: 'listening', readonly url: string, readonly backend: string }
   | { readonly event: 'error', readonly message: string };
@@ -39,7 +39,7 @@ const parseEvent = (line: string): ServeEvent | undefined => {
 };
 
 /**
- * Start `laika local serve --json --port 0` and resolve once it reports the
+ * Start `contentia local serve --json --port 0` and resolve once it reports the
  * URL it bound to. The auth token and backend options travel through the
  * environment rather than argv, so credentials never show up in the process
  * list.
@@ -63,8 +63,8 @@ export const startServe = (options: ServeOptions): Promise<RunningServer> => {
       shell: options.cli.shell,
       env: {
         ...process.env,
-        LAIKA_AUTH_TOKEN: authToken,
-        LAIKA_BACKEND_OPTIONS: JSON.stringify(options.backendOptions),
+        CONTENTIA_AUTH_TOKEN: authToken,
+        CONTENTIA_BACKEND_OPTIONS: JSON.stringify(options.backendOptions),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -96,7 +96,7 @@ export const startServe = (options: ServeOptions): Promise<RunningServer> => {
       reject(error);
     };
     const timer = setTimeout(
-      () => fail(new Error(`laikacli did not report a listening URL within ${options.timeoutMs ?? 30_000}ms`)),
+      () => fail(new Error(`contentia did not report a listening URL within ${options.timeoutMs ?? 30_000}ms`)),
       options.timeoutMs ?? 30_000,
     );
 
@@ -117,7 +117,7 @@ export const startServe = (options: ServeOptions): Promise<RunningServer> => {
 
     child.on('error', error => fail(new Error(`Could not start ${options.cli.command}: ${error.message}`)));
     child.on('exit', code => {
-      if (!settled) return fail(new Error(`laikacli exited with code ${code} before it started listening`));
+      if (!settled) return fail(new Error(`contentia exited with code ${code} before it started listening`));
       for (const listener of exitListeners) listener(code);
     });
   });

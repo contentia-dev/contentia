@@ -1,5 +1,5 @@
 packages:
-  - "packages/laikacms"
+  - "packages/contentia"
   - "packages/server"
   - "packages/github"
   - "packages/gitlab"
@@ -10,12 +10,12 @@ packages:
   - "apps/website"
   - "apps/cli"
   - "apps/vscode"
-  # Dev workspace opened by the extension's launch config; links the local laikacli build.
+  # Dev workspace opened by the extension's launch config; links the local contentia build.
   - "apps/vscode/fixtures/playground"
 
 catalogs:
 
-  # Vercel AI SDK, used by @laikacms/server/ai (optional peers there, so only
+  # Vercel AI SDK, used by @contentia/server/ai (optional peers there, so only
   # consumers that mount the AI endpoints install them).
   ai:
     "@ai-sdk/anthropic": "^4.0.16"

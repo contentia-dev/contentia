@@ -1,5 +1,5 @@
-import { EntryAlreadyExistsError, LaikaStream, LaikaTask, NotFoundError } from 'laikacms/core';
-import type { AtomSummary, Key, StorageObject, StorageRepository } from 'laikacms/storage';
+import { ContentiaStream, ContentiaTask, EntryAlreadyExistsError, NotFoundError } from 'contentia/core';
+import type { AtomSummary, Key, StorageObject, StorageRepository } from 'contentia/storage';
 
 /**
  * Why a folder/object was skipped during a migration run.
@@ -98,7 +98,7 @@ export const migrateStorage = async (
   const copyObject = async (key: Key) => {
     let object: StorageObject;
     try {
-      object = await LaikaTask.runPromise(source.getObject(key));
+      object = await ContentiaTask.runPromise(source.getObject(key));
     } catch (err) {
       recordError(key, err);
       return;
@@ -119,9 +119,9 @@ export const migrateStorage = async (
 
     try {
       if (overwrite) {
-        await LaikaTask.runPromise(destination.createOrUpdateObject(create));
+        await ContentiaTask.runPromise(destination.createOrUpdateObject(create));
       } else {
-        await LaikaTask.runPromise(destination.createObject(create));
+        await ContentiaTask.runPromise(destination.createObject(create));
       }
       result.objectsCopied += 1;
       emit({ type: 'object-copied', key });
@@ -146,7 +146,7 @@ export const migrateStorage = async (
       return;
     }
     try {
-      await LaikaTask.runPromise(destination.createFolder({ type: 'folder', key }));
+      await ContentiaTask.runPromise(destination.createFolder({ type: 'folder', key }));
       result.foldersCreated += 1;
       emit({ type: 'folder-created', key });
     } catch (err) {
@@ -163,7 +163,7 @@ export const migrateStorage = async (
     const all: AtomSummary[] = [];
     let page = 1;
     while (true) {
-      const { data, recoverableErrors } = await LaikaStream.runPromiseCollect(
+      const { data, recoverableErrors } = await ContentiaStream.runPromiseCollect(
         source.listAtomSummaries(folderKey, {
           depth: 0,
           pagination: { page, perPage: pageSize },

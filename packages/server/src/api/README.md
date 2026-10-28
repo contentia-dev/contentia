@@ -1,8 +1,8 @@
-# @laikacms/server/api
+# @contentia/server/api
 
-[![npm](https://img.shields.io/npm/v/@laikacms/server)](https://www.npmjs.com/package/@laikacms/server)
-[![npm](https://img.shields.io/npm/dm/@laikacms/server)](https://www.npmjs.com/package/@laikacms/server)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@laikacms/server)](https://bundlephobia.com/result?p=@laikacms/server)
+[![npm](https://img.shields.io/npm/v/@contentia/server)](https://www.npmjs.com/package/@contentia/server)
+[![npm](https://img.shields.io/npm/dm/@contentia/server)](https://www.npmjs.com/package/@contentia/server)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@contentia/server)](https://bundlephobia.com/result?p=@contentia/server)
 
 Decap-compatible HTTP API. A single `fetch(request)` router that composes the `storage`,
 `documents`, `assets`, and `locks` JSON:API sub-APIs behind one authentication + authorization
@@ -12,9 +12,9 @@ talk to.
 ## Usage
 
 ```typescript
-import { laikaApi } from '@laikacms/server/api';
+import { contentiaApi } from '@contentia/server/api';
 
-const api = laikaApi({
+const api = contentiaApi({
   documents: myDocumentsRepository,
   storage: myStorageRepository,
 
@@ -29,10 +29,10 @@ const api = laikaApi({
 export default { fetch: api.fetch.bind(api) };
 ```
 
-`laikaApi(options)` returns a `LaikaApi`:
+`contentiaApi(options)` returns a `ContentiaApi`:
 
 ```typescript
-export interface LaikaApi {
+export interface ContentiaApi {
   fetch(request: Request): Promise<Response>;
   authenticateRequest(request: Request): Promise<Response | User>;
 }
@@ -72,25 +72,25 @@ export interface AuthorizeContext {
 
 ## Optional options
 
-| Option                 | Type                                                    | Default | Description                                                                                                                                                                                                                    |
-| ---------------------- | ------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `assets`               | `AssetsRepository`                                      | —       | When provided, mounts the `/assets` sub-API. Omitted, `/assets` does not exist.                                                                                                                                                |
-| `locks`                | `LockManager`                                           | —       | Advisory lock backend for the `/locks` sub-API (Decap "being edited by …" banner). Use `InProcessLockManager` from `laikacms/locks/in-process`. When omitted and documents lacks lock support, `/locks` returns `204` (no-op). |
-| `basePath`             | `string`                                                | `''`    | Prefix under which every sub-API is mounted, e.g. `/api` puts documents at `/api/documents`.                                                                                                                                   |
-| `authenticateApiToken` | `(token: string) => Promise<User>`                      | —       | Authenticates an API key sent via `X-API-Key` or `Authorization: ApiKey <key>`. Required only if callers use API keys.                                                                                                         |
-| `cors`                 | `CorsOptions`                                           | —       | See [CORS](#cors) below. Omitted, no CORS headers are emitted and `OPTIONS` preflights 404.                                                                                                                                    |
-| `logger`               | `Pick<Console, 'error' \| 'warn' \| 'info' \| 'debug'>` | —       | Structured logger for internal diagnostics — `console` or any subset-compatible logger.                                                                                                                                        |
+| Option                 | Type                                                    | Default | Description                                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `assets`               | `AssetsRepository`                                      | —       | When provided, mounts the `/assets` sub-API. Omitted, `/assets` does not exist.                                                                                                                                                 |
+| `locks`                | `LockManager`                                           | —       | Advisory lock backend for the `/locks` sub-API (Decap "being edited by …" banner). Use `InProcessLockManager` from `contentia/locks/in-process`. When omitted and documents lacks lock support, `/locks` returns `204` (no-op). |
+| `basePath`             | `string`                                                | `''`    | Prefix under which every sub-API is mounted, e.g. `/api` puts documents at `/api/documents`.                                                                                                                                    |
+| `authenticateApiToken` | `(token: string) => Promise<User>`                      | —       | Authenticates an API key sent via `X-API-Key` or `Authorization: ApiKey <key>`. Required only if callers use API keys.                                                                                                          |
+| `cors`                 | `CorsOptions`                                           | —       | See [CORS](#cors) below. Omitted, no CORS headers are emitted and `OPTIONS` preflights 404.                                                                                                                                     |
+| `logger`               | `Pick<Console, 'error' \| 'warn' \| 'info' \| 'debug'>` | —       | Structured logger for internal diagnostics — `console` or any subset-compatible logger.                                                                                                                                         |
 
 ## Scope-based authorization
 
-For the common pattern of granting access based on fine-grained scopes, `@laikacms/server/api` ships
-`createScopePolicy()` — a drop-in `authorize` factory. The scope vocabulary (`hasScope`, `isScope`,
-`normalizeScopes`, `GRANULAR_SCOPES`, etc.) is re-exported from `laikacms/auth`.
+For the common pattern of granting access based on fine-grained scopes, `@contentia/server/api`
+ships `createScopePolicy()` — a drop-in `authorize` factory. The scope vocabulary (`hasScope`,
+`isScope`, `normalizeScopes`, `GRANULAR_SCOPES`, etc.) is re-exported from `contentia/auth`.
 
 ```typescript
-import { createScopePolicy, laikaApi } from '@laikacms/server/api';
+import { contentiaApi, createScopePolicy } from '@contentia/server/api';
 
-const api = laikaApi({
+const api = contentiaApi({
   documents,
   storage,
   authenticateAccessToken: async token => {
@@ -114,7 +114,7 @@ const api = laikaApi({
 
 ### Role-based authorization
 
-For simpler flat-role policies (not using the `laikacms/auth` scope vocabulary), implement
+For simpler flat-role policies (not using the `contentia/auth` scope vocabulary), implement
 `authorize` directly:
 
 ```typescript
@@ -131,7 +131,7 @@ admin/`
 on `:5000` while the API runs on `:3000`):
 
 ```typescript
-laikaApi({
+contentiaApi({
   // …
   cors: { origins: ['http://localhost:5000'] },
 });
@@ -150,16 +150,16 @@ responses.
 
 ## Routing
 
-`laikaApi` resolves every request to one of five domains under `basePath` and dispatches
+`contentiaApi` resolves every request to one of five domains under `basePath` and dispatches
 accordingly. A path matching none of these 404s before authorization runs:
 
 | Path                   | Domain      | Requires                               | Handled by                                                                                                                                |
 | ---------------------- | ----------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `{basePath}/health`    | —           | nothing (no auth)                      | Inline — `{ status: 'ok', timestamp }`                                                                                                    |
 | `{basePath}/session`   | `session`   | auth only                              | Inline — returns the authenticated `User`, minus `passwordHash`                                                                           |
-| `{basePath}/storage`   | `storage`   | auth + authorize                       | `buildJsonApi` from `laikacms/storage/api`, given `options.storage`                                                                       |
-| `{basePath}/documents` | `documents` | auth + authorize                       | `buildJsonApi` from `laikacms/documents/api`, given `options.documents`                                                                   |
-| `{basePath}/assets`    | `assets`    | auth + authorize, `options.assets` set | `buildAssetsApi` from `laikacms/assets/api`, given `options.assets`                                                                       |
+| `{basePath}/storage`   | `storage`   | auth + authorize                       | `buildJsonApi` from `contentia/storage/api`, given `options.storage`                                                                      |
+| `{basePath}/documents` | `documents` | auth + authorize                       | `buildJsonApi` from `contentia/documents/api`, given `options.documents`                                                                  |
+| `{basePath}/assets`    | `assets`    | auth + authorize, `options.assets` set | `buildAssetsApi` from `contentia/assets/api`, given `options.assets`                                                                      |
 | `{basePath}/locks`     | `locks`     | auth + authorize                       | `buildLocksApi` from `./locks.js`; uses `options.locks` if provided, else duck-types `documents`; 204 no-op when neither supports locking |
 
 Each sub-API is built per-request and mounted at `{basePath}/{domain}` as its own `basePath`, so
@@ -175,9 +175,9 @@ and then `authorize(ctx)` before reaching its sub-API.
 banner. Wire a lock manager via the `locks` option to enable it:
 
 ```typescript
-import { InProcessLockManager } from 'laikacms/locks/in-process';
+import { InProcessLockManager } from 'contentia/locks/in-process';
 
-laikaApi({
+contentiaApi({
   documents,
   storage,
   locks: new InProcessLockManager(), // single-node; advisory only

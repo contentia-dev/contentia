@@ -50,10 +50,10 @@ describe('splitContent', () => {
 
   it('reports no body when the field is absent — a YAML or JSON record', () => {
     const result = splitContent(
-      { key: 'config/site', content: { name: 'Laika' } },
+      { key: 'config/site', content: { name: 'Contentia' } },
       { entry: {}, render: {} },
     );
-    expect(result.data).toEqual({ name: 'Laika' });
+    expect(result.data).toEqual({ name: 'Contentia' });
     expect(result.body).toBeUndefined();
   });
 

@@ -7,7 +7,7 @@ import { TypegenWriter } from './writer.js';
 let root: string;
 
 beforeEach(async () => {
-  root = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-writer-'));
+  root = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-writer-'));
 });
 
 afterEach(async () => {
@@ -15,11 +15,11 @@ afterEach(async () => {
 });
 
 describe('TypegenWriter', () => {
-  it('writes types.d.ts under .laika/vite-generated/', async () => {
+  it('writes types.d.ts under .contentia/vite-generated/', async () => {
     const writer = new TypegenWriter(root);
     const changed = await writer.writeTypes('// types\n');
     expect(changed).toBe(true);
-    expect(await fs.readFile(path.join(root, '.laika', 'vite-generated', 'types.d.ts'), 'utf8')).toBe('// types\n');
+    expect(await fs.readFile(path.join(root, '.contentia', 'vite-generated', 'types.d.ts'), 'utf8')).toBe('// types\n');
   });
 
   it('skips a no-op rewrite (identical content)', async () => {
@@ -29,37 +29,37 @@ describe('TypegenWriter', () => {
     expect(changedAgain).toBe(false);
   });
 
-  it('creates laika-env.d.ts once and never clobbers a user-modified file', async () => {
+  it('creates contentia-env.d.ts once and never clobbers a user-modified file', async () => {
     const writer = new TypegenWriter(root);
     const created = await writer.ensureEnvReference();
     expect(created).toBe(true);
-    expect(await fs.readFile(path.join(root, 'laika-env.d.ts'), 'utf8')).toBe(
-      '/// <reference path="./.laika/vite-generated/types.d.ts" />\n',
+    expect(await fs.readFile(path.join(root, 'contentia-env.d.ts'), 'utf8')).toBe(
+      '/// <reference path="./.contentia/vite-generated/types.d.ts" />\n',
     );
 
     // Simulate a user edit; ensure it is preserved.
-    await fs.writeFile(path.join(root, 'laika-env.d.ts'), 'CUSTOM CONTENT\n', 'utf8');
+    await fs.writeFile(path.join(root, 'contentia-env.d.ts'), 'CUSTOM CONTENT\n', 'utf8');
     const createdAgain = await writer.ensureEnvReference();
     expect(createdAgain).toBe(false);
-    expect(await fs.readFile(path.join(root, 'laika-env.d.ts'), 'utf8')).toBe('CUSTOM CONTENT\n');
+    expect(await fs.readFile(path.join(root, 'contentia-env.d.ts'), 'utf8')).toBe('CUSTOM CONTENT\n');
   });
 
-  it('ignores only the generated subtree, never .laika/ itself', async () => {
+  it('ignores only the generated subtree, never .contentia/ itself', async () => {
     const writer = new TypegenWriter(root);
     await fs.writeFile(path.join(root, '.gitignore'), 'node_modules\n', 'utf8');
 
     expect(await writer.ensureRootGitignore()).toBe(true);
     const gitignore = await fs.readFile(path.join(root, '.gitignore'), 'utf8');
     expect(gitignore).toContain('node_modules');
-    expect(gitignore).toContain('.laika/vite-generated/');
-    // A bare `.laika/` rule would swallow the catalog, schemas and revisions.
-    expect(gitignore.split(/\r?\n/).map(l => l.trim())).not.toContain('.laika/');
+    expect(gitignore).toContain('.contentia/vite-generated/');
+    // A bare `.contentia/` rule would swallow the catalog, schemas and revisions.
+    expect(gitignore.split(/\r?\n/).map(l => l.trim())).not.toContain('.contentia/');
 
     // Idempotent.
     expect(await writer.ensureRootGitignore()).toBe(false);
 
-    await writer.ensureLaikaGitignore();
-    expect(await fs.readFile(path.join(root, '.laika', '.gitignore'), 'utf8')).toBe(
+    await writer.ensureContentiaGitignore();
+    expect(await fs.readFile(path.join(root, '.contentia', '.gitignore'), 'utf8')).toBe(
       'vite-generated/\n',
     );
   });
@@ -68,7 +68,7 @@ describe('TypegenWriter', () => {
     const writer = new TypegenWriter(root);
     expect(await writer.ensureRootGitignore()).toBe(true);
     expect(await fs.readFile(path.join(root, '.gitignore'), 'utf8')).toContain(
-      '.laika/vite-generated/',
+      '.contentia/vite-generated/',
     );
   });
 

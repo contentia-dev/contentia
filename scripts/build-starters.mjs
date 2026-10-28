@@ -28,7 +28,7 @@ const STARTERS = [
 // Workspace packages the starters/ workspace links to via link: overrides
 // (starters/pnpm-workspace.yaml overrides block). Their dist/ must exist
 // before `pnpm install` in starters/ can resolve them.
-const LINKED_PACKAGES = ['laikacms', '@laikacms/github'];
+const LINKED_PACKAGES = ['contentia', '@contentia/github'];
 
 function run(cmd, args, cwd) {
   process.stdout.write(`  $ ${cmd} ${args.join(' ')}\n`);

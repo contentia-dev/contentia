@@ -55,7 +55,7 @@ describe('readmeToSection', () => {
     const md = '[api](../../docs/reference/json-api/storage.md#x) [src](./testing.ts) [web](https://a.b)';
     expect(readmeToSection(md, 'packages/pkg')).toBe(
       '[api](/reference/json-api/storage#x) '
-        + '[src](https://github.com/laikacms/laikacms/blob/develop/packages/pkg/testing.ts) [web](https://a.b)',
+        + '[src](https://github.com/contentia-dev/contentia/blob/develop/packages/pkg/testing.ts) [web](https://a.b)',
     );
   });
 });

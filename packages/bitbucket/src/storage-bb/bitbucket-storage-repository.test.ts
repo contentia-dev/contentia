@@ -1,14 +1,14 @@
 import {
+  ContentiaStream,
+  ContentiaTask,
   ForbiddenError,
   InternalError,
-  LaikaStream,
-  LaikaTask,
   NotFoundError,
   ServiceUnavailableError,
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
-} from 'laikacms/core';
-import { runStorageRepositoryContract } from 'laikacms/storage/testing';
+} from 'contentia/core';
+import { runStorageRepositoryContract } from 'contentia/storage/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { bitbucketContractCase } from './testing/index.js';
@@ -179,7 +179,7 @@ const makeRepo = (overrides?: Partial<{ token: string }>) =>
       },
     },
     defaultFileExtension: 'md',
-    commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+    commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
   });
 
 const seedFile = (path: string, content: string) => {
@@ -200,7 +200,7 @@ describe('BitbucketStorageRepository CRUD', () => {
   it('creates, reads, updates and deletes an object', async () => {
     const repo = makeRepo();
 
-    const created = await LaikaTask.runPromise(
+    const created = await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'hello', content: { body: 'hi' } }),
     );
     expect(created.key).toBe('hello');
@@ -208,13 +208,13 @@ describe('BitbucketStorageRepository CRUD', () => {
     expect(created.metadata?.extension).toBe('md');
     expect(bb.files.get('hello.md')?.content).toBe('hi');
 
-    const updated = await LaikaTask.runPromise(
+    const updated = await ContentiaTask.runPromise(
       repo.updateObject({ key: 'hello', content: { body: 'updated' } }),
     );
     expect(updated.content).toEqual({ body: 'updated' });
     expect(updated.metadata?.revisionId).not.toBe(created.metadata?.revisionId);
 
-    const removed = await LaikaStream.runPromiseCollect(repo.removeAtoms(['hello']));
+    const removed = await ContentiaStream.runPromiseCollect(repo.removeAtoms(['hello']));
     expect(removed.data).toEqual(['hello']);
     expect(removed.done).toEqual({ removed: 1, skipped: 0 });
     expect(bb.files.has('hello.md')).toBe(false);
@@ -222,11 +222,11 @@ describe('BitbucketStorageRepository CRUD', () => {
 
   it('rejects a duplicate createObject for the same key', async () => {
     const repo = makeRepo();
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'hello', content: { body: 'one' } }),
     );
     await expect(
-      LaikaTask.runPromise(
+      ContentiaTask.runPromise(
         repo.createObject({ type: 'object', key: 'hello', content: { body: 'two' } }),
       ),
     ).rejects.toThrow(/already exists/i);
@@ -234,7 +234,7 @@ describe('BitbucketStorageRepository CRUD', () => {
 
   it('createFolder writes a .keep marker so the folder shows up in listings', async () => {
     const repo = makeRepo();
-    await LaikaTask.runPromise(repo.createFolder({ type: 'folder', key: 'notes' }));
+    await ContentiaTask.runPromise(repo.createFolder({ type: 'folder', key: 'notes' }));
     expect(bb.files.has('notes/.keep')).toBe(true);
   });
 });
@@ -245,7 +245,7 @@ describe('BitbucketStorageRepository listing', () => {
     seedFile('notes/b.md', 'y');
     seedFile('top.md', 'z');
 
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
     );
     const byKey = Object.fromEntries(collected.data.map(s => [s.key, s.type] as const));
@@ -253,7 +253,7 @@ describe('BitbucketStorageRepository listing', () => {
   });
 
   it('reports a missing folder as a recoverable NotFoundError', async () => {
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       makeRepo().listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data).toEqual([]);
@@ -265,7 +265,7 @@ describe('BitbucketStorageRepository listing', () => {
 describe('BitbucketStorageRepository auth', () => {
   it('sends HTTP Basic when configured with an app password', async () => {
     const repo = makeRepo();
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'h', content: { body: 'x' } }),
     );
     // base64("alice:app-pw") = "YWxpY2U6YXBwLXB3"
@@ -274,7 +274,7 @@ describe('BitbucketStorageRepository auth', () => {
 
   it('sends Bearer when configured with an OAuth2 token', async () => {
     const repo = makeRepo({ token: 'oauth-xyz' });
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'h', content: { body: 'x' } }),
     );
     expect(bb.lastAuth()).toBe('Bearer oauth-xyz');
@@ -296,9 +296,9 @@ describe('BitbucketStorageRepository auth', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'h', content: { body: 'x' } }),
     );
     expect(bb.lastAuth()).toBe('Bearer sync-token-abc');
@@ -320,9 +320,9 @@ describe('BitbucketStorageRepository auth', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'h', content: { body: 'x' } }),
     );
     expect(bb.lastAuth()).toBe('Bearer async-token-xyz');
@@ -344,9 +344,9 @@ describe('BitbucketStorageRepository auth', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'h', content: { body: 'x' } }),
     );
     expect(bb.lastAuth()).toBe('Bearer provider-token');
@@ -370,7 +370,7 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
 
   it('propagates TooManyRequestsError (429) instead of falling through to getFolder', async () => {
@@ -378,7 +378,7 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
       new Response(JSON.stringify({ error: { message: 'Rate limit exceeded' } }), { status: 429 });
     const repo = makeRepoWithFetch(fetch429);
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
@@ -387,14 +387,14 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
       new Response(JSON.stringify({ error: { message: 'Access denied' } }), { status: 403 });
     const repo = makeRepoWithFetch(fetch403);
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it('falls through to getFolder on NotFoundError and returns folder when it exists', async () => {
     seedFile('notes/.keep', '');
     const repo = makeRepo();
-    const atom = await LaikaTask.runPromise(repo.getAtom('notes'));
+    const atom = await ContentiaTask.runPromise(repo.getAtom('notes'));
     expect(atom.type).toBe('folder');
     expect(atom.key).toBe('notes');
   });
@@ -404,7 +404,7 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
       new Response(JSON.stringify({ error: { message: 'Invalid credentials' } }), { status: 401 });
     const repo = makeRepoWithFetch(fetch401);
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(UpstreamUnAuthorizedError);
   });
 
@@ -413,7 +413,7 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
       new Response(JSON.stringify({ error: { message: 'Under maintenance' } }), { status: 503 });
     const repo = makeRepoWithFetch(fetch503);
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(ServiceUnavailableError);
   });
 
@@ -422,7 +422,7 @@ describe('BitbucketStorageRepository.getAtom error propagation', () => {
       new Response(JSON.stringify({ error: { message: 'Bad gateway' } }), { status: 502 });
     const repo = makeRepoWithFetch(fetch502);
     await expect(
-      LaikaTask.runPromise(repo.getAtom('notes/article')),
+      ContentiaTask.runPromise(repo.getAtom('notes/article')),
     ).rejects.toBeInstanceOf(ServiceUnavailableError);
   });
 });
@@ -452,10 +452,10 @@ describe('BitbucketStorageRepository.getFolder pagination safety loop', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
     await expect(
-      LaikaTask.runPromise(repo.getFolder('notes')),
+      ContentiaTask.runPromise(repo.getFolder('notes')),
     ).rejects.toBeInstanceOf(InternalError);
   });
 });
@@ -481,11 +481,11 @@ describe('BitbucketStorageRepository mapError', () => {
         },
       },
       defaultFileExtension: 'md',
-      commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+      commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
     });
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 });

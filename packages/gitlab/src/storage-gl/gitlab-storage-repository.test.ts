@@ -1,14 +1,14 @@
 import {
+  ContentiaStream,
+  ContentiaTask,
   ForbiddenError,
-  LaikaStream,
-  LaikaTask,
   NotFoundError,
   ServiceUnavailableError,
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
   VersionMismatchError,
-} from 'laikacms/core';
-import { runStorageRepositoryContract } from 'laikacms/storage/testing';
+} from 'contentia/core';
+import { runStorageRepositoryContract } from 'contentia/storage/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { GitlabStorageRepository } from './gitlab-storage-repository.js';
@@ -254,7 +254,7 @@ describe('GitlabStorageRepository listing', () => {
     seedFile('hello.md', 'hi');
     seedFile('world.md', 'hello');
 
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
     );
 
@@ -267,7 +267,7 @@ describe('GitlabStorageRepository listing', () => {
     seedFile('notes/b.md', 'b');
     seedFile('other.md', 'x');
 
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
     );
 
@@ -276,7 +276,7 @@ describe('GitlabStorageRepository listing', () => {
   });
 
   it('reports a missing folder as a recoverable NotFoundError, not a fatal failure', async () => {
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       makeRepo().listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data).toEqual([]);
@@ -289,7 +289,7 @@ describe('GitlabStorageRepository CRUD round-trip', () => {
   it('creates, reads, updates and deletes an object', async () => {
     const repo = makeRepo();
 
-    const created = await LaikaTask.runPromise(
+    const created = await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'hello', content: { body: 'hi' } }),
     );
     expect(created.key).toBe('hello');
@@ -298,12 +298,12 @@ describe('GitlabStorageRepository CRUD round-trip', () => {
     expect(created.metadata?.revisionId).toBeTruthy();
     expect(server.files.has('hello.md')).toBe(true);
 
-    const updated = await LaikaTask.runPromise(
+    const updated = await ContentiaTask.runPromise(
       repo.updateObject({ key: 'hello', content: { body: 'updated' } }),
     );
     expect(updated.content).toEqual({ body: 'updated' });
 
-    const removed = await LaikaStream.runPromiseCollect(repo.removeAtoms(['hello']));
+    const removed = await ContentiaStream.runPromiseCollect(repo.removeAtoms(['hello']));
     expect(removed.data).toEqual(['hello']);
     expect(removed.done).toEqual({ removed: 1, skipped: 0 });
     expect(server.files.has('hello.md')).toBe(false);
@@ -311,12 +311,12 @@ describe('GitlabStorageRepository CRUD round-trip', () => {
 
   it('rejects a second createObject for the same key', async () => {
     const repo = makeRepo();
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repo.createObject({ type: 'object', key: 'hello', content: { body: 'one' } }),
     );
 
     await expect(
-      LaikaTask.runPromise(
+      ContentiaTask.runPromise(
         repo.createObject({ type: 'object', key: 'hello', content: { body: 'two' } }),
       ),
     ).rejects.toThrow(/already exists/i);
@@ -325,10 +325,10 @@ describe('GitlabStorageRepository CRUD round-trip', () => {
   it('createFolder writes a .keep file so the folder shows up in listings', async () => {
     const repo = makeRepo();
 
-    await LaikaTask.runPromise(repo.createFolder({ type: 'folder', key: 'notes' }));
+    await ContentiaTask.runPromise(repo.createFolder({ type: 'folder', key: 'notes' }));
     expect(server.files.has('notes/.keep')).toBe(true);
 
-    const collected = await LaikaStream.runPromiseCollect(
+    const collected = await ContentiaStream.runPromiseCollect(
       repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data.map(s => s.key)).toEqual(['notes']);
@@ -356,7 +356,7 @@ describe('GitlabStorageRepository mapError', () => {
     });
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
   });
 
@@ -382,7 +382,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch409);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(VersionMismatchError);
   });
 
@@ -391,7 +391,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch412);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(VersionMismatchError);
   });
 
@@ -400,7 +400,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch422);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(VersionMismatchError);
   });
 
@@ -409,7 +409,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch405);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -418,7 +418,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch503);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(ServiceUnavailableError);
   });
 
@@ -427,7 +427,7 @@ describe('GitlabStorageRepository mapError', () => {
     const repo = makeRepoWithFetch(fetch401);
 
     await expect(
-      LaikaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
+      ContentiaTask.runPromise(repo.createObject({ type: 'object', key: 'some-key', content: { body: 'hi' } })),
     ).rejects.toBeInstanceOf(UpstreamUnAuthorizedError);
   });
 });

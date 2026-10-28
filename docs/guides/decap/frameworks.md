@@ -5,25 +5,25 @@ footgun — do it once and forget it.
 
 ### Framework adapter matrix
 
-`laika.fetch` (and `api.fetch`) expects a **Web API `Request`**. The table below shows what each
+`contentia.fetch` (and `api.fetch`) expects a **Web API `Request`**. The table below shows what each
 framework gives you at the route handler boundary and whether you need a bridge.
 
 | Framework                         | What you receive                                 | Bridge needed?                                                                                                                          |
 | --------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Astro**                         | Web API `Request`                                | None — pass directly: `laika.fetch(request)`                                                                                            |
-| **SvelteKit**                     | Web API `Request`                                | None — pass directly: `laika.fetch(event.request)`                                                                                      |
-| **Remix**                         | Web API `Request`                                | None — pass directly: `laika.fetch(request)`                                                                                            |
-| **Next.js (App Router)**          | `NextRequest` (extends Web API `Request`)        | None — pass directly: `laika.fetch(request)`                                                                                            |
-| **Hono**                          | Hono `HonoRequest` wrapper                       | None — use `c.req.raw`: `laika.fetch(c.req.raw)`                                                                                        |
+| **Astro**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                                                        |
+| **SvelteKit**                     | Web API `Request`                                | None — pass directly: `contentia.fetch(event.request)`                                                                                  |
+| **Remix**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                                                        |
+| **Next.js (App Router)**          | `NextRequest` (extends Web API `Request`)        | None — pass directly: `contentia.fetch(request)`                                                                                        |
+| **Hono**                          | Hono `HonoRequest` wrapper                       | None — use `c.req.raw`: `contentia.fetch(c.req.raw)`                                                                                    |
 | **TanStack Start**                | Web API `Request`                                | None — pass directly from the server route handler                                                                                      |
 | **Cloudflare Workers**            | Web API `Request`                                | None — Workers environment is spec-compliant                                                                                            |
-| **Nuxt / h3**                     | h3 `H3Event`                                     | `toWebRequest(event)` from `h3`: `laika.fetch(toWebRequest(event))`                                                                     |
+| **Nuxt / h3**                     | h3 `H3Event`                                     | `toWebRequest(event)` from `h3`: `contentia.fetch(toWebRequest(event))`                                                                 |
 | **Express / plain `http.Server`** | Node.js `IncomingMessage`                        | Manual bridge — see [Express bridge](#express--plain-httpserver--manual-bridge) below                                                   |
 | **AdonisJS v6**                   | AdonisJS `HttpContext` (wraps `IncomingMessage`) | `ctx.request.request` + `ctx.response.response` — same Express bridge in a controller                                                   |
 | **NestJS (Express adapter)**      | Node.js `IncomingMessage` (via Express)          | Manual bridge in `NestMiddleware.use(req, res)` — same as Express                                                                       |
 | **FoalTS v4**                     | FoalTS `Context` (Express-based)                 | Wrap FoalTS app inside bare Express; use `express.raw()` before mounting FoalTS — see [FoalTS](#foalts-v4--outer-express-wrapper) below |
 | **Fastify**                       | Fastify `FastifyRequest`                         | `request.raw` → same Express bridge inside a Fastify route handler                                                                      |
-| **AWS Lambda (via http bridge)**  | Lambda event object                              | Manual bridge — convert Lambda event → WHATWG `Request` before passing to `laika.fetch`                                                 |
+| **AWS Lambda (via http bridge)**  | Lambda event object                              | Manual bridge — convert Lambda event → WHATWG `Request` before passing to `contentia.fetch`                                             |
 
 ### Express / plain `http.Server` — manual bridge
 
@@ -34,10 +34,10 @@ the Web API. You must construct a WHATWG `Request` manually and pipe the respons
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { Readable } from 'node:stream';
 
-async function bridgeToLaika(
+async function bridgeToContentia(
   req: ExpressRequest,
   res: ExpressResponse,
-  laika: { fetch(r: Request): Promise<Response> },
+  contentia: { fetch(r: Request): Promise<Response> },
 ) {
   const url = `${req.protocol}://${req.headers.host}${req.originalUrl}`;
 
@@ -60,7 +60,7 @@ async function bridgeToLaika(
     duplex: 'half',
   } as RequestInit);
 
-  const webResponse = await laika.fetch(webRequest);
+  const webResponse = await contentia.fetch(webRequest);
 
   res.status(webResponse.status);
   webResponse.headers.forEach((value, key) => res.setHeader(key, value));
@@ -76,7 +76,7 @@ async function bridgeToLaika(
 Wire it into Express:
 
 ```ts
-app.all('/api/decap/*', (req, res) => bridgeToLaika(req, res, laika));
+app.all('/api/decap/*', (req, res) => bridgeToContentia(req, res, contentia));
 ```
 
 ### TypeScript 6 — `BodyInit` regression with `Buffer` / `Uint8Array`
@@ -106,7 +106,7 @@ The `.buffer` property of a `Buffer` is the **underlying shared** `ArrayBuffer`;
 ### VitePress / Docusaurus — Vite-based dev servers
 
 VitePress and Docusaurus both run Node.js-based dev servers (Vite's Connect middleware and
-webpack-dev-server respectively). You must register `laika.fetch` as a middleware rather than a
+webpack-dev-server respectively). You must register `contentia.fetch` as a middleware rather than a
 route handler, which means you get `IncomingMessage`/`ServerResponse` — not a Web API `Request`. Use
 the same manual bridge as the [Express section](#express--plain-httpserver--manual-bridge).
 
@@ -115,12 +115,12 @@ the same manual bridge as the [Express section](#express--plain-httpserver--manu
 ```ts
 // .vitepress/config.mts
 import { defineConfig } from 'vitepress';
-import { laika } from '../src/laika.js';
+import { contentia } from '../src/contentia.js';
 
 export default defineConfig({
   vite: {
     plugins: [{
-      name: 'laika-decap-api',
+      name: 'contentia-decap-api',
       configureServer(server) {
         server.middlewares.use('/api/decap', async (req, res) => {
           // Connect IncomingMessage → Web Request bridge (req.url is path-only)
@@ -139,7 +139,7 @@ export default defineConfig({
               : null,
             ...(bodyBuf ? { duplex: 'half' } : {}),
           } as RequestInit);
-          const webRes = await laika.fetch(webReq);
+          const webRes = await contentia.fetch(webReq);
           res.writeHead(webRes.status, Object.fromEntries(webRes.headers));
           res.end(Buffer.from(await webRes.arrayBuffer()));
         });
@@ -149,8 +149,8 @@ export default defineConfig({
 });
 ```
 
-This approach means your VitePress `contentDir` and the LaikaCMS `contentDir` can be the same folder
-— Decap CMS writes markdown files that VitePress renders directly.
+This approach means your VitePress `contentDir` and the Contentia `contentDir` can be the same
+folder — Decap CMS writes markdown files that VitePress renders directly.
 
 **Docusaurus v3** — use `configureWebpack` (not `configureDevServer`):
 
@@ -159,12 +159,12 @@ This approach means your VitePress `contentDir` and the LaikaCMS `contentDir` ca
 > a partial webpack config from `configureWebpack` using webpack-dev-server v5's `setupMiddlewares`:
 
 ```ts
-// src/laika-plugin.ts
+// src/contentia-plugin.ts
 import type { Plugin } from '@docusaurus/types';
 
-export default function laikaPlugin(): Plugin {
+export default function contentiaPlugin(): Plugin {
   return {
-    name: 'laika-decap-api',
+    name: 'contentia-decap-api',
     configureWebpack(_config, isServer) {
       if (isServer) return;
       return {
@@ -188,7 +188,7 @@ export default function laikaPlugin(): Plugin {
                   : null,
                 ...(bodyBuf ? { duplex: 'half' } : {}),
               } as RequestInit);
-              const webRes = await laika.fetch(webReq);
+              const webRes = await contentia.fetch(webReq);
               res.writeHead(webRes.status, Object.fromEntries(webRes.headers));
               res.end(Buffer.from(await webRes.arrayBuffer()));
             });
@@ -204,9 +204,9 @@ export default function laikaPlugin(): Plugin {
 Register the plugin in `docusaurus.config.ts`:
 
 ```ts
-import laikaPlugin from './src/laika-plugin.js';
+import contentiaPlugin from './src/contentia-plugin.js';
 const config: Config = {
-  plugins: [laikaPlugin],
+  plugins: [contentiaPlugin],
   // ...
 };
 ```
@@ -240,24 +240,24 @@ export default jsxRenderer(({ children, title }: { children?: unknown, title?: s
 Without this augmentation, `c.render(<JSX />, { title: 'My Blog' })` produces a TypeScript error
 (`Expected 1 arguments, but got 2`).
 
-### Astro — prefer `@laikacms/astro`
+### Astro — prefer `@contentia/astro`
 
-For reading content, do not hand-roll repository calls: `@laikacms/astro` plugs Laika into Astro's
-Content Layer, so pages use `getCollection` / `getEntry` / `render` and get the incremental content
-store, schema validation and generated entry types. The notes below apply when you are calling the
-repositories directly instead.
+For reading content, do not hand-roll repository calls: `@contentia/astro` plugs Contentia into
+Astro's Content Layer, so pages use `getCollection` / `getEntry` / `render` and get the incremental
+content store, schema validation and generated entry types. The notes below apply when you are
+calling the repositories directly instead.
 
-### Astro — use `laikacms/compat`, not `laikacms/core`
+### Astro — use `contentia/compat`, not `contentia/core`
 
-`runTask` and `collectStream` must be imported from `laikacms/compat`. The `laikacms/core` subpath
+`runTask` and `collectStream` must be imported from `contentia/compat`. The `contentia/core` subpath
 does not export them (this was a README bug fixed in PR #41).
 
 ```ts
 // correct
-import { collectStream, runTask } from 'laikacms/compat';
+import { collectStream, runTask } from 'contentia/compat';
 
 // wrong — named exports do not exist here
-import { collectStream, runTask } from 'laikacms/core';
+import { collectStream, runTask } from 'contentia/core';
 ```
 
 ### Next.js (App Router) — admin page must be a client component
@@ -289,8 +289,8 @@ export default function AdminPage() {
 
 ### AdonisJS v6 — access the raw Node.js request via `ctx.request.request`
 
-AdonisJS v6 is **ESM-native** — it can import `laikacms` and `@laikacms/server` directly without the
-dynamic `import()` workaround required by CommonJS frameworks like NestJS.
+AdonisJS v6 is **ESM-native** — it can import `contentia` and `@contentia/server` directly without
+the dynamic `import()` workaround required by CommonJS frameworks like NestJS.
 
 AdonisJS wraps `IncomingMessage` in its own `Request` class. The raw Node.js objects are:
 
@@ -320,7 +320,7 @@ export default class DecapController {
       ...(body.byteLength > 0 ? { duplex: 'half' } : {}),
     } as RequestInit);
 
-    const webResponse = await laika.fetch(webRequest);
+    const webResponse = await contentia.fetch(webRequest);
 
     res.statusCode = webResponse.status;
     webResponse.headers.forEach((value, name) => res.setHeader(name, value));
@@ -361,7 +361,7 @@ import { createApp } from '@foal/core';
 import express from 'express';
 import * as http from 'node:http';
 import { AppController } from './app/app.controller.js';
-import { laika } from './app/laika.js';
+import { contentia } from './app/contentia.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -376,7 +376,7 @@ outer.use(
     const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
     const body = hasBody && Buffer.isBuffer(req.body) && req.body.length > 0 ? req.body : null;
 
-    const webRes = await laika.fetch(
+    const webRes = await contentia.fetch(
       new Request(url, {
         method: req.method,
         headers: req.headers as Record<string, string>,
@@ -431,7 +431,7 @@ SvelteKit enforces its own env model. Vite won't populate `process.env` from `.e
 
 ```ts
 import { env } from '$env/dynamic/private';
-const token = env.LAIKA_ADMIN_TOKEN;
+const token = env.CONTENTIA_ADMIN_TOKEN;
 ```
 
 #### Module-level singleton datasource init
@@ -440,13 +440,13 @@ SvelteKit server modules are singletons (persistent Node process). Initialize da
 level, not per-request:
 
 ```ts
-// src/lib/laika.ts
-import { laikaApi } from '@laikacms/server/api';
-import { CatalogAssetsRepository } from 'laikacms/assets-catalog';
-import { DecapCatalogProvider } from 'laikacms/catalog-decap';
-import { CatalogDocumentsRepository } from 'laikacms/documents-catalog';
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
+// src/lib/contentia.ts
+import { contentiaApi } from '@contentia/server/api';
+import { CatalogAssetsRepository } from 'contentia/assets-catalog';
+import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { FileSystemStorageRepository } from 'contentia/storage-fs';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { resolve } from 'node:path';
 
 // Module-level singletons — initialized once, reused across all requests
@@ -457,7 +457,7 @@ const storage = new FileSystemStorageRepository(
 );
 const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
 
-export const laika = laikaApi({
+export const contentia = contentiaApi({
   documents: new CatalogDocumentsRepository(storage, settings),
   storage,
   assets: new CatalogAssetsRepository(storage, settings),

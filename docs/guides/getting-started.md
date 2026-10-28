@@ -1,17 +1,17 @@
 # Getting Started
 
-Laika's core is one package, `laikacms`. Everything starts from a **storage repository**: an object
-that reads and writes content in one backend (the filesystem, R2, a database, a git host, the
+Contentia's core is one package, `contentia`. Everything starts from a **storage repository**: an
+object that reads and writes content in one backend (the filesystem, R2, a database, a git host, the
 browser) behind one shared interface. This page walks through that core: create a repository, read
 and write content, list a folder, swap the backend, and serve it all over HTTP.
 
 ## Installation
 
 ```bash
-pnpm add laikacms
+pnpm add contentia
 ```
 
-`laikacms` runs anywhere modern JavaScript runs: Node.js, Bun, Deno, Cloudflare Workers, and the
+`contentia` runs anywhere modern JavaScript runs: Node.js, Bun, Deno, Cloudflare Workers, and the
 browser. Import only the subpaths you use.
 
 ## Create a repository
@@ -20,36 +20,37 @@ A repository needs three things: where the content lives, the serializers it may
 the file extension new objects get.
 
 ```typescript
-import { jsonSerializer } from 'laikacms/serializers/json';
-import { FileSystemStorageRepository } from 'laikacms/storage/fs';
+import { jsonSerializer } from 'contentia/serializers/json';
+import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
 const repo = new FileSystemStorageRepository('./content', { json: jsonSerializer }, 'json');
 ```
 
 Keys never include the extension: the object `posts/hello` is stored as
 `./content/posts/hello.json`. Serializers for YAML, Markdown with frontmatter, and raw files live
-next to the JSON one (`laikacms/serializers/yaml`, `…/markdown`, `…/raw`).
+next to the JSON one (`contentia/serializers/yaml`, `…/markdown`, `…/raw`).
 
 ## Write and read objects
 
-Repository methods return a [`LaikaTask`](../reference/api/laikacms/core/namespaces/LaikaTask/).
-[`runTask`](../reference/api/laikacms/compat/functions/runTask) from `laikacms/compat` runs one and
-gives you a Promise, so you don't need to know Effect to get started.
+Repository methods return a
+[`ContentiaTask`](../reference/api/contentia/core/namespaces/ContentiaTask/).
+[`runTask`](../reference/api/contentia/compat/functions/runTask) from `contentia/compat` runs one
+and gives you a Promise, so you don't need to know Effect to get started.
 
 ```typescript
-import { runTask } from 'laikacms/compat';
+import { runTask } from 'contentia/compat';
 
-await runTask(repo.createObject({ key: 'posts/hello', content: { title: 'Hello, Laika' } }));
+await runTask(repo.createObject({ key: 'posts/hello', content: { title: 'Hello, Contentia' } }));
 
 const post = await runTask(repo.getObject('posts/hello'));
-console.log(post.content.title); // "Hello, Laika"
+console.log(post.content.title); // "Hello, Contentia"
 
 await runTask(repo.updateObject({ key: 'posts/hello', content: { title: 'Hello again' } }));
 ```
 
 A failed task rejects with a typed
-[`LaikaError`](../reference/api/laikacms/core/errors/classes/LaikaError). Check its `code` (for
-example `not_found`) instead of matching on the message:
+[`ContentiaError`](../reference/api/contentia/core/errors/classes/ContentiaError). Check its `code`
+(for example `not_found`) instead of matching on the message:
 
 ```typescript
 try {
@@ -64,11 +65,11 @@ try {
 ## List a folder
 
 Listings are streams, so a large folder never has to fit in memory at once.
-[`collectStream`](../reference/api/laikacms/compat/functions/collectStream) drains one into an
+[`collectStream`](../reference/api/contentia/compat/functions/collectStream) drains one into an
 array:
 
 ```typescript
-import { collectStream } from 'laikacms/compat';
+import { collectStream } from 'contentia/compat';
 
 const { items } = await collectStream(repo.listAtoms('posts', { depth: 1, pagination: {} }));
 
@@ -100,19 +101,19 @@ Without `onProgress`, warnings are dropped.
 ## Swap the backend
 
 Every backend implements the same
-[`StorageRepository`](../reference/api/laikacms/storage/classes/StorageRepository) interface, so
+[`StorageRepository`](../reference/api/contentia/storage/classes/StorageRepository) interface, so
 switching is a constructor change. The code that reads and writes content stays the same.
 
 ```typescript
 // Cloudflare R2, from inside a Worker
-import { R2StorageRepository } from 'laikacms/storage/r2';
+import { R2StorageRepository } from 'contentia/storage/r2';
 
 const repo = new R2StorageRepository(env.CONTENT_BUCKET, { json: jsonSerializer }, 'json');
 ```
 
 ```typescript
 // The browser's localStorage: no server at all
-import { WebStorageRepository } from 'laikacms/storage/web';
+import { WebStorageRepository } from 'contentia/storage/web';
 
 const repo = new WebStorageRepository({
   storage: localStorage,
@@ -132,15 +133,15 @@ filesystem, and the browser.
 
 ## Serve it over HTTP
 
-[`buildJsonApi`](../reference/api/laikacms/storage/api/functions/buildJsonApi) turns any storage
+[`buildJsonApi`](../reference/api/contentia/storage/api/functions/buildJsonApi) turns any storage
 repository into a [JSON:API](../reference/json-api/) handler. It returns a standard
 `fetch(request): Promise<Response>` function, so it runs on any runtime that speaks the Fetch API.
 
 ```typescript
-import { allowAll } from 'laikacms/json-api';
-import { jsonSerializer } from 'laikacms/serializers/json';
-import { buildJsonApi } from 'laikacms/storage/api';
-import { FileSystemStorageRepository } from 'laikacms/storage/fs';
+import { allowAll } from 'contentia/json-api';
+import { jsonSerializer } from 'contentia/serializers/json';
+import { buildJsonApi } from 'contentia/storage/api';
+import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
 const repo = new FileSystemStorageRepository('./content', { json: jsonSerializer }, 'json');
 const api = buildJsonApi({ repo, authorize: allowAll });
@@ -149,7 +150,7 @@ export default { fetch: api.fetch };
 ```
 
 `authorize` is required. There is no implicit "allow everything" default:
-[`allowAll`](../reference/api/laikacms/json-api/functions/allowAll) is the explicit way to say a
+[`allowAll`](../reference/api/contentia/json-api/functions/allowAll) is the explicit way to say a
 surface is intentionally open, and it's only safe on a local dev server or behind something that
 already authenticated the request.
 
@@ -175,17 +176,17 @@ The handler also serves its own OpenAPI spec, so any HTTP client or LLM tool can
 
 ## Using Effect directly
 
-`laikacms` is built on [Effect](https://effect.website/). If your app already uses Effect, skip the
+`contentia` is built on [Effect](https://effect.website/). If your app already uses Effect, skip the
 Promise bridge and run tasks inside your own program with
-[`LaikaTask.runValue`](../reference/api/laikacms/core/namespaces/LaikaTask/functions/runValue). Add
-`effect` as a direct dependency (`pnpm add effect`) so your code can import it:
+[`ContentiaTask.runValue`](../reference/api/contentia/core/namespaces/ContentiaTask/functions/runValue).
+Add `effect` as a direct dependency (`pnpm add effect`) so your code can import it:
 
 ```typescript
+import { ContentiaTask } from 'contentia/core';
 import { Effect } from 'effect';
-import { LaikaTask } from 'laikacms/core';
 
 const program = Effect.gen(function*() {
-  const post = yield* LaikaTask.runValue(repo.getObject('posts/hello'));
+  const post = yield* ContentiaTask.runValue(repo.getObject('posts/hello'));
   return post.content.title;
 });
 ```

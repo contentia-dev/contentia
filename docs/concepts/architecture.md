@@ -12,11 +12,11 @@ becomes natural once you work with content this way, and the jargon quickly disa
 background. Most CMSs contain these concepts too. They hide the complexity by tightly coupling
 concepts that do not need to be coupled, in the name of convenience.
 
-Laika is layered so applications can adopt only the assumptions they need. At the core is a
+Contentia is layered so applications can adopt only the assumptions they need. At the core is a
 [storage object](./content-model.md#atoms-and-folders): content that is uniquely addressable through
 a key. It is comparable to an AWS S3 object: a generic thing that is uniquely addressable. An object
 can be each of the choices `red`, `green`, and `blue` in a select input (even when they have no
-value), a database record, a page, or a sensor metric. Laika supplies the address and transport
+value), a database record, a page, or a sensor metric. Contentia supplies the address and transport
 contracts. The application owns the content shape.
 
 Each conceptual layer adds assumptions on top of that foundation:
@@ -37,7 +37,7 @@ not use those concepts can expose a constant `published` status; language defaul
 valid BCP 47 tag for undetermined language.
 
 Common data sources have implementations you can pick and compose like a banquet. You can use one,
-extend one for your infrastructure, or implement a contract directly. The reason to use Laika is
+extend one for your infrastructure, or implement a contract directly. The reason to use Contentia is
 that you don't want to model your domain around your CMS. The goal is to get you 90% there; you will
 most likely implement or extend a repository to make the last part fit your infrastructure. See
 [Repositories](./repositories.md) for composition and implementation guidance and
@@ -69,26 +69,26 @@ flowchart TD
 ```typescript
 // Domain defines the interface
 abstract class StorageRepository {
-  abstract getObject(key: Key): LaikaTask.LaikaTask<StorageObject>;
-  abstract createObject(create: StorageObjectCreate): LaikaTask.LaikaTask<StorageObject>;
+  abstract getObject(key: Key): ContentiaTask.ContentiaTask<StorageObject>;
+  abstract createObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject>;
   abstract listAtoms(
     folderKey: Key,
     options: ListAtomsOptions,
-  ): LaikaStream.LaikaStream<Atom, ListAtomsDone>;
+  ): ContentiaStream.ContentiaStream<Atom, ListAtomsDone>;
 }
 
 // Implementation provides concrete behavior
 class R2StorageRepository extends StorageRepository {
-  getObject(key: Key): LaikaTask.LaikaTask<StorageObject> {
-    // build callback returns Effect.Effect<StorageObject, LaikaError>
-    return LaikaTask.make(() =>
+  getObject(key: Key): ContentiaTask.ContentiaTask<StorageObject> {
+    // build callback returns Effect.Effect<StorageObject, ContentiaError>
+    return ContentiaTask.make(() =>
       Effect.tryPromise({
         try: async () => {
           const object = await this.bucket.get(key);
           if (!object) throw new NotFoundError(`Not found: ${key}`);
           return { key, content: await object.text() };
         },
-        catch: err => err instanceof LaikaError ? err : new UnknownError(err),
+        catch: err => err instanceof ContentiaError ? err : new UnknownError(err),
       })
     );
   }
@@ -97,12 +97,12 @@ class R2StorageRepository extends StorageRepository {
 
 ### Result Streams
 
-Repository methods return either `LaikaTask<T>` (single result) or `LaikaStream<T, D>` (multiple
-results with a typed done value). Both are Effect-based; use the `laikacms/compat` helpers to
-consume them without importing Effect directly.
+Repository methods return either `ContentiaTask<T>` (single result) or `ContentiaStream<T, D>`
+(multiple results with a typed done value). Both are Effect-based; use the `contentia/compat`
+helpers to consume them without importing Effect directly.
 
 ```typescript
-import { collectStream, runTask } from 'laikacms/compat';
+import { collectStream, runTask } from 'contentia/compat';
 
 // Single result
 const object = await runTask(repo.getObject('posts/hello'));
@@ -116,13 +116,13 @@ console.log(items); // Atom[]
 
 ## Standard Schema
 
-Laika exports its entity types as
+Contentia exports its entity types as
 [Standard Schema v1](https://github.com/standard-schema/standard-schema) compatible schemas.
 Consumers can use these directly with Zod, Valibot, ArkType, or any Standard-Schema-compatible
 validator.
 
 ```typescript
-import { StorageObjectSchema } from 'laikacms/storage';
+import { StorageObjectSchema } from 'contentia/storage';
 
 // StorageObjectSchema satisfies StandardSchemaV1 — parse with any compatible library
 const result = StorageObjectSchema['~standard'].validate(unknownPayload);

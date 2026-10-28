@@ -1,7 +1,7 @@
 /**
  * Storage-root selection and repository wiring — the heart of this starter.
  *
- * Content lives behind a `WebFsStorageRepository` (`laikacms/storage/web-fs`),
+ * Content lives behind a `WebFsStorageRepository` (`contentia/storage/web-fs`),
  * which accepts any `FileSystemDirectoryHandle`. This module decides which
  * handle that is:
  *
@@ -15,23 +15,23 @@
  *     helps recover from.
  *
  * On top of the storage repository sit the same Catalog adapters the
- * server-side stack uses (`@laikacms/vite-plugin` wires them identically):
+ * server-side stack uses (`@contentia/vite-plugin` wires them identically):
  * documents for entries, assets for media.
  */
-import { CatalogAssetsRepository } from 'laikacms/assets/catalog';
-import { ConventionCatalogProvider } from 'laikacms/catalog-convention';
-import { CatalogDocumentsRepository } from 'laikacms/documents/catalog';
-import { jsonSerializer } from 'laikacms/serializers/json';
-import { markdownSerializer } from 'laikacms/serializers/markdown';
-import { rawSerializer } from 'laikacms/serializers/raw';
-import { yamlSerializer } from 'laikacms/serializers/yaml';
-import type { StorageRepository } from 'laikacms/storage';
-import { WebFsStorageRepository } from 'laikacms/storage/web-fs';
+import { CatalogAssetsRepository } from 'contentia/assets/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
+import { jsonSerializer } from 'contentia/serializers/json';
+import { markdownSerializer } from 'contentia/serializers/markdown';
+import { rawSerializer } from 'contentia/serializers/raw';
+import { yamlSerializer } from 'contentia/serializers/yaml';
+import type { StorageRepository } from 'contentia/storage';
+import { WebFsStorageRepository } from 'contentia/storage/web-fs';
 
 export type StorageMode = 'opfs' | 'local';
 
-const MODE_KEY = 'laika-starter-storage-mode';
-const IDB_NAME = 'laika-starter-opfs-blog';
+const MODE_KEY = 'contentia-starter-storage-mode';
+const IDB_NAME = 'contentia-starter-opfs-blog';
 const IDB_STORE = 'handles';
 const IDB_ROOT_KEY = 'root';
 
@@ -96,7 +96,7 @@ export async function pickLocalFolder(): Promise<boolean> {
   }
   let handle: FileSystemDirectoryHandle;
   try {
-    handle = await window.showDirectoryPicker({ id: 'laika-starter-content', mode: 'readwrite' });
+    handle = await window.showDirectoryPicker({ id: 'contentia-starter-content', mode: 'readwrite' });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return false;
     throw error;
@@ -165,7 +165,7 @@ export function getRepositories(): Repositories {
       root: resolveRoot,
       // The user picks (or the origin owns) a folder dedicated to this blog,
       // so content lands at its top level (`posts/…`, `uploads/…`) instead of
-      // under the default `laikacms/` namespace subdirectory. Set a namespace
+      // under the default `contentia/` namespace subdirectory. Set a namespace
       // if the folder is shared with unrelated data.
       namespace: '',
       serializerRegistry: {

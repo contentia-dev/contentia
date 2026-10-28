@@ -178,8 +178,8 @@
 /* ─── one helper Tailwind utilities can't express cleanly ─────────────────── */
 /* dog motif: SVG used as a mask so it can be tinted with `text-*` colour. */
 .dog-motif {
-  -webkit-mask: url(/assets/laika-dog.svg) center / contain no-repeat;
-  mask: url(/assets/laika-dog.svg) center / contain no-repeat;
+  -webkit-mask: url(/assets/contentia-dog.svg) center / contain no-repeat;
+  mask: url(/assets/contentia-dog.svg) center / contain no-repeat;
   background: currentColor;
 }
 
@@ -190,7 +190,7 @@
 }
 
 /* ─── MDX bodies ──────────────────────────────────────────────────────────── */
-/* Inline elements are styled once, here: content can say `laika-gateway` in
+/* Inline elements are styled once, here: content can say `contentia-gateway` in
    backticks and get monospace without the section knowing. Block-level spacing
    stays with the section, which is why every `<Body>` is wrapped in a div
    carrying `[&>p]:…` — the section lead and the card bodies inside a Pillar

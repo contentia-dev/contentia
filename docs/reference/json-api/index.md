@@ -1,6 +1,6 @@
 # JSON:API Reference
 
-LaikaCMS exposes its content over HTTP as [JSON:API v1.1](https://jsonapi.org/) servers. This
+Contentia exposes its content over HTTP as [JSON:API v1.1](https://jsonapi.org/) servers. This
 section documents every endpoint, grouped by API server.
 
 - [Storage API](./storage) — low-level key/value atom and folder storage
@@ -22,7 +22,7 @@ docs rebuild.
 
 ## Overview
 
-LaikaCMS exposes three HTTP API servers, each following the [JSON:API v1.1](https://jsonapi.org/)
+Contentia exposes three HTTP API servers, each following the [JSON:API v1.1](https://jsonapi.org/)
 specification. All responses use the `application/vnd.api+json` content type.
 
 | Server        | Default Base Path | Purpose                                            |
@@ -47,8 +47,8 @@ specification. All responses use the `application/vnd.api+json` content type.
   `page[size]` query parameters. Offset-based pagination uses `page[offset]` and `page[limit]`.
   **Cursor pagination is backend-specific.** Not all storage backends support `page[after]` /
   `page[before]`; backends like
-  [`FileSystemStorageRepository`](../api/laikacms/storage/fs/classes/FileSystemStorageRepository)
-  and [`R2StorageRepository`](../api/laikacms/storage/r2/classes/R2StorageRepository) only support
+  [`FileSystemStorageRepository`](../api/contentia/storage/fs/classes/FileSystemStorageRepository)
+  and [`R2StorageRepository`](../api/contentia/storage/r2/classes/R2StorageRepository) only support
   offset- and page-based pagination. Sending a cursor param to an unsupported backend returns a
   `400 Bad Request` with a `invalid_data` error. Inspect `GET /capabilities`
   (`attributes.pagination.styles.cursor`) to confirm cursor support before using these params.

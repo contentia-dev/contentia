@@ -1,10 +1,10 @@
 /**
  * OAuth 2.0 PKCE Authentication Module
  *
- * Provides secure OAuth 2.0 authentication with PKCE support for Laika CMS.
+ * Provides secure OAuth 2.0 authentication with PKCE support for Contentia.
  * Security hardened for post-quantum computing resistance.
  *
- * @module @laikacms/server/oauth2
+ * @module @contentia/server/oauth2
  */
 
 // OAuth 2.0 PKCE

@@ -1,20 +1,20 @@
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
-import { collectStream, runTask } from 'laikacms/compat';
+import { collectStream, runTask } from 'contentia/compat';
 
-import { laika } from './laika.js';
+import { contentia } from './contentia.js';
 
 const app = new Hono();
 
-// Decap JSON:API — forward all /api/decap/* requests to the embedded laika handler.
-// c.req.raw is the Web API Request object that laika.fetch expects.
-app.all('/api/decap/*', c => laika.fetch(c.req.raw));
+// Decap JSON:API — forward all /api/decap/* requests to the embedded contentia handler.
+// c.req.raw is the Web API Request object that contentia.fetch expects.
+app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
 
-// Blog index — list published posts via laika.documents (no extra HTTP round-trip).
+// Blog index — list published posts via contentia.documents (no extra HTTP round-trip).
 app.get('/', async c => {
   const { items: records } = await collectStream(
-    laika.documents.listRecords({
+    contentia.documents.listRecords({
       pagination: { page: 1, perPage: 100 },
       folder: 'posts',
       depth: 1,
@@ -55,13 +55,13 @@ app.get('/', async c => {
 </html>`);
 });
 
-// Individual blog post — read a single document via laika.documents.
+// Individual blog post — read a single document via contentia.documents.
 app.get('/blog/:slug', async c => {
   const { slug } = c.req.param();
 
   let post;
   try {
-    post = await runTask(laika.documents.getDocument(`posts/${slug}.json`));
+    post = await runTask(contentia.documents.getDocument(`posts/${slug}.json`));
   } catch {
     return c.notFound();
   }
@@ -96,8 +96,8 @@ app.use('/*', serveStatic({ root: './public' }));
 
 const PORT = Number(process.env.PORT ?? 3000);
 // Seed config.yml before accepting requests so direct repo access in SSR
-// routes (laika.documents.*) is safe without a prior fetch() call.
-await laika.ensureReady();
+// routes (contentia.documents.*) is safe without a prior fetch() call.
+await contentia.ensureReady();
 serve({ fetch: app.fetch, port: PORT }, info => {
   console.log(`Hono blog running at http://localhost:${info.port}`);
   console.log(`  Blog:  http://localhost:${info.port}/`);

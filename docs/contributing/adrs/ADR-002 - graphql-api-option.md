@@ -7,11 +7,11 @@ status: rejected
 
 # ADR-002: GraphQL API Option
 
-**Date:** 2026-05-20 **Status:** Rejected (defer indefinitely) **Deciders:** LaikaCMS core team
+**Date:** 2026-05-20 **Status:** Rejected (defer indefinitely) **Deciders:** Contentia core team
 
 ## Context
 
-LaikaCMS exposes three JSON:API HTTP surfaces:
+Contentia exposes three JSON:API HTTP surfaces:
 
 - **`storage-api`** — low-level key/value object and folder store, backed by `StorageRepository`
   (Cloudflare R2, Node.js filesystem, libSQL/Drizzle). Provides `atoms`, `atom-summaries`,
@@ -24,11 +24,11 @@ LaikaCMS exposes three JSON:API HTTP surfaces:
 
 All three servers implement the same pattern: a `fetch(request: Request): Promise<Response>`
 function that routes on URL path and HTTP method, calls repository methods that return
-`LaikaTask<T>` or `LaikaStream<Atom, Done>` (Effect-based typed async streams), and serialises
-results to JSON:API format.
+`ContentiaTask<T>` or `ContentiaStream<Atom, Done>` (Effect-based typed async streams), and
+serialises results to JSON:API format.
 
-The primary editorial client is a lightly patched fork of **Decap CMS**. The `laika-backend.ts`
-adapter translates Decap's `Implementation` interface into LaikaCMS JSON:API calls. Decap has no
+The primary editorial client is a lightly patched fork of **Decap CMS**. The `contentia-backend.ts`
+adapter translates Decap's `Implementation` interface into Contentia JSON:API calls. Decap has no
 knowledge of GraphQL and no plans to adopt it; GraphQL would therefore serve **non-Decap consumers
 only** — custom frontends, mobile apps, third-party integrations, or data pipelines that prefer a
 query-driven API over REST.
@@ -53,7 +53,7 @@ handling, and relay-style connections.
 
 - Pro: Type-safe from TypeScript domain models to GraphQL types; no SDL/TypeScript sync problem.
 - Pro: Pothos's `SchemaBuilder` can be shared across resolvers, making the schema extensible by
-  plugin packages (e.g., a future `laikacms-graphql-documents` package).
+  plugin packages (e.g., a future `contentia-graphql-documents` package).
 - Con: Still requires manually mapping each repository method to a resolver. For three repositories
   with a combined ~20 distinct operations, this is ~20 resolvers plus input/output types.
 - Con: Pothos adds a runtime dependency and a non-trivial learning curve for contributors unfamiliar
@@ -74,8 +74,8 @@ with `graphql-codegen`.
 
 #### Mapping to existing repository abstractions
 
-`StorageRepository` and `DocumentsRepository` both return `LaikaTask<T>` (single-value async
-generator) and `LaikaStream<Atom, Done>` (multi-value async generator). A GraphQL resolver must
+`StorageRepository` and `DocumentsRepository` both return `ContentiaTask<T>` (single-value async
+generator) and `ContentiaStream<Atom, Done>` (multi-value async generator). A GraphQL resolver must
 return a plain `Promise<T>` or throw. The adapter shim is straightforward for single-value tasks
 (`firstResult(gen)` already exists in each server) but requires collecting the full stream before
 returning for list operations — which the JSON:API servers also do today.
@@ -88,8 +88,8 @@ Relationship traversal (e.g., `document.revisions`) would require either:
 2. **Eager joins at the repository level** — expose a new `getDocumentWithRevisions(key)` method on
    `DocumentsRepository`. This leaks GraphQL concerns into the domain layer.
 
-Neither option is clean. The `LaikaTask`/`LaikaStream` abstraction was designed for pull-based,
-one-consumer-at-a-time access; GraphQL's field-resolution model assumes synchronous or
+Neither option is clean. The `ContentiaTask`/`ContentiaStream` abstraction was designed for
+pull-based, one-consumer-at-a-time access; GraphQL's field-resolution model assumes synchronous or
 `Promise`-based nested access, which does not compose naturally with the generator protocol.
 
 #### Infrastructure changes required
@@ -122,8 +122,8 @@ one-consumer-at-a-time access; GraphQL's field-resolution model assumes synchron
 - Schema maintenance burden: every domain change requires three updates (domain model, JSON:API
   serialiser, GraphQL type/resolver).
 - N+1 risk without Dataloader; Dataloader adds complexity that the current codebase does not have.
-- GraphQL over `LaikaTask`/`LaikaStream` is an impedance mismatch; adapters add surface area for
-  bugs.
+- GraphQL over `ContentiaTask`/`ContentiaStream` is an impedance mismatch; adapters add surface area
+  for bugs.
 - Cloudflare Workers / edge deployments may have bundle size constraints that a full GraphQL runtime
   (Apollo Server: ~150 kB; graphql-yoga: ~80 kB) could stress.
 - No current consumer has requested GraphQL.
@@ -187,11 +187,11 @@ and is rejected on feasibility grounds.
 ### Rationale
 
 1. **No current consumer.** The only editorial client (Decap CMS) communicates via JSON:API. There
-   are no known non-Decap consumers of LaikaCMS that have requested GraphQL. Building a GraphQL API
+   are no known non-Decap consumers of Contentia that have requested GraphQL. Building a GraphQL API
    now is speculative infrastructure for a use case that has not materialised.
 
-2. **Impedance mismatch with the domain model.** The `LaikaTask`/`LaikaStream` abstraction is a
-   pull-based, typed async generator protocol that does not compose naturally with GraphQL's
+2. **Impedance mismatch with the domain model.** The `ContentiaTask`/`ContentiaStream` abstraction
+   is a pull-based, typed async generator protocol that does not compose naturally with GraphQL's
    field-resolution model. Bridging the two requires Dataloader, eager joins, or adapter code that
    adds complexity without adding capability.
 
@@ -230,7 +230,7 @@ and is rejected on feasibility grounds.
 - The three JSON:API servers (`storage-api`, `documents-api`, `assets-api`) remain the sole
   programmatic API surface.
 - No new dependencies are added.
-- Custom frontend teams must use JSON:API or build their own BFF GraphQL layer on top of LaikaCMS
+- Custom frontend teams must use JSON:API or build their own BFF GraphQL layer on top of Contentia
   JSON:API endpoints.
 - When/if GraphQL is reconsidered, the chosen approach should be Pothos code-first (Option A1), the
   schema should cover only the endpoints required by known consumers (not a full mirror of
@@ -240,7 +240,7 @@ and is rejected on feasibility grounds.
 
 - A new package `packages/api/graphql-api` is created.
 - `StorageRepository` and `DocumentsRepository` are wrapped in a thin adapter that converts
-  `LaikaTask<T>` / `LaikaStream<Atom, Done>` to `Promise<T>` / `Promise<T[]>` for resolver
+  `ContentiaTask<T>` / `ContentiaStream<Atom, Done>` to `Promise<T>` / `Promise<T[]>` for resolver
   consumption.
 - Dataloader instances are created per request for list + relationship queries.
 - `Capabilities` gains `graphqlCapability: { supported: true, endpoint: '/graphql' }`.

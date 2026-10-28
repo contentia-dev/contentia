@@ -1,18 +1,18 @@
-# `@laikacms/bitbucket`
+# `@contentia/bitbucket`
 
-A Bitbucket-backed `StorageRepository` for Laika CMS via the
+A Bitbucket-backed `StorageRepository` for Contentia via the
 [Cloud REST v2 API](https://developer.atlassian.com/cloud/bitbucket/rest/intro/). Completes the
-git-platform triumvirate alongside [`@laikacms/github`](../github) and
-[`@laikacms/gitlab`](../gitlab).
+git-platform triumvirate alongside [`@contentia/github`](../github) and
+[`@contentia/gitlab`](../gitlab).
 
 Runtime-agnostic — only depends on `fetch`. Works on Node, Bun, Deno, Cloudflare Workers, and the
 browser.
 
-## `@laikacms/bitbucket/storage-bb`
+## `@contentia/bitbucket/storage-bb`
 
 ```ts
-import { BitbucketStorageRepository } from '@laikacms/bitbucket/storage-bb';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
+import { BitbucketStorageRepository } from '@contentia/bitbucket/storage-bb';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 
 const repo = new BitbucketStorageRepository({
   workspace: 'esstudio',
@@ -25,7 +25,7 @@ const repo = new BitbucketStorageRepository({
   },
   serializerRegistry: { md: markdownSerializer },
   defaultFileExtension: 'md',
-  commitAuthor: { name: 'Laika Bot', email: 'bot@example.com' },
+  commitAuthor: { name: 'Contentia Bot', email: 'bot@example.com' },
 });
 ```
 
@@ -105,7 +105,7 @@ app passwords, `Bearer <token>` for OAuth), so misconfiguration surfaces early.
   **/Thumbs.db
   **/desktop.ini
   **/.catalog
-  **/.laikacms
+  **/.contentia
   ```
 
 - **`commitAuthor`** — `{ name: string; email: string }` stamped as both the author and committer on

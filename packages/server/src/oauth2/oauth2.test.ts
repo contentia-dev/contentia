@@ -11,14 +11,14 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleAuthorize, handleToken, laikaOauth2 } from './oauth2.js';
+import { contentiaOauth2, handleAuthorize, handleToken } from './oauth2.js';
 import type { AuthorizationCode, OAuthCallbacks, OAuthConfig, OAuthSession, User } from './oauth2.js';
 
 // ---------------------------------------------------------------------------
-// Mock laikacms/crypto so tests don't run bcrypt (slow) or timing delays
+// Mock contentia/crypto so tests don't run bcrypt (slow) or timing delays
 // ---------------------------------------------------------------------------
 
-vi.mock('laikacms/crypto', () => ({
+vi.mock('contentia/crypto', () => ({
   addTimingJitter: vi.fn().mockResolvedValue(undefined),
   constantTimeEqual: vi.fn().mockImplementation((a: string, b: string) => Promise.resolve(a === b)),
   generateSecureRandomString: vi.fn().mockImplementation((len: number) => 'x'.repeat(len)),
@@ -51,7 +51,7 @@ vi.mock('./totp/totp.js', () => ({
 }));
 
 // Import after mock registration so the mock is in place when the module loads.
-import { verifyPassword } from 'laikacms/crypto';
+import { verifyPassword } from 'contentia/crypto';
 import { verifyOAuthTOTPWithReplayProtection } from './totp/totp.js';
 
 // ---------------------------------------------------------------------------
@@ -1093,13 +1093,13 @@ describe('handleToken — grant_type validation and method guard (LCMS-394)', ()
 });
 
 // ---------------------------------------------------------------------------
-// laikaOauth2 — custom authorizeEndpoint / tokenEndpoint routing (LCMS-280)
+// contentiaOauth2 — custom authorizeEndpoint / tokenEndpoint routing (LCMS-280)
 // ---------------------------------------------------------------------------
 
-describe('laikaOauth2 custom endpoint routing', () => {
+describe('contentiaOauth2 custom endpoint routing', () => {
   it('routes to default <basePath>/authorize when authorizeEndpoint is not set', async () => {
     const callbacks = makeCallbacks();
-    const handler = laikaOauth2(makeConfig(callbacks));
+    const handler = contentiaOauth2(makeConfig(callbacks));
     const request = new Request(
       `https://auth.example.com/${BASE_PATH}/authorize?response_type=code&client_id=${CLIENT_ID}&redirect_uri=https://app.example.com/cb&code_challenge=abc&code_challenge_method=S256`,
       { method: 'GET' },
@@ -1111,7 +1111,7 @@ describe('laikaOauth2 custom endpoint routing', () => {
 
   it('routes to custom authorizeEndpoint when provided', async () => {
     const callbacks = makeCallbacks();
-    const handler = laikaOauth2(makeConfig(callbacks, { authorizeEndpoint: '/custom/auth' }));
+    const handler = contentiaOauth2(makeConfig(callbacks, { authorizeEndpoint: '/custom/auth' }));
 
     // A request to the default basePath/authorize path should now 404
     const defaultRequest = new Request(
@@ -1130,7 +1130,7 @@ describe('laikaOauth2 custom endpoint routing', () => {
 
   it('routes to custom tokenEndpoint when provided', async () => {
     const callbacks = makeCallbacks();
-    const handler = laikaOauth2(makeConfig(callbacks, { tokenEndpoint: '/custom/token' }));
+    const handler = contentiaOauth2(makeConfig(callbacks, { tokenEndpoint: '/custom/token' }));
 
     // A POST to the default basePath/token should now 404
     const defaultRequest = new Request(`https://auth.example.com/${BASE_PATH}/token`, {

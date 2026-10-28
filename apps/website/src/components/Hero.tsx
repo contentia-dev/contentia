@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { BackendIcon } from './BackendIcon';
-import { CATALOGUE_SERIALIZERS, LAIKA_GROUPS } from './Backends';
+import { CATALOGUE_SERIALIZERS, CONTENTIA_GROUPS } from './Backends';
 import { IconArrow, IconGitHub, IconGlobe } from './icons';
 
 const BTN_PRIMARY =
@@ -11,7 +11,7 @@ const BTN_GHOST =
   'font-body font-medium text-[15.5px] rounded-[10px] py-[13px] px-[22px] inline-flex items-center gap-[9px] cursor-pointer whitespace-nowrap bg-surface text-ink border border-hairline-2 transition-[background,color,border-color,transform,box-shadow] duration-150 hover:border-ink-3 hover:bg-surface-2 active:translate-y-px';
 
 /* The marquee is decorative: every backend twice so the loop is seamless. */
-const marquee = [...LAIKA_GROUPS.flatMap(g => g.items), ...CATALOGUE_SERIALIZERS.items];
+const marquee = [...CONTENTIA_GROUPS.flatMap(g => g.items), ...CATALOGUE_SERIALIZERS.items];
 const loop = [...marquee, ...marquee];
 
 interface HeroCta {
@@ -85,7 +85,7 @@ export function Hero({
         <div className="relative min-w-0 max-[940px]:order-2">
           <img
             className="absolute w-[128%] h-[128%] max-w-none top-1/2 left-[64%] -translate-x-1/2 -translate-y-1/2 object-contain opacity-55 dark:opacity-20 z-0 pointer-events-none"
-            src="/assets/laika-dog-mid.png"
+            src="/assets/contentia-dog-mid.png"
             alt=""
             aria-hidden="true"
           />

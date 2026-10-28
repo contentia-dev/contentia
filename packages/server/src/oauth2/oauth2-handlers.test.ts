@@ -4,7 +4,7 @@
  *  handlePasskeySetupPage, handlePasskeyRegister, handlePasskeyAuthenticateVerify,
  *  handleForgotPassword, handleResetPassword,
  *  handleLogout, handleLogoutAll,
- *  laikaOauth2() router dispatch.
+ *  contentiaOauth2() router dispatch.
  *
  * LCMS-166
  */
@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — must be hoisted above imports
 // ---------------------------------------------------------------------------
 
-vi.mock('laikacms/crypto', () => ({
+vi.mock('contentia/crypto', () => ({
   addTimingJitter: vi.fn().mockResolvedValue(undefined),
   constantTimeEqual: vi.fn().mockImplementation((a: string, b: string) => Promise.resolve(a === b)),
   generateSecureRandomString: vi.fn().mockImplementation((len: number) => 'x'.repeat(len)),
@@ -43,7 +43,7 @@ vi.mock('./email/email.js', () => ({
 
 // Imports after mock registration
 import { requestPasswordReset, resetPassword } from './email/email.js';
-import { handleLogout, handleLogoutAll, laikaOauth2 } from './oauth2.js';
+import { contentiaOauth2, handleLogout, handleLogoutAll } from './oauth2.js';
 import type { OAuthCallbacks, OAuthConfig, OAuthSession, User } from './oauth2.js';
 import { generateRegistrationOptions, verifyAuthentication, verifyRegistration } from './passkey/passkey.js';
 import { setupOAuthTOTP, verifyOAuthTOTPSetup } from './totp/totp.js';
@@ -176,7 +176,7 @@ describe('handleTotpSetupPage', () => {
     const callbacks = makeCallbacks();
     const totpCbs = makeTotpCallbacks();
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/totp', { setup_token: 'tok' }), { method: 'GET' });
     const response = await router.fetch(request);
@@ -187,7 +187,7 @@ describe('handleTotpSetupPage', () => {
   it('returns 400 when TOTP is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks); // no totp config
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/totp', { redirect_uri: 'https://auth.example.com/oauth2/authorize', setup_token: 'tok' }),
@@ -202,7 +202,7 @@ describe('handleTotpSetupPage', () => {
     const callbacks = makeCallbacks();
     const totpCbs = makeTotpCallbacks();
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/totp', { redirect_uri: 'https://auth.example.com/oauth2/authorize' }),
@@ -218,7 +218,7 @@ describe('handleTotpSetupPage', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/totp', {
@@ -237,7 +237,7 @@ describe('handleTotpSetupPage', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/totp', {
@@ -257,7 +257,7 @@ describe('handleTotpSetupPage', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: user.id, purpose: 'setup' });
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/totp', {
@@ -290,7 +290,7 @@ describe('handleTotpSetupVerify', () => {
     const callbacks = makeCallbacks();
     const totpCbs = makeTotpCallbacks();
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('totp_code', '123456');
@@ -304,7 +304,7 @@ describe('handleTotpSetupVerify', () => {
     const callbacks = makeCallbacks();
     const totpCbs = makeTotpCallbacks();
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'tok');
@@ -317,7 +317,7 @@ describe('handleTotpSetupVerify', () => {
   it('returns 400 when TOTP is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks); // no totp config
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'tok');
@@ -333,7 +333,7 @@ describe('handleTotpSetupVerify', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'bad-token');
@@ -350,7 +350,7 @@ describe('handleTotpSetupVerify', () => {
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     totpCbs.getTotpSecret.mockResolvedValue(null);
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'valid-token');
@@ -368,7 +368,7 @@ describe('handleTotpSetupVerify', () => {
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     totpCbs.getTotpSecret.mockResolvedValue('BASE32SECRET');
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'valid-token');
@@ -386,7 +386,7 @@ describe('handleTotpSetupVerify', () => {
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     totpCbs.getTotpSecret.mockResolvedValue('BASE32SECRET');
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const redirectUri = `${ORIGIN}/${BASE_PATH}/authorize`;
     const body = new FormData();
@@ -408,7 +408,7 @@ describe('handleTotpSetupVerify', () => {
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     totpCbs.getTotpSecret.mockResolvedValue('BASE32SECRET');
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'valid-token');
@@ -429,7 +429,7 @@ describe('handleTotpSetupVerify', () => {
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     totpCbs.getTotpSecret.mockResolvedValue('BASE32SECRET');
     const config = makeConfig(callbacks, { totp: totpConfig(totpCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('setup_token', 'valid-token');
@@ -476,7 +476,7 @@ describe('handlePasskeySetupPage', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey', { setup_token: 'tok' }), { method: 'GET' });
     const response = await router.fetch(request);
@@ -487,7 +487,7 @@ describe('handlePasskeySetupPage', () => {
   it('returns 400 when passkey is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks); // no passkey config
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/passkey', { redirect_uri: `${ORIGIN}/callback`, setup_token: 'tok' }),
@@ -502,7 +502,7 @@ describe('handlePasskeySetupPage', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/passkey', { redirect_uri: `${ORIGIN}/callback` }),
@@ -518,7 +518,7 @@ describe('handlePasskeySetupPage', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/passkey', { redirect_uri: `${ORIGIN}/callback`, setup_token: 'bad-token' }),
@@ -534,7 +534,7 @@ describe('handlePasskeySetupPage', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/passkey', { redirect_uri: `${ORIGIN}/callback`, setup_token: 'valid-token' }),
@@ -551,7 +551,7 @@ describe('handlePasskeySetupPage', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue({ userId: user.id, purpose: 'setup' });
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(
       makeUrl('setup/passkey', { redirect_uri: `${ORIGIN}/callback`, setup_token: 'valid-token' }),
@@ -590,7 +590,7 @@ describe('handlePasskeyRegister', () => {
   it('returns 400 when passkey is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks); // no passkey config
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey/register'), {
       method: 'POST',
@@ -608,7 +608,7 @@ describe('handlePasskeyRegister', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey/register'), {
       method: 'POST',
@@ -625,7 +625,7 @@ describe('handlePasskeyRegister', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey/register'), {
       method: 'POST',
@@ -643,7 +643,7 @@ describe('handlePasskeyRegister', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey/register'), {
       method: 'POST',
@@ -663,7 +663,7 @@ describe('handlePasskeyRegister', () => {
     const passkeyCbs = makePasskeyCallbacks();
     passkeyCbs.getPendingPasskeySetupSession.mockResolvedValue({ userId: 'user-1', purpose: 'setup' });
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('setup/passkey/register'), {
       method: 'POST',
@@ -705,7 +705,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
   it('returns 400 when passkey is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks);
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('passkey/authenticate/verify'), {
       method: 'POST',
@@ -722,7 +722,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('passkey/authenticate/verify'), {
       method: 'POST',
@@ -739,7 +739,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('passkey/authenticate/verify'), {
       method: 'POST',
@@ -756,7 +756,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const url = makeUrl('passkey/authenticate/verify', {
       client_id: 'test-client',
@@ -787,7 +787,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
       passkey: passkeyConfig(passkeyCbs),
       totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const url = makeUrl('passkey/authenticate/verify', {
       redirect_uri: 'https://example.com/callback',
@@ -811,7 +811,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     // code_challenge present but redirect_uri missing
     const url = makeUrl('passkey/authenticate/verify', { code_challenge: 'abc123' });
@@ -832,7 +832,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     const callbacks = makeCallbacks();
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     // redirect_uri present but code_challenge missing
     const url = makeUrl('passkey/authenticate/verify', {
@@ -857,7 +857,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
     });
     const passkeyCbs = makePasskeyCallbacks();
     const config = makeConfig(callbacks, { passkey: passkeyConfig(passkeyCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const url = makeUrl('passkey/authenticate/verify', {
       client_id: 'test-client',
@@ -896,7 +896,7 @@ describe('handleForgotPassword', () => {
   it('returns 404 when password reset is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks); // no passwordReset config
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -908,7 +908,7 @@ describe('handleForgotPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -921,7 +921,7 @@ describe('handleForgotPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData(); // no email field
     const request = new Request(makeUrl('forgot-password'), { method: 'POST', body });
@@ -936,7 +936,7 @@ describe('handleForgotPassword', () => {
     const prCbs = makePasswordResetCallbacks();
     vi.mocked(requestPasswordReset).mockResolvedValue({ success: true });
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('email', 'user@example.com');
@@ -951,7 +951,7 @@ describe('handleForgotPassword', () => {
     const callbacks = makeCallbacks({ getUserByEmail: vi.fn().mockResolvedValue(null) });
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     vi.useFakeTimers();
     const body = new FormData();
@@ -970,7 +970,7 @@ describe('handleForgotPassword', () => {
     const callbacks = makeCallbacks({ getUserByEmail: vi.fn().mockResolvedValue(null) });
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     vi.useFakeTimers();
     const body = new FormData();
@@ -988,7 +988,7 @@ describe('handleForgotPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'PUT' });
     const response = await router.fetch(request);
@@ -1028,7 +1028,7 @@ describe('handleForgotPassword — CAPTCHA CSP', () => {
       passwordReset: passwordResetConfig(prCbs),
       captcha: makeCaptchaConfig(' https://example-captcha.com; frame-src https://example-captcha.com'),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1045,7 +1045,7 @@ describe('handleForgotPassword — CAPTCHA CSP', () => {
       passwordReset: passwordResetConfig(prCbs),
       captcha: makeCaptchaConfig(), // enabled, no captchaCspAdditions
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1062,7 +1062,7 @@ describe('handleForgotPassword — CAPTCHA CSP', () => {
       passwordReset: passwordResetConfig(prCbs),
       // no captcha config
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('forgot-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1079,7 +1079,7 @@ describe('handleForgotPassword — CAPTCHA CSP', () => {
       passwordReset: passwordResetConfig(prCbs),
       captcha: makeCaptchaConfig(' https://example-captcha.com'),
     });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData(); // no email
     const request = new Request(makeUrl('forgot-password'), { method: 'POST', body });
@@ -1107,7 +1107,7 @@ describe('handleResetPassword', () => {
   it('returns 404 when password reset is not enabled', async () => {
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks);
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('reset-password', { token: 'tok' }), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1119,7 +1119,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('reset-password'), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1132,7 +1132,7 @@ describe('handleResetPassword', () => {
     prCbs.getResetToken.mockResolvedValue(null); // token not found
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('reset-password', { token: 'expired-token' }), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1152,7 +1152,7 @@ describe('handleResetPassword', () => {
     });
     const callbacks = makeCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('reset-password', { token: 'valid-token' }), { method: 'GET' });
     const response = await router.fetch(request);
@@ -1165,7 +1165,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('password', 'newpassword123');
@@ -1180,7 +1180,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('token', 'valid-token');
@@ -1198,7 +1198,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('token', 'valid-token');
@@ -1217,7 +1217,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('token', 'bad-token');
@@ -1234,7 +1234,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('token', 'valid-token');
@@ -1253,7 +1253,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks({ logoutAll: logoutAllFn });
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new FormData();
     body.set('token', 'valid-token');
@@ -1269,7 +1269,7 @@ describe('handleResetPassword', () => {
     const callbacks = makeCallbacks();
     const prCbs = makePasswordResetCallbacks();
     const config = makeConfig(callbacks, { passwordReset: passwordResetConfig(prCbs) });
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(makeUrl('reset-password'), { method: 'DELETE' });
     const response = await router.fetch(request);
@@ -1349,7 +1349,7 @@ describe('handleLogout', () => {
     expect(response.status).toBe(405);
   });
 
-  it('also dispatches through laikaOauth2() router', async () => {
+  it('also dispatches through contentiaOauth2() router', async () => {
     const session = makeSession();
     const logoutFn = vi.fn().mockResolvedValue(undefined);
     const callbacks = makeCallbacks({
@@ -1357,7 +1357,7 @@ describe('handleLogout', () => {
       logoutSession: logoutFn,
     });
     const config = makeConfig(callbacks);
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
     const request = new Request(makeUrl('logout'), {
       method: 'GET',
       headers: { Authorization: `Bearer ${session.accessToken}` },
@@ -1440,7 +1440,7 @@ describe('handleLogoutAll', () => {
     expect(response.status).toBe(405);
   });
 
-  it('also dispatches through laikaOauth2() router', async () => {
+  it('also dispatches through contentiaOauth2() router', async () => {
     const session = makeSession();
     const logoutAllFn = vi.fn().mockResolvedValue(undefined);
     const callbacks = makeCallbacks({
@@ -1448,7 +1448,7 @@ describe('handleLogoutAll', () => {
       logoutAll: logoutAllFn,
     });
     const config = makeConfig(callbacks);
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
     const request = new Request(makeUrl('logout-all'), {
       method: 'GET',
       headers: { Authorization: `Bearer ${session.accessToken}` },
@@ -1461,13 +1461,13 @@ describe('handleLogoutAll', () => {
 });
 
 // ===========================================================================
-// laikaOauth2() router — path dispatch
+// contentiaOauth2() router — path dispatch
 // ===========================================================================
 
-describe('laikaOauth2() router dispatch', () => {
+describe('contentiaOauth2() router dispatch', () => {
   it('returns 404 for unknown routes', async () => {
     const config = makeConfig(makeCallbacks());
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const request = new Request(`${ORIGIN}/${BASE_PATH}/nonexistent`, { method: 'GET' });
     const response = await router.fetch(request);
@@ -1477,7 +1477,7 @@ describe('laikaOauth2() router dispatch', () => {
 
   it('dispatches GET /authorize to handleAuthorize', async () => {
     const config = makeConfig(makeCallbacks());
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -1496,7 +1496,7 @@ describe('laikaOauth2() router dispatch', () => {
 
   it('dispatches POST /token to handleToken', async () => {
     const config = makeConfig(makeCallbacks());
-    const router = laikaOauth2(config);
+    const router = contentiaOauth2(config);
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',

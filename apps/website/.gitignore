@@ -1,8 +1,8 @@
-# The vite plugin's generated types + body chunks. The rest of .laika/ (the
+# The vite plugin's generated types + body chunks. The rest of .contentia/ (the
 # catalog, schemas, revisions) is durable state and stays committed.
-.laika/vite-generated/
+.contentia/vite-generated/
 # Astro's generated types + build cache.
 .astro/
 # This site doesn't use the catalog, but the convention provider still
 # auto-writes default collection settings into the content dir on first use.
-src/content/.laika/
+src/content/.contentia/

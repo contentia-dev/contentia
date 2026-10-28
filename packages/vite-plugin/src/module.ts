@@ -1,7 +1,7 @@
 /**
  * Render a content object into an ES module string with one named export per
  * top-level field. Rollup treats each named export as an independent binding,
- * so `import { title } from 'laika:doc/posts/hello'` drops every other field
+ * so `import { title } from 'contentia:doc/posts/hello'` drops every other field
  * from the bundle — which is what makes `import.meta.glob(..., { import: 'title' })`
  * over a blog index cheap.
  */

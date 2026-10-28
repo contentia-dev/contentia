@@ -1,4 +1,4 @@
-/* "Where Laika sits" — an honest map of the headless CMS field.
+/* "Where Contentia sits" — an honest map of the headless CMS field.
    Tone rule: describe competitors neutrally (they're good tools), then state
    the concrete difference. No checkmark tables, no strawmen.
    The map itself is content, passed in as props from the page that uses it. */
@@ -6,7 +6,7 @@
 export interface Rival {
   name: string;
   what: string;
-  laika: string;
+  contentia: string;
 }
 
 export interface CompareProps {
@@ -42,9 +42,9 @@ export function Compare({ heading, lead, columns, rivals }: CompareProps) {
               <p className="text-ink-2 text-[15px] leading-[1.6]">{r.what}</p>
               <p className="text-[15px] leading-[1.6] text-indigo-ink">
                 <span className="max-[880px]:inline hidden font-mono text-[11px] tracking-[0.08em] uppercase text-indigo mr-2">
-                  Laika
+                  Contentia
                 </span>
-                {r.laika}
+                {r.contentia}
               </p>
             </div>
           ))}

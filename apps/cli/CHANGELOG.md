@@ -1,10 +1,10 @@
-# laikacli
+# @contentia/cli
 
 ## 0.2.1
 
 ### Patch Changes
 
-- 14df4cf: Fix `npx laikacli` crashing with `ERR_MODULE_NOT_FOUND` on
+- 14df4cf: Fix `npx contentia` crashing with `ERR_MODULE_NOT_FOUND` on
   `effect/unstable/http/Multipasta/Node`.
 
   The catalog pinned `effect` and `@effect/platform-node` to `4.0.0-beta.66` while
@@ -20,7 +20,7 @@
 
   Also fixes two problems surfaced by the bump:
 
-  - `@laikacms/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
+  - `@contentia/server` imported `effect/DateTime` and `effect/Result` without declaring `effect` as
     a dependency, resolving through a stale phantom symlink. It is now a declared dependency, which
     also makes the published package installable on npm.
   - `effect/Schema`'s `decodeUnknownSync` now throws a real `SchemaError` rather than a plain

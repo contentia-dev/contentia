@@ -1,6 +1,6 @@
 ---
 /**
- * One blog post. The route is a rest parameter because a Laika document key
+ * One blog post. The route is a rest parameter because a Contentia document key
  * may be nested (`posts/2026/hello` → id `2026/hello`), and only `[...id]`
  * lets the slash survive into the URL.
  */
@@ -21,7 +21,7 @@ const { Content } = await render(post);
 
 <Base
   frontmatter={{
-    title: `${title} | Laika blog`,
+    title: `${title} | Contentia blog`,
     description,
     article: { publishedTime: date, author, tags },
   }}

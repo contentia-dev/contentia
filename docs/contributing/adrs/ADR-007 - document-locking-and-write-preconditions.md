@@ -9,15 +9,15 @@ status: accepted
 
 **Date:** 2026-08-05 **Status:** Accepted **Relates to:** [[ADR-001 - realtime-collaboration]] (this
 is the follow-through on its deferred "Option 2 — pessimistic locking"), [[ADR-008 -
-repository-effect-boundary-convention]] (LaikaTask target style), [[ADR-006 -
+repository-effect-boundary-convention]] (ContentiaTask target style), [[ADR-006 -
 cms-agnostic-protocol]] (decap is an adapter, not the owner of the mechanism)
 
 > **Implementation status (2026-08-10):** the advisory half of this ADR is built. Shipped:
 > `Lock`/`LockToken`/`LockConflictError` (423), the `locks` capability with both `scope` and
 > `transactional` axes, five methods on `DocumentsRepository`, `InProcessLockManager`
-> (`laikacms/locks/in-process`), the `/locks/{key}` sub-path on documents-api, the proxy's HTTP
-> forwarding, `@laikacms/server/api`'s `/locks` rewritten as a repository adapter, and the four
-> `CmsImplementation` methods in the decap-cms laika backend.
+> (`contentia/locks/in-process`), the `/locks/{key}` sub-path on documents-api, the proxy's HTTP
+> forwarding, `@contentia/server/api`'s `/locks` rewritten as a repository adapter, and the four
+> `CmsImplementation` methods in the decap-cms contentia backend.
 >
 > Three documented deviations from the sketch below:
 >
@@ -45,8 +45,8 @@ bolted onto the Decap backend:
 - a Promise-based **`LockStore`** KV interface (`get`/`set`/`delete` with a TTL argument),
 - a **`LockManager`** policy class (acquire / refresh / release / get, with force-override and
   owner-guarded release), and
-- **`buildLocksApi`**, an HTTP handler mounted as `/locks` on `laikaApi`, wired through
-  `LaikaApiOptions.locks?: LockStore` + `locksTtlMs`.
+- **`buildLocksApi`**, an HTTP handler mounted as `/locks` on `contentiaApi`, wired through
+  `ContentiaApiOptions.locks?: LockStore` + `locksTtlMs`.
 
 It works, but it is unsatisfying on four axes:
 
@@ -58,9 +58,9 @@ It works, but it is unsatisfying on four axes:
    locking is therefore impossible: the one guarantee server-arbitrated locks exist to provide is
    the one the seam forecloses.
 3. **Advisory-only, no path to enforcement.** Nothing consults a lock on write.
-4. **Off-island stylistically.** Promises + a thrown `LockConflict` class instead of `LaikaTask` + a
-   typed `LaikaError`, so it does not compose with the rest of the pipeline and is tested
-   differently.
+4. **Off-island stylistically.** Promises + a thrown `LockConflict` class instead of
+   `ContentiaTask` + a typed `ContentiaError`, so it does not compose with the rest of the pipeline
+   and is tested differently.
 
 [[ADR-001 - realtime-collaboration]] deferred real-time collaboration to post-v1.0 and named
 **pessimistic locking** as the lowest-complexity path when demand materialised, to be layered "on
@@ -81,10 +81,10 @@ datasource's native transaction.
     `max(updatedAt)` are all valid implementations."
   - **`revision`** (`StorageObjectMetadata.revision`, gated by `VersionTrackingCapability`) —
     opaque, equality-only, **per-record**. "A git blob/commit sha, a DB row version, an R2 ETag."
-- `LaikaError` variants exist including **`VersionMismatchError`** (code `version_mismatch`, status
-  **409**). There is **no** lock error yet. `LaikaError` has no generic data slot — a subclass adds
-  its own fields.
-- `@laikacms/server/api` already holds a **`DocumentsRepository` directly**
+- `ContentiaError` variants exist including **`VersionMismatchError`** (code `version_mismatch`,
+  status **409**). There is **no** lock error yet. `ContentiaError` has no generic data slot — a
+  subclass adds its own fields.
+- `@contentia/server/api` already holds a **`DocumentsRepository` directly**
   (`documents: DocumentsRepository`), which may itself be the `documents-jsonapi-proxy`. The
   repository interface is the single seam; decap does not care whether it is native or a proxy.
 - Effect's concurrency primitives (`Ref`, STM `TRef`/`TMap`, `Semaphore`) are **in-process only**:
@@ -94,8 +94,8 @@ datasource's native transaction.
 
 Locking becomes a **repository-native, capability-gated capability on `DocumentsRepository`** (the
 repo Decap edits, and where per-record `revision` already lives), expressed in the established
-`LaikaTask` / `LaikaError` / capability idiom. Advisory _communication_ and write _atomicity_ are
-separated: the lock **informs**; the write's **precondition** enforces.
+`ContentiaTask` / `ContentiaError` / capability idiom. Advisory _communication_ and write
+_atomicity_ are separated: the lock **informs**; the write's **precondition** enforces.
 
 ### 1. New methods on `DocumentsRepository` (shared types, Documents-only methods)
 
@@ -141,8 +141,8 @@ scope**; the ladder only _signals_.)
 - **`LockToken`** — a **branded opaque string** (equality-only, like `SyncToken`/`revision`). It is
   a **bearer capability**: whoever holds it can release the lock or write through it. Returned
   **only** to the acquirer/refresher; **never** exposed by `getLock` (see §5).
-- **`LockConflictError`** — new `LaikaError`, **status 423 Locked** (deliberately distinct from the
-  version rung's 409 so a client branches on status alone), carrying the current `Lock` in the
+- **`LockConflictError`** — new `ContentiaError`, **status 423 Locked** (deliberately distinct from
+  the version rung's 409 so a client branches on status alone), carrying the current `Lock` in the
   JSON:API error's **`meta.lock`**.
 - **Version rung reuses the existing `VersionMismatchError`** (409) — no new error — carrying
   `currentRevision` in `meta`.
@@ -202,7 +202,7 @@ breaking capability change.
   deferred** (Decap polls `getLock` explicitly; noted as a future optimisation for other API
   consumers, not silently dropped).
 - **decap cleanup:** delete `LockStore`, `LockManager`, `createInMemoryLockStore`,
-  `DEFAULT_ENTRY_LOCK_TTL_MS`, and the `locks` / `locksTtlMs` `LaikaApiOptions`. The `/locks`
+  `DEFAULT_ENTRY_LOCK_TTL_MS`, and the `locks` / `locksTtlMs` `ContentiaApiOptions`. The `/locks`
   endpoint becomes a thin adapter over `documents.*` lock methods, capability-gated on
   `documents.getCapabilities().locks`.
 
@@ -235,7 +235,7 @@ breaking capability change.
 
 ## Consequences
 
-- **`laikacms/core` / storage-shared** gains: `Lock`, `LockToken`, `LockConflictError` (code
+- **`contentia/core` / storage-shared** gains: `Lock`, `LockToken`, `LockConflictError` (code
   `lock_conflict`, status 423), the `LocksCapability` schema, and the `precondition` struct.
   `VersionMismatchError` is reused (now carries `currentRevision` in `meta`).
 - **`DocumentsRepository`** gains five methods (four abstract-with-`NotImplementedError`-default

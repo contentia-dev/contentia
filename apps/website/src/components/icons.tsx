@@ -346,7 +346,7 @@ export const GenericIcon = ({ name }: { name: string }) => <>{GENERIC[name] ?? G
 export const Logo = ({ height = 30 }: { height?: number }) => (
   <span className="inline-flex items-center gap-[11px]">
     <img
-      src="/assets/laika-icon.png"
+      src="/assets/contentia-icon.png"
       alt=""
       width={height}
       height={height}
@@ -356,7 +356,7 @@ export const Logo = ({ height = 30 }: { height?: number }) => (
       className="font-display font-semibold tracking-[-0.02em] text-ink"
       style={{ fontSize: height * 0.7 }}
     >
-      Laika
+      Contentia
     </span>
   </span>
 );

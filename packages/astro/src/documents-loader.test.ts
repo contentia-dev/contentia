@@ -1,5 +1,5 @@
 /**
- * The loader against real Laika repositories.
+ * The loader against real Contentia repositories.
  *
  * Two profiles are exercised deliberately:
  *
@@ -19,10 +19,10 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createFsStorage, createRepositories } from '@laikacms/vite-plugin';
-import { runTask } from 'laikacms/compat';
-import type { DocumentsRepository } from 'laikacms/documents';
-import { InMemoryDocumentsRepository } from 'laikacms/documents/testing';
+import { createFsStorage, createRepositories } from '@contentia/vite-plugin';
+import { runTask } from 'contentia/compat';
+import type { DocumentsRepository } from 'contentia/documents';
+import { InMemoryDocumentsRepository } from 'contentia/documents/testing';
 
 import { createDocumentsSyncSource } from './documents-loader.js';
 import { type SourceRecord, toDataEntry } from './mapping.js';
@@ -37,7 +37,7 @@ afterEach(async () => {
 
 /** A filesystem-backed documents repository, wired exactly as the loader wires it. */
 async function createFilesystemRepository(): Promise<DocumentsRepository> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-'));
   tempDirs.push(dir);
   await fs.mkdir(path.join(dir, 'posts'), { recursive: true });
   return createRepositories(createFsStorage({ dir, defaultExtension: 'md' })).documents;
@@ -98,7 +98,7 @@ describe.each(PROFILES)('$name', ({ create, expectedTier }) => {
 
     await sync(documents, fake);
 
-    expect(fake.meta.get('laika:strategy')).toBe(expectedTier);
+    expect(fake.meta.get('contentia:strategy')).toBe(expectedTier);
   });
 
   it('loads documents with frontmatter in data and the body rendered', async () => {
@@ -201,7 +201,7 @@ describe.each(PROFILES)('$name', ({ create, expectedTier }) => {
       logger: fake.logger,
       entry: {},
       generateDigest: fake.generateDigest,
-      refreshContextData: { laika: { changes: [{ key: 'posts/a', deleted: false }] } },
+      refreshContextData: { contentia: { changes: [{ key: 'posts/a', deleted: false }] } },
       toEntry: (record: SourceRecord) =>
         toDataEntry(record, {
           collection: 'posts',

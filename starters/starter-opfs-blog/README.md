@@ -1,8 +1,8 @@
 # starter-opfs-blog
 
-A blog where **LaikaCMS runs entirely in the browser** — no server, no database, no git remote.
+A blog where **Contentia runs entirely in the browser** — no server, no database, no git remote.
 The Decap admin and the blog both talk to a
-[`WebFsStorageRepository`](https://www.npmjs.com/package/laikacms) (`laikacms/storage/web-fs`)
+[`WebFsStorageRepository`](https://www.npmjs.com/package/contentia) (`contentia/storage/web-fs`)
 backed by the browser's File System API, wrapped in the same Catalog documents/assets adapters
 the server-side stacks use.
 
@@ -31,20 +31,20 @@ Open the printed URL — the blog is at `/`, the admin at `/admin/`.
 
 ## Working from the monorepo
 
-If you cloned the `laikacms` repository and are running this starter in-place (not via the wizard),
+If you cloned the `contentia` repository and are running this starter in-place (not via the wizard),
 the `starters/pnpm-workspace.yaml` carries `link:` overrides pointing at local builds of packages
 that are ahead of npm. Build those packages first, then install and run:
 
 ```sh
 # Build the linked packages (run from this directory)
-pnpm -C ../.. --filter laikacms build
+pnpm -C ../.. --filter contentia build
 
 pnpm install
 pnpm dev
 ```
 
 The admin logs in automatically:
-there is no server to authenticate against, so the `laika` backend runs in `dev_token` mode and a
+there is no server to authenticate against, so the `contentia` backend runs in `dev_token` mode and a
 tiny same-origin fetch shim (`src/local-session.ts`) answers its `/session` and `/health` checks.
 
 ## How it's wired
@@ -52,7 +52,7 @@ tiny same-origin fetch shim (`src/local-session.ts`) answers its `/session` and 
 ```
 src/storage.ts        mode selection (localStorage) + picked-handle persistence (IndexedDB)
                       WebFsStorageRepository → Catalog documents/assets repositories
-src/cms.ts            bare Decap app registrations; laika backend with *injected* repositories
+src/cms.ts            bare Decap app registrations; contentia backend with *injected* repositories
 src/prism-global.ts   Prism bootstrap the bare app needs before any widget import
 src/local-session.ts  fetch shim for the backend's /session + /health endpoints
 src/admin.ts          admin entry: storage bar + init() with dev_token backend config
@@ -64,7 +64,7 @@ state — a mid-session revocation shows up as a typed error, not silent breakag
 
 ## What this is (and isn't) for
 
-Local-first demos, offline drafting, trying LaikaCMS without infrastructure, and editing a real
+Local-first demos, offline drafting, trying Contentia without infrastructure, and editing a real
 content folder on disk without running a server. It is **not** multi-user and has **no access
 control** — everything behind the directory handle is readable and writable by any script that
 obtains it, and OPFS data can be evicted under storage pressure unless the origin holds persistent

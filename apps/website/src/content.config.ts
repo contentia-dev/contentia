@@ -1,7 +1,7 @@
 /**
  * Content collections.
  *
- * These are Laika *storage objects* rather than documents: they have no
+ * These are Contentia *storage objects* rather than documents: they have no
  * published/draft state, they are structured data the page renders, and they
  * live under `content/` so a non-developer can edit them. `objectsLoader` is the
  * loader for that half of the model.
@@ -12,12 +12,12 @@
  * schema from — the content is the only description of itself — so the schema
  * stays permissive and these types report rather than constrain.
  *
- * Blog posts are the other half: Laika *documents*, markdown files under
+ * Blog posts are the other half: Contentia *documents*, markdown files under
  * `content/posts/` read by `documentsLoader`. Only published documents are
  * loaded, so a draft never reaches the built site. Their frontmatter has a
  * fixed shape, so it gets a real schema rather than an inferred one.
  */
-import { documentsLoader, objectsLoader } from '@laikacms/astro/loader';
+import { documentsLoader, objectsLoader } from '@contentia/astro/loader';
 import { defineCollection, z } from 'astro:content';
 
 const dir = 'content';
@@ -38,7 +38,7 @@ export const collections = {
       title: z.string(),
       description: z.string(),
       date: z.coerce.date(),
-      author: z.string().default('Laika contributors'),
+      author: z.string().default('Contentia contributors'),
       tags: z.array(z.string()).default([]),
     }),
   }),

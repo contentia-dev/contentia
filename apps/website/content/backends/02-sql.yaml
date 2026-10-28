@@ -1,6 +1,6 @@
 id: sql
 label: SQL databases
-via: one adapter · laikacms/storage-drizzle
+via: one adapter · contentia/storage-drizzle
 note: >-
   A single Drizzle-backed repository reaches every SQL dialect Drizzle speaks:
   eight engines, one line of config.

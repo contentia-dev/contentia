@@ -4,10 +4,10 @@
  * Implements FIDO2/WebAuthn passwordless authentication.
  * Works in both Cloudflare Workers and Node.js environments.
  *
- * @module @laikacms/server/oauth2/passkey
+ * @module @contentia/server/oauth2/passkey
  */
 
-import { constantTimeEqualBuffer } from 'laikacms/crypto';
+import { constantTimeEqualBuffer } from 'contentia/crypto';
 
 // ============================================================================
 // Types and Interfaces

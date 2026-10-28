@@ -2,11 +2,11 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LaikaId, LaikaNamespace } from '../protocol.js';
+import type { ContentiaId, ContentiaNamespace } from '../protocol.js';
 import type { ContentChangeChannel, ContentChangeEvent } from './channel.js';
 import {
+  ContentiaTypegen,
   createTypegen,
-  LaikaTypegen,
   regenerateAll,
   regenerateItem,
   removeItem,
@@ -18,7 +18,7 @@ let contentDir: string;
 let viteRoot: string;
 
 beforeEach(async () => {
-  workdir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-typegen-'));
+  workdir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-typegen-'));
   contentDir = path.join(workdir, 'content');
   viteRoot = path.join(workdir, 'project');
   await fs.mkdir(viteRoot, { recursive: true });
@@ -30,7 +30,7 @@ afterEach(async () => {
 
 /** Writes a `{ content, meta }` JSON item under `content/<ns>/<key>.json`. */
 async function writeItem(
-  namespace: LaikaNamespace,
+  namespace: ContentiaNamespace,
   key: string,
   content: Record<string, unknown>,
   meta: Record<string, unknown>,
@@ -65,7 +65,7 @@ function fsReader(): TypegenReader {
       const base = path.join(contentDir, namespace);
       return (await walk(base, base)).sort();
     },
-    async readItem(id: LaikaId) {
+    async readItem(id: ContentiaId) {
       const file = path.join(contentDir, id.namespace, `${id.key}.json`);
       const raw = JSON.parse(await fs.readFile(file, 'utf8')) as {
         content: Record<string, unknown>,
@@ -77,7 +77,7 @@ function fsReader(): TypegenReader {
 }
 
 async function readTypes(): Promise<string> {
-  return fs.readFile(path.join(viteRoot, '.laika', 'vite-generated', 'types.d.ts'), 'utf8');
+  return fs.readFile(path.join(viteRoot, '.contentia', 'vite-generated', 'types.d.ts'), 'utf8');
 }
 
 class TestChannel implements ContentChangeChannel {
@@ -96,7 +96,7 @@ class TestChannel implements ContentChangeChannel {
 // A repos placeholder; the injected reader is used instead in these tests.
 const repos = {} as never;
 
-describe('LaikaTypegen.regenerateAll', () => {
+describe('ContentiaTypegen.regenerateAll', () => {
   it('emits exact declare module blocks + collection unions over a temp fs repo', async () => {
     await writeItem('doc', 'posts/a', { title: 'Hello', tags: ['a'] }, {
       key: 'a',
@@ -110,70 +110,70 @@ describe('LaikaTypegen.regenerateAll', () => {
       metadata: { width: 100 },
     });
 
-    const typegen = new LaikaTypegen({ viteRoot, reader: fsReader() });
+    const typegen = new ContentiaTypegen({ viteRoot, reader: fsReader() });
     await typegen.regenerateAll(repos);
     await typegen.dispose();
 
     const types = await readTypes();
-    expect(types).toContain("declare module 'laika:doc/posts/a' {");
-    expect(types).toContain("declare module 'laika:doc/posts/b' {");
-    expect(types).toContain("declare module 'laika:store/images/logo' {");
+    expect(types).toContain("declare module 'contentia:doc/posts/a' {");
+    expect(types).toContain("declare module 'contentia:doc/posts/b' {");
+    expect(types).toContain("declare module 'contentia:store/images/logo' {");
     expect(types).toContain('export const title: string');
     expect(types).toContain('export const url: string');
     // Cold-start fallback is always present and lowest specificity.
-    expect(types).toContain("declare module 'laika:*'");
+    expect(types).toContain("declare module 'contentia:*'");
 
     // Per-collection union alias for import.meta.glob typing.
     const postsAlias = await fs.readFile(
-      path.join(viteRoot, '.laika', 'vite-generated', 'collections', 'posts.ts'),
+      path.join(viteRoot, '.contentia', 'vite-generated', 'collections', 'posts.ts'),
       'utf8',
     );
     expect(postsAlias).toContain('export type Posts =');
-    expect(postsAlias).toContain("| typeof import('laika:doc/posts/a')");
-    expect(postsAlias).toContain("| typeof import('laika:doc/posts/b')");
-    // Glob comment must use the laika: protocol, not a filesystem path.
-    expect(postsAlias).toContain("import.meta.glob<Posts>('laika:doc/posts/*', { eager: true })");
+    expect(postsAlias).toContain("| typeof import('contentia:doc/posts/a')");
+    expect(postsAlias).toContain("| typeof import('contentia:doc/posts/b')");
+    // Glob comment must use the contentia: protocol, not a filesystem path.
+    expect(postsAlias).toContain("import.meta.glob<Posts>('contentia:doc/posts/*', { eager: true })");
     expect(postsAlias).not.toContain('/content/');
     const imagesAlias = await fs.readFile(
-      path.join(viteRoot, '.laika', 'vite-generated', 'collections', 'images.ts'),
+      path.join(viteRoot, '.contentia', 'vite-generated', 'collections', 'images.ts'),
       'utf8',
     );
-    expect(imagesAlias).toContain("| typeof import('laika:store/images/logo')");
-    expect(imagesAlias).toContain("import.meta.glob<Images>('laika:store/images/*', { eager: true })");
+    expect(imagesAlias).toContain("| typeof import('contentia:store/images/logo')");
+    expect(imagesAlias).toContain("import.meta.glob<Images>('contentia:store/images/*', { eager: true })");
 
     // Committed reference + ignore wiring.
-    expect(await fs.readFile(path.join(viteRoot, 'laika-env.d.ts'), 'utf8')).toContain(
-      '/// <reference path="./.laika/vite-generated/types.d.ts" />',
+    expect(await fs.readFile(path.join(viteRoot, 'contentia-env.d.ts'), 'utf8')).toContain(
+      '/// <reference path="./.contentia/vite-generated/types.d.ts" />',
     );
-    expect(await fs.readFile(path.join(viteRoot, '.gitignore'), 'utf8')).toContain('.laika/vite-generated/');
-    expect(await fs.readFile(path.join(viteRoot, '.laika', '.gitignore'), 'utf8')).toBe('vite-generated/\n');
+    expect(await fs.readFile(path.join(viteRoot, '.gitignore'), 'utf8')).toContain('.contentia/vite-generated/');
+    expect(await fs.readFile(path.join(viteRoot, '.contentia', '.gitignore'), 'utf8')).toBe('vite-generated/\n');
   });
 
   it('falls back to only the generic ambient block when typescript is unavailable', async () => {
     await writeItem('doc', 'posts/a', { title: 'Hello' }, { key: 'a', language: 'en', status: 'published' });
 
-    const typegen = new LaikaTypegen({ viteRoot, reader: fsReader(), tsLoader: async () => null });
+    const typegen = new ContentiaTypegen({ viteRoot, reader: fsReader(), tsLoader: async () => null });
     await typegen.regenerateAll(repos);
     await typegen.dispose();
 
     const types = await readTypes();
-    expect(types).toContain("declare module 'laika:*'");
+    expect(types).toContain("declare module 'contentia:*'");
     // No exact block could be emitted without the compiler.
-    expect(types).not.toContain("declare module 'laika:doc/posts/a'");
+    expect(types).not.toContain("declare module 'contentia:doc/posts/a'");
   });
 
   it('emits only the generic fallback for an empty repo', async () => {
-    const typegen = new LaikaTypegen({ viteRoot, reader: fsReader() });
+    const typegen = new ContentiaTypegen({ viteRoot, reader: fsReader() });
     await typegen.regenerateAll(repos);
     await typegen.dispose();
 
     const types = await readTypes();
-    expect(types).toContain("declare module 'laika:*'");
-    expect(types).not.toContain("declare module 'laika:doc");
+    expect(types).toContain("declare module 'contentia:*'");
+    expect(types).not.toContain("declare module 'contentia:doc");
   });
 });
 
-describe('LaikaTypegen channel-driven incremental regen', () => {
+describe('ContentiaTypegen channel-driven incremental regen', () => {
   it('regenerates on upsert and drops on delete', async () => {
     await writeItem('doc', 'posts/a', { title: 'Hello' }, { key: 'a', language: 'en', status: 'published' });
     const channel = new TestChannel();
@@ -181,12 +181,12 @@ describe('LaikaTypegen channel-driven incremental regen', () => {
 
     channel.emit({ namespace: 'doc', key: 'posts/a', kind: 'upsert' });
     await vi.waitFor(async () => {
-      expect(await readTypes()).toContain("declare module 'laika:doc/posts/a'");
+      expect(await readTypes()).toContain("declare module 'contentia:doc/posts/a'");
     });
 
     channel.emit({ namespace: 'doc', key: 'posts/a', kind: 'delete' });
     await vi.waitFor(async () => {
-      expect(await readTypes()).not.toContain("declare module 'laika:doc/posts/a'");
+      expect(await readTypes()).not.toContain("declare module 'contentia:doc/posts/a'");
     });
 
     await typegen.dispose();
@@ -199,24 +199,24 @@ describe('standalone registry helpers', () => {
     await writeItem('doc', 'posts/a', { title: 'A' }, { key: 'a', language: 'en', status: 'published' });
 
     await regenerateAll(repos, options);
-    expect(await readTypes()).toContain("declare module 'laika:doc/posts/a'");
+    expect(await readTypes()).toContain("declare module 'contentia:doc/posts/a'");
 
     await writeItem('doc', 'posts/b', { title: 'B' }, { key: 'b', language: 'en', status: 'published' });
     await regenerateItem(repos, 'doc/posts/b', options);
     await vi.waitFor(async () => {
-      expect(await readTypes()).toContain("declare module 'laika:doc/posts/b'");
+      expect(await readTypes()).toContain("declare module 'contentia:doc/posts/b'");
     });
 
     await removeItem('doc/posts/a', options);
     await vi.waitFor(async () => {
-      expect(await readTypes()).not.toContain("declare module 'laika:doc/posts/a'");
+      expect(await readTypes()).not.toContain("declare module 'contentia:doc/posts/a'");
     });
   });
 });
 
 describe('ingest', () => {
   it('renders directly from provided content/meta (no reader needed)', async () => {
-    const typegen = new LaikaTypegen({ viteRoot, debounceMs: 0 });
+    const typegen = new ContentiaTypegen({ viteRoot, debounceMs: 0 });
     await typegen.ingest('doc/posts/a', { title: 'Direct' }, { key: 'a', language: 'en', status: 'published' });
     await typegen.flush();
     expect(await readTypes()).toContain('export const title: string');

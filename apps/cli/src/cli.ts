@@ -12,25 +12,26 @@ import {
   makeServeCommand,
 } from './commands.js';
 
-// Everything local-dev lives under the `local` namespace: `laika local serve`,
-// `laika local generate`, … — leaving the top level free for future
-// non-local commands (deploy, login, …). The package ships two bins for the
-// same entry: `laikacli` (canonical, matches the npm name so `npx laikacli`
-// resolves) and `laika` (short alias for installed use).
+// Everything local-dev lives under the `local` namespace: `contentia local serve`,
+// `contentia local generate`, … — leaving the top level free for future
+// non-local commands (deploy, login, …). The package is `@contentia/cli` and
+// its bin is `contentia`. `npx contentia` resolves to the core `contentia`
+// package, whose `bin/contentia.mjs` shim delegates here (locally installed or
+// fetched via `npm exec`).
 const localCommand = Command.make('local').pipe(
   Command.withDescription(
     'Local-file dev tooling: storage server (`serve`), config codegen (`generate`), and repository migrations (`migrate`).',
   ),
   Command.withSubcommands([
-    makeServeCommand('serve', 'laika local'),
-    makeGenerateCommand('generate', 'laika local'),
-    makeMigrateCommand('migrate', 'laika local'),
+    makeServeCommand('serve', 'contentia local'),
+    makeGenerateCommand('generate', 'contentia local'),
+    makeMigrateCommand('migrate', 'contentia local'),
     makeListBackendsCommand(),
   ]),
 );
 
-const command = Command.make('laikacli').pipe(
-  Command.withDescription('The Laika CMS CLI.'),
+const command = Command.make('contentia').pipe(
+  Command.withDescription('The Contentia CLI.'),
   Command.withSubcommands([makeCreateCommand(), localCommand]),
 );
 

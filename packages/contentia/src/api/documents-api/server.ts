@@ -1,0 +1,1665 @@
+import * as Effect from 'effect/Effect';
+import * as Result from 'effect/Result';
+import * as S from 'effect/Schema';
+
+import type { ContentiaDone, ContentiaResult, ErrorStatus } from 'contentia/core';
+import {
+  BadRequestError,
+  ConflictError,
+  ContentiaError,
+  ContentiaStream,
+  ContentiaTask,
+  errorCode,
+  ErrorCodeToStatusMap,
+  InternalError,
+  InvalidData,
+  NotFoundError,
+} from 'contentia/core';
+import type { DocumentsCapabilities, DocumentsRepository } from 'contentia/documents';
+import type {
+  JsonApiCollectionResponse,
+  JsonApiError,
+  JsonApiLogger,
+  JsonApiResource,
+  JsonApiResponse,
+} from 'contentia/json-api';
+import {
+  buildPaginationLinks,
+  errorToJsonApiMapper,
+  parsePaginationQuery,
+  recoverableErrorsToWarnings,
+} from 'contentia/json-api';
+import { openApiDocumentToYaml, resolveAuthorization } from 'contentia/json-api';
+import type { AuthorizeDecision } from 'contentia/json-api';
+import { LockToken, SyncToken } from 'contentia/storage';
+import {
+  documentCreateFromJsonApi,
+  type DocumentCreateJsonApi,
+  documentSummaryToJsonApi,
+  documentToJsonApi,
+  folderSummaryToJsonApi,
+  folderToJsonApi,
+  lockToJsonApiAttributes,
+  ownedLockToJsonApi,
+  revisionCreateFromJsonApi,
+  type RevisionCreateJsonApi,
+  revisionSummaryToJsonApi,
+  revisionToJsonApi,
+  unpublishedCreateFromJsonApi,
+  type UnpublishedCreateJsonApi,
+  unpublishedSummaryToJsonApi,
+  unpublishedToJsonApi,
+  unpublishedUpdateFromJsonApi,
+  type UnpublishedUpdateJsonApi,
+} from './jsonapi.js';
+
+// The spec is a large static object literal that only the two openapi routes
+// ever read, so it is loaded on demand rather than statically imported: a
+// deployment that never serves it keeps it out of the startup path, and
+// bundlers can split it into a chunk of its own instead of inlining it into
+// every worker that mounts this handler.
+const loadOpenApiBuilder = async () => (await import('./openapi.js')).buildDocumentsOpenApi;
+
+type AllJsonApiResponses =
+  | JsonApiResponse
+  | JsonApiCollectionResponse
+  | JsonApiError;
+
+const json = <
+  T extends
+    | AllJsonApiResponses
+    | { data: null }
+    | { meta: Record<string, unknown> }
+    | { results: unknown[] },
+>(
+  body: T,
+  status: number = 200,
+) => {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      'Cache-Control': 'no-store',
+    },
+  });
+};
+
+// JSON:API error response
+function respondError(result: ContentiaResult<unknown>, status: ErrorStatus = 400, logger?: JsonApiLogger) {
+  if (Result.isSuccess(result)) throw new Error('respondError called with success result');
+  return json(errorToJsonApiMapper(result, logger), status);
+}
+
+/**
+ * Map a documents-api resource `type` to its canonical detail URL relative to
+ * the API base path. Summaries inherit the URL of their full counterpart so
+ * collection clients can follow a list item into detail without knowing the
+ * route table.
+ */
+const docsSelfPathFor = (type: string, id: string): string | undefined => {
+  const encoded = encodeURIComponent(id);
+  switch (type) {
+    case 'published':
+    case 'published-summary':
+      return `/published/${encoded}`;
+    case 'unpublished':
+    case 'unpublished-summary':
+      return `/unpublished/${encoded}`;
+    case 'revision':
+    case 'revision-summary': {
+      // id is composite "key/revision" (LCMS-286); split on last slash to rebuild the individual-revision URL
+      const lastSlash = id.lastIndexOf('/');
+      return `/revisions/${encodeURIComponent(id.slice(0, lastSlash))}/${encodeURIComponent(id.slice(lastSlash + 1))}`;
+    }
+    case 'documents-capabilities':
+      return `/capabilities`;
+    case 'sync-token':
+      return `/sync-token`;
+    default:
+      return undefined;
+  }
+};
+
+const withDocsSelfLink = <
+  R extends { type: string, id: string, links?: Record<string, string> },
+>(
+  resource: R,
+  basePath: string,
+): R => {
+  const path = docsSelfPathFor(resource.type, resource.id);
+  if (!path) return resource;
+  return { ...resource, links: { ...(resource.links ?? {}), self: `${basePath}${path}` } };
+};
+
+// JSON:API success response for single resource
+function respondResource<T, R extends JsonApiResource>(
+  result: ContentiaResult<T>,
+  transformer: (data: T) => R,
+  basePath: string,
+  recoverableErrors?: ReadonlyArray<ContentiaError>,
+  onErrorFn?: ((error: unknown) => void) | undefined,
+  status: number = 200,
+  logger?: JsonApiLogger,
+) {
+  if (Result.isFailure(result)) {
+    onErrorFn?.(result.failure);
+    const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+    return respondError(result, status, logger);
+  }
+  const warnings = recoverableErrors ? recoverableErrorsToWarnings(recoverableErrors) : undefined;
+  return json({
+    data: withDocsSelfLink(transformer(result.success), basePath),
+    ...(warnings ? { meta: { warnings } } : {}),
+  }, status);
+}
+
+/**
+ * Run a ContentiaTask and respond with the resulting resource — surfacing any
+ * recoverable warnings (e.g. R2 readback fallback on writes, content-parse
+ * fallback on reads) into `meta.warnings`. Equivalent to
+ * `respondResource(await firstResult(...), ...)` but threads metadata through.
+ */
+async function respondResourceWithWarnings<T, R extends JsonApiResource>(
+  task: ContentiaTask.ContentiaTask<T>,
+  transformer: (data: T) => R,
+  basePath: string,
+  onErrorFn?: ((error: unknown) => void) | undefined,
+  status: number = 200,
+  logger?: JsonApiLogger,
+) {
+  const r = await firstResultWithMetadata(task);
+  if (Result.isFailure(r)) {
+    return respondResource(
+      Result.fail(r.failure) as ContentiaResult<T>,
+      transformer,
+      basePath,
+      undefined,
+      onErrorFn,
+      undefined,
+      logger,
+    );
+  }
+  return respondResource(
+    Result.succeed(r.success.value),
+    transformer,
+    basePath,
+    r.success.recoverableErrors,
+    onErrorFn,
+    status,
+    logger,
+  );
+}
+
+// JSON:API success response for void result (delete operations)
+function respondVoid(
+  result: ContentiaResult<void>,
+  recoverableErrors?: ReadonlyArray<ContentiaError>,
+  onErrorFn?: ((error: unknown) => void) | undefined,
+  logger?: JsonApiLogger,
+) {
+  if (Result.isFailure(result)) {
+    onErrorFn?.(result.failure);
+    const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+    return respondError(result, status, logger);
+  }
+  const warnings = recoverableErrors ? recoverableErrorsToWarnings(recoverableErrors) : undefined;
+  return json({ meta: { deleted: true, ...(warnings ? { warnings } : {}) } });
+}
+
+/**
+ * Run a delete ContentiaTask and respond via {@link respondVoid}, surfacing any
+ * recoverableErrors emitted during the delete as `meta.warnings` (e.g. a
+ * folder partially-removed-with-skipped-children warning).
+ */
+async function respondVoidWithWarnings(
+  task: ContentiaTask.ContentiaTask<void>,
+  onErrorFn?: ((error: unknown) => void) | undefined,
+  logger?: JsonApiLogger,
+) {
+  const r = await firstResultWithMetadata(task);
+  if (Result.isFailure(r)) {
+    return respondVoid(Result.fail(r.failure) as ContentiaResult<void>, undefined, onErrorFn, logger);
+  }
+  return respondVoid(Result.succeed(undefined), r.success.recoverableErrors, onErrorFn, logger);
+}
+
+// JSON:API success response for resource collection with pagination
+async function respondCollection<T, R extends JsonApiResource>(
+  request: Request,
+  items: readonly T[],
+  transformer: (item: T) => R,
+  baseUrl: string,
+  basePath: string,
+  done?: { total?: number, syncToken?: string },
+  recoverableErrors?: ReadonlyArray<ContentiaError>,
+) {
+  const url = new URL(request.url);
+  const queryParams = Object.fromEntries(url.searchParams.entries());
+  const pagination = parsePaginationQuery(queryParams);
+  const last = items[items.length - 1] as { id?: string, key?: string } | undefined;
+  const lastCursor: string | undefined = last?.id ?? last?.key;
+  const requestedLimit = 'limit' in pagination
+    ? pagination.limit
+    : ('perPage' in pagination ? pagination.perPage : undefined);
+  const hasMore = typeof requestedLimit === 'number'
+    ? items.length === requestedLimit
+    : false;
+
+  const links = buildPaginationLinks(baseUrl, pagination, hasMore, lastCursor);
+
+  // `meta.page` carries aggregate counts; `meta.warnings` carries per-item
+  // recoverable errors collected during the stream; `meta.syncToken` carries
+  // the new sync token on change-feed responses.
+  const warnings = recoverableErrors ? recoverableErrorsToWarnings(recoverableErrors) : undefined;
+  const page = typeof done?.total === 'number' ? { total: done.total } : undefined;
+  const syncToken = done?.syncToken;
+  const meta = page || warnings || syncToken
+    ? {
+      ...(page ? { page } : {}),
+      ...(syncToken ? { syncToken } : {}),
+      ...(warnings ? { warnings } : {}),
+    }
+    : undefined;
+
+  const response: JsonApiCollectionResponse = {
+    data: items.map(item => withDocsSelfLink(transformer(item), basePath)),
+    links,
+    ...(meta ? { meta } : {}),
+  };
+
+  return json(response);
+}
+
+/**
+ * Convert any caught throw into a ContentiaError, preserving ContentiaError instances,
+ * mapping Effect Schema decode failures to InvalidData (400), and wrapping
+ * everything else (genuine defects) in InternalError (500).
+ *
+ * `S.decodeUnknownSync` throws an `effect/Schema` `SchemaError` carrying the
+ * `Issue` tree, so detect it with `S.isSchemaError`. This is a defense-in-depth
+ * choke point: `parseBody`/`parseQuery` already convert decode failures to
+ * InvalidData at each call site, but any decoder invoked outside those
+ * helpers still lands here.
+ */
+function toContentiaError(err: unknown): ContentiaError {
+  if (err instanceof ContentiaError) return err;
+  if (S.isSchemaError(err)) {
+    return new InvalidData(err.message, { cause: err });
+  }
+  if (err instanceof Error) return new InternalError(err.message, { cause: err });
+  return new InternalError(String(err));
+}
+
+/**
+ * Safely parse the JSON request body and decode it with the given function.
+ * Both `request.json()` failures (SyntaxError on malformed JSON) and schema
+ * decode failures are client input errors — they return InvalidData (400)
+ * rather than leaking as InternalError (500) through the outer fetch catch.
+ */
+async function parseBody<T>(request: Request, decode: (raw: unknown) => T): Promise<ContentiaResult<T>> {
+  try {
+    const raw = await request.json();
+    return Result.succeed(decode(raw));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Invalid request body';
+    return Result.fail(new InvalidData(msg));
+  }
+}
+
+/**
+ * Safely decode query parameters with the given schema decoder.
+ * Schema decode failures are client input errors — they return InvalidData (400)
+ * rather than leaking as InternalError (500) through the outer fetch catch.
+ */
+function parseQuery<T>(queryParams: Record<string, string>, decode: (raw: unknown) => T): ContentiaResult<T> {
+  try {
+    return Result.succeed(decode(queryParams));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Invalid query parameters';
+    return Result.fail(new InvalidData(msg));
+  }
+}
+
+/**
+ * Run a ContentiaTask and surface the resolved value as a ContentiaResult. Catches
+ * both typed failures AND defects (e.g. `TypeError`s thrown by buggy impl
+ * code) so route handlers always produce a JSON:API response instead of
+ * leaking text/plain 500s to the framework.
+ */
+async function firstResult<T>(task: ContentiaTask.ContentiaTask<T>): Promise<ContentiaResult<T>> {
+  try {
+    return await Effect.runPromise(Effect.result(ContentiaTask.runValue(task)));
+  } catch (err) {
+    return Result.fail(toContentiaError(err));
+  }
+}
+
+/**
+ * Like {@link firstResult} but preserves any ContentiaTask recoverableErrors so
+ * the caller can surface them as `meta.warnings` on a single-resource
+ * response — needed for the create/update routes where the backing impl
+ * may emit recoverable warnings (e.g. R2 readback fallback after a write).
+ */
+async function firstResultWithMetadata<T>(
+  task: ContentiaTask.ContentiaTask<T>,
+): Promise<ContentiaResult<{ value: T, recoverableErrors: ReadonlyArray<ContentiaError> }>> {
+  try {
+    const r = await Effect.runPromise(Effect.result(ContentiaTask.runCollect(task)));
+    if (Result.isFailure(r)) return Result.fail(r.failure);
+    return Result.succeed({ value: r.success.value, recoverableErrors: r.success.recoverableErrors });
+  } catch (err) {
+    return Result.fail(toContentiaError(err));
+  }
+}
+
+/**
+ * Run a ContentiaStream and collect data, the terminal `Done` value, and any
+ * per-item recoverableErrors so we can surface `meta.page.total` and
+ * `meta.warnings` on the JSON:API response. Catches defects, same as
+ * {@link firstResult}.
+ */
+async function runStreamWithDone<A, D extends ContentiaDone>(
+  stream: ContentiaStream.ContentiaStream<A, D>,
+): Promise<
+  ContentiaResult<{
+    data: ReadonlyArray<A>,
+    done: D,
+    recoverableErrors: ReadonlyArray<ContentiaError>,
+  }>
+> {
+  try {
+    const r = await Effect.runPromise(Effect.result(ContentiaStream.runCollect(stream)));
+    if (Result.isFailure(r)) return Result.fail(r.failure);
+    return Result.succeed({
+      data: r.success.data,
+      done: r.success.done,
+      recoverableErrors: r.success.recoverableErrors,
+    });
+  } catch (err) {
+    return Result.fail(toContentiaError(err));
+  }
+}
+
+/**
+ * A single documents action the API is about to perform, discriminated on
+ * `action` and carrying that action's direct arguments (the same values passed
+ * to the underlying {@link DocumentsRepository} method). Atomic-operation
+ * sub-steps are surfaced individually via their granular action.
+ */
+export type DocumentsAuthorizeAction =
+  | { action: 'readOpenApi', format: 'json' | 'yaml' }
+  | { action: 'getCapabilities' }
+  | { action: 'getSyncToken', options: Parameters<DocumentsRepository['getSyncToken']>[0] }
+  | { action: 'listChanges', options: Parameters<DocumentsRepository['listChanges']>[0] }
+  | { action: 'listRecords', options: Parameters<DocumentsRepository['listRecords']>[0] }
+  | { action: 'listRecordSummaries', options: Parameters<DocumentsRepository['listRecordSummaries']>[0] }
+  | { action: 'getDocument', key: string }
+  | { action: 'createDocument', data: Parameters<DocumentsRepository['createDocument']>[0] }
+  | { action: 'updateDocument', data: Parameters<DocumentsRepository['updateDocument']>[0] }
+  | { action: 'deleteDocument', key: string }
+  | { action: 'unpublish', key: string, status: string }
+  | { action: 'getUnpublished', key: string }
+  | { action: 'createUnpublished', data: Parameters<DocumentsRepository['createUnpublished']>[0] }
+  | { action: 'updateUnpublished', data: Parameters<DocumentsRepository['updateUnpublished']>[0] }
+  | { action: 'deleteUnpublished', key: string }
+  | { action: 'publish', key: string }
+  | { action: 'createRevision', data: Parameters<DocumentsRepository['createRevision']>[0] }
+  | { action: 'listRevisions', key: string }
+  | { action: 'getRevision', key: string, revisionId: string }
+  | { action: 'getLock', key: string }
+  | { action: 'acquireLock', key: string }
+  | { action: 'refreshLock', key: string }
+  | { action: 'releaseLock', key: string };
+
+/**
+ * The argument passed to a documents {@link DocumentsAuthorize} callback: the
+ * action descriptor plus the entire originating {@link Request}.
+ */
+export type DocumentsAuthorizeInput = DocumentsAuthorizeAction & { request: Request };
+
+/**
+ * Per-action authorization callback. Invoked once for every documents action
+ * (and once per sub-operation of an atomic request) before the underlying
+ * repository is touched. Return `true` to allow, `false` to deny with a 403,
+ * or a `ContentiaError` to deny with a custom status/message.
+ */
+export type DocumentsAuthorize = (input: DocumentsAuthorizeInput) => AuthorizeDecision | Promise<AuthorizeDecision>;
+
+export interface DocumentsApiOptions {
+  repo: DocumentsRepository;
+  basePath?: string;
+  onError?(error: unknown): void;
+  logger?: Pick<Console, 'error' | 'warn' | 'info' | 'debug'> | undefined;
+  /**
+   * Per-action authorization hook. Required: there is no implicit default,
+   * because an API that silently defaults to open is the failure mode this
+   * option exists to prevent. Pass `allowAll` to state that a surface is
+   * intentionally unauthenticated. See {@link DocumentsAuthorize}.
+   */
+  authorize: DocumentsAuthorize;
+}
+
+// Schema definitions using Effect Schema
+const RecordsQuerySchema = S.toStandardSchemaV1(S.Struct({
+  'filter[type]': S.optional(S.Union([
+    S.Literal('published'),
+    S.Literal('unpublished'),
+    S.Literal('all'),
+  ])),
+  'filter[folder]': S.optional(S.String),
+  'filter[depth]': S.optional(S.NumberFromString.pipe(
+    S.check(S.makeFilter<number>(n => n >= 1 ? undefined : 'Depth must be at least 1')),
+  )),
+}));
+
+// JSON:API request body schemas
+const DocumentCreateBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('published'),
+    id: S.optional(S.String),
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const UnpublishedCreateBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('unpublished'),
+    id: S.optional(S.String),
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const UnpublishedUpdateBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('unpublished'),
+    id: S.String,
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const UnpublishBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('unpublished'),
+    attributes: S.Struct({
+      status: S.String,
+    }),
+  }),
+}));
+
+// ===== LOCK BODIES (ADR-007) =====
+// The owner's `id`/`name` are display and attribution data only. What actually
+// authorises a refresh or release is the opaque `token`, which the server minted
+// and handed only to the acquirer.
+
+const LockAcquireBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('lock'),
+    attributes: S.Struct({
+      owner: S.Struct({ id: S.String, name: S.String }),
+      ttlMs: S.optional(S.Number),
+      force: S.optional(S.Boolean),
+    }),
+  }),
+}));
+
+const LockRefreshBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('lock'),
+    attributes: S.Struct({
+      token: S.String,
+      owner: S.Struct({ id: S.String, name: S.String }),
+      ttlMs: S.optional(S.Number),
+    }),
+  }),
+}));
+
+const LockReleaseBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('lock'),
+    attributes: S.Struct({
+      token: S.String,
+    }),
+  }),
+}));
+
+const RevisionCreateBodySchema = S.toStandardSchemaV1(S.Struct({
+  data: S.Struct({
+    type: S.Literal('revision'),
+    id: S.optional(S.String),
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const RefSchema = S.toStandardSchemaV1(S.Struct({
+  id: S.String,
+  type: S.Union([
+    S.Literal('document'),
+    S.Literal('unpublished'),
+    S.Literal('revision'),
+  ]),
+}));
+
+// Atomic operation schemas
+const AddUnpublishedOpSchema = S.toStandardSchemaV1(S.Struct({
+  op: S.Literal('add'),
+  data: S.Struct({
+    type: S.Literal('unpublished'),
+    id: S.optional(S.String),
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const AddDocumentOpSchema = S.toStandardSchemaV1(S.Struct({
+  op: S.Literal('add'),
+  data: S.Struct({
+    type: S.Literal('published'),
+    id: S.optional(S.String),
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const StateTransitionOpSchema = S.toStandardSchemaV1(S.Struct({
+  op: S.Literal('update'),
+  href: S.Union([S.Literal('/publish'), S.Literal('/unpublish')]),
+  ref: RefSchema,
+  data: S.optional(S.Struct({
+    type: S.Literal('unpublished'),
+    attributes: S.Struct({
+      status: S.String,
+    }),
+  })),
+}));
+
+const UpdateUnpublishedOpSchema = S.toStandardSchemaV1(S.Struct({
+  op: S.Literal('update'),
+  data: S.Struct({
+    type: S.Literal('unpublished'),
+    id: S.String,
+    attributes: S.Record(S.String, S.Any),
+  }),
+}));
+
+const RemoveOpSchema = S.toStandardSchemaV1(S.Struct({
+  op: S.Literal('remove'),
+  ref: RefSchema,
+}));
+
+const AtomicOperationSchema = S.Union([
+  AddUnpublishedOpSchema,
+  AddDocumentOpSchema,
+  StateTransitionOpSchema,
+  UpdateUnpublishedOpSchema,
+  RemoveOpSchema,
+]);
+
+const OperationsSchema = S.toStandardSchemaV1(S.Struct({
+  operations: S.Array(AtomicOperationSchema),
+}));
+
+// Decoders
+const decodeRecordsQuery = S.decodeUnknownSync(RecordsQuerySchema);
+const decodeDocumentCreateBody = S.decodeUnknownSync(DocumentCreateBodySchema);
+const decodeUnpublishedCreateBody = S.decodeUnknownSync(UnpublishedCreateBodySchema);
+const decodeUnpublishedUpdateBody = S.decodeUnknownSync(UnpublishedUpdateBodySchema);
+const decodeUnpublishBody = S.decodeUnknownSync(UnpublishBodySchema);
+const decodeRevisionCreateBody = S.decodeUnknownSync(RevisionCreateBodySchema);
+const decodeLockAcquireBody = S.decodeUnknownSync(LockAcquireBodySchema);
+const decodeLockRefreshBody = S.decodeUnknownSync(LockRefreshBodySchema);
+const decodeLockReleaseBody = S.decodeUnknownSync(LockReleaseBodySchema);
+const decodeOperations = S.decodeUnknownSync(OperationsSchema);
+
+// Type aliases for decoded values
+type AtomicOperation = S.Schema.Type<typeof AtomicOperationSchema>;
+type AddUnpublishedOp = S.Schema.Type<typeof AddUnpublishedOpSchema>;
+type AddDocumentOp = S.Schema.Type<typeof AddDocumentOpSchema>;
+type StateTransitionOp = S.Schema.Type<typeof StateTransitionOpSchema>;
+type UpdateUnpublishedOp = S.Schema.Type<typeof UpdateUnpublishedOpSchema>;
+type RemoveOp = S.Schema.Type<typeof RemoveOpSchema>;
+
+/**
+ * Validate an operation's request shape without performing any I/O.
+ * Returns a ContentiaError when the op is malformed, null when it is valid.
+ * Called in the pre-flight pass so that a batch with any shape-invalid op
+ * returns HTTP 400 with zero writes.
+ */
+function validateOperationShape(operation: AtomicOperation, index: number): ContentiaError | null {
+  if (operation.op === 'add') {
+    const op = operation as AddUnpublishedOp | AddDocumentOp;
+    if (!op.data.id) {
+      return new BadRequestError(
+        `operations[${index}].data.id is required — provide the document key (e.g. 'posts/my-doc')`,
+      );
+    }
+    return null;
+  }
+  if (operation.op === 'update') {
+    if ('href' in operation && 'ref' in operation) {
+      const { href, ref, data } = operation as StateTransitionOp;
+      if (href === '/publish') {
+        if (ref.type !== 'unpublished') return new BadRequestError(`Cannot publish ${ref.type}`);
+      } else if (href === '/unpublish') {
+        if (ref.type !== 'document') return new BadRequestError(`Cannot unpublish ${ref.type}`);
+        if (!data) return new BadRequestError('Missing data for unpublish operation');
+      } else {
+        return new BadRequestError(`Unknown action: ${href}`);
+      }
+      return null;
+    }
+    if ('data' in operation) return null;
+    return new BadRequestError('Invalid update operation');
+  }
+  if (operation.op === 'remove') {
+    const { ref } = operation as RemoveOp;
+    if (ref.type !== 'document' && ref.type !== 'unpublished') {
+      return new BadRequestError(`Cannot remove ${ref.type}`);
+    }
+    return null;
+  }
+  return new BadRequestError(`Unsupported operation: ${(operation as { op?: string }).op}`);
+}
+
+/**
+ * Build a JSON:API handler for the documents repository.
+ *
+ * ⚠️ This handler ships **no authentication**. Wrap it (e.g. with
+ * `contentia/decap-api` or a custom middleware that validates a Bearer token)
+ * before exposing it to an untrusted network — otherwise anyone who can reach
+ * `fetch` can read, create, modify, publish, unpublish, and delete documents
+ * and revisions.
+ */
+export function buildJsonApi(options: DocumentsApiOptions) {
+  const { repo, basePath = '', onError, logger, authorize } = options;
+
+  /** Notify onError and delegate to respondError. */
+  const failResponse = (result: ContentiaResult<unknown>, status?: ErrorStatus): Response => {
+    if (Result.isFailure(result)) onError?.(result.failure);
+    return respondError(result, status, logger);
+  };
+
+  return {
+    async fetch(request: Request): Promise<Response> {
+      try {
+        return await fetchInner(request);
+      } catch (err) {
+        onError?.(err);
+        const contentiaErr = toContentiaError(err);
+        const status = ErrorCodeToStatusMap[contentiaErr.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return respondError(Result.fail(contentiaErr), status, logger);
+      }
+    },
+  };
+
+  async function fetchInner(request: Request): Promise<Response> {
+    // Run the per-action authorization hook (if configured). Returns a ready
+    // error Response when the action is denied, or `null` when it's allowed.
+    const authorizeAction = async (action: DocumentsAuthorizeAction): Promise<Response | null> => {
+      const denial = resolveAuthorization(await authorize({ ...action, request }));
+      if (!denial) return null;
+      const status = ErrorCodeToStatusMap[denial.code as keyof typeof ErrorCodeToStatusMap] ?? 403;
+      return failResponse(Result.fail(denial), status);
+    };
+
+    const url = new URL(request.url);
+    let path = url.pathname.substring(basePath.length);
+    if (path.startsWith('/')) path = path.substring(1);
+    if (path.endsWith('/')) path = path.slice(0, -1);
+
+    // OpenAPI document — plain JSON (not JSON:API), with the servers entry
+    // resolved against the incoming request's origin.
+    if (path === 'openapi.json' && request.method === 'GET') {
+      const denied = await authorizeAction({ action: 'readOpenApi', format: 'json' });
+      if (denied) return denied;
+      const doc = (await loadOpenApiBuilder())({ basePath });
+      return new Response(
+        JSON.stringify({ ...doc, servers: [{ url: `${url.origin}${basePath}` }] }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        },
+      );
+    }
+
+    if (path === 'openapi.yaml' && request.method === 'GET') {
+      const denied = await authorizeAction({ action: 'readOpenApi', format: 'yaml' });
+      if (denied) return denied;
+      const doc = (await loadOpenApiBuilder())({ basePath });
+      const yaml = openApiDocumentToYaml({ ...doc, servers: [{ url: `${url.origin}${basePath}` }] });
+      return new Response(yaml, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/yaml',
+          'Cache-Control': 'no-store',
+        },
+      });
+    }
+
+    // Root endpoint - list available endpoints
+    if (path === '' && request.method === 'GET') {
+      return json({
+        data: {
+          type: 'api-info',
+          id: 'documents',
+          attributes: {
+            name: 'Documents API',
+            version: '1.0.0',
+            endpoints: [
+              {
+                path: '/openapi.json',
+                methods: ['GET'],
+                description: 'OpenAPI 3.1 specification for this API',
+              },
+              {
+                path: '/openapi.yaml',
+                methods: ['GET'],
+                description: 'OpenAPI 3.1 specification for this API, as YAML',
+              },
+              {
+                path: '/capabilities',
+                methods: ['GET'],
+                description: 'Underlying documents repository capabilities',
+              },
+              {
+                path: '/sync-token',
+                methods: ['GET'],
+                description: 'Get an opaque per-scope change token (capability-gated)',
+              },
+              {
+                path: '/locks/{key}',
+                methods: ['GET', 'POST', 'DELETE'],
+                description: 'Advisory document lock: read the holder, acquire, or release (capability-gated)',
+              },
+              {
+                path: '/locks/{key}/refresh',
+                methods: ['POST'],
+                description: 'Extend a held advisory lock (capability-gated)',
+              },
+              {
+                path: '/changes',
+                methods: ['GET'],
+                description: 'List changes since a sync token (capability-gated)',
+              },
+              {
+                path: '/records',
+                methods: ['GET'],
+                description: 'List full records (published + unpublished view per key)',
+              },
+              {
+                path: '/record-summaries',
+                methods: ['GET'],
+                description: 'List record summaries (lightweight listing)',
+              },
+              {
+                path: '/published',
+                methods: ['POST'],
+                description: 'Create a published document',
+              },
+              {
+                path: '/published/{key}',
+                methods: ['GET', 'PATCH', 'DELETE'],
+                description: 'Read, update, or remove a published document',
+              },
+              {
+                path: '/published/{key}/unpublish',
+                methods: ['POST'],
+                description: 'State transition: move a published document to unpublished',
+              },
+              {
+                path: '/unpublished',
+                methods: ['POST'],
+                description: 'Create an unpublished draft',
+              },
+              {
+                path: '/unpublished/{key}',
+                methods: ['GET', 'PATCH', 'DELETE'],
+                description: 'Read, update, or remove an unpublished draft',
+              },
+              {
+                path: '/unpublished/{key}/publish',
+                methods: ['POST'],
+                description: 'State transition: publish an unpublished draft',
+              },
+              {
+                path: '/revisions',
+                methods: ['POST'],
+                description: 'Create a revision for a document',
+              },
+              {
+                path: '/revisions/{key}',
+                methods: ['GET'],
+                description: 'List revisions for a document',
+              },
+              {
+                path: '/revisions/{key}/{revisionId}',
+                methods: ['GET'],
+                description: 'Read a specific revision of a document',
+              },
+              {
+                path: '/operations',
+                methods: ['POST'],
+                description: 'Atomic operations (add/update/remove + publish/unpublish transitions)',
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    const pathParts = path.split('/');
+    const resource = pathParts[0];
+    const key = pathParts[1] ? decodeURIComponent(pathParts[1]) : undefined;
+    const action = pathParts[2];
+
+    const queryParams = Object.fromEntries(url.searchParams.entries());
+
+    // Returns a 400 response if the client requested cursor pagination but the
+    // backend has declared it unsupported in its capabilities. Returns null
+    // when cursor pagination is either not requested or is supported.
+    const rejectUnsupportedCursor = async (): Promise<Response | null> => {
+      const hasAfter = queryParams['page[after]'] !== undefined;
+      const hasBefore = queryParams['page[before]'] !== undefined;
+      if (!hasAfter && !hasBefore) return null;
+      let capsResult: ContentiaResult<DocumentsCapabilities>;
+      try {
+        capsResult = await firstResult(repo.getCapabilities());
+      } catch {
+        return null; // can't check; let the list proceed
+      }
+      if (Result.isFailure(capsResult)) return null; // can't check; let the list proceed
+      const caps = capsResult.success;
+      const cursorSupported = caps.pagination.supported && caps.pagination.styles.cursor;
+      if (cursorSupported) return null;
+      return failResponse(
+        Result.fail(
+          new InvalidData(
+            'Cursor pagination (page[after] / page[before]) is not supported by this documents backend. '
+              + 'Use page[number] / page[size] or page[offset] / page[limit] instead. '
+              + 'Consult GET /capabilities for the pagination modes this backend supports.',
+          ),
+        ),
+        400,
+      );
+    };
+
+    const listFullRecords = async () => {
+      const cursorRejection = await rejectUnsupportedCursor();
+      if (cursorRejection) return cursorRejection;
+      const parsedResult = parseQuery(queryParams, decodeRecordsQuery);
+      if (Result.isFailure(parsedResult)) return failResponse(parsedResult, 400);
+      const parsed = parsedResult.success;
+      const type = parsed['filter[type]'] === 'all' ? undefined : (parsed['filter[type]'] ?? 'published');
+      const folder = parsed['filter[folder]'] ?? '';
+      const depth = parsed['filter[depth]'] ?? 1;
+
+      const listOptions = {
+        pagination: parsePaginationQuery(queryParams),
+        folder,
+        type: type as 'published' | 'unpublished' | undefined,
+        depth,
+      };
+      const denied = await authorizeAction({ action: 'listRecords', options: listOptions });
+      if (denied) return denied;
+      const result = await runStreamWithDone(repo.listRecords(listOptions));
+      if (Result.isFailure(result)) {
+        const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return failResponse(result, status);
+      }
+      const allResults = result.success.data as ReadonlyArray<{
+        type: string,
+        key: string,
+        [key: string]: unknown,
+      }>;
+
+      // `respondCollection` adds per-item `links.self`, the collection's
+      // pagination links, and `meta.page.total` from the stream's Done.
+      // Per-entry type drives which converter we apply up front; the
+      // collection helper then applies the self-link decorator.
+      const transformedResults = allResults.map(entry => {
+        switch (entry.type) {
+          case 'published':
+            return documentToJsonApi(entry as Parameters<typeof documentToJsonApi>[0]);
+          case 'unpublished':
+            return unpublishedToJsonApi(entry as Parameters<typeof unpublishedToJsonApi>[0]);
+          case 'folder':
+            return folderToJsonApi(entry as Parameters<typeof folderToJsonApi>[0]);
+          default:
+            throw new Error(`Unknown entry type: ${entry.type}`);
+        }
+      });
+
+      return respondCollection(
+        request,
+        transformedResults,
+        r => r,
+        `${url.origin}${url.pathname}`,
+        basePath,
+        { total: result.success.done.total },
+        result.success.recoverableErrors,
+      );
+    };
+
+    const listRecordSummaries = async () => {
+      const cursorRejection = await rejectUnsupportedCursor();
+      if (cursorRejection) return cursorRejection;
+      const parsedResult = parseQuery(queryParams, decodeRecordsQuery);
+      if (Result.isFailure(parsedResult)) return failResponse(parsedResult, 400);
+      const parsed = parsedResult.success;
+      const type = parsed['filter[type]'] === 'all' ? undefined : (parsed['filter[type]'] ?? 'published');
+      const folder = parsed['filter[folder]'] ?? '';
+      const depth = parsed['filter[depth]'] ?? 1;
+
+      const listOptions = {
+        pagination: parsePaginationQuery(queryParams),
+        folder,
+        type: type as 'published' | 'unpublished' | undefined,
+        depth,
+      };
+      const denied = await authorizeAction({ action: 'listRecordSummaries', options: listOptions });
+      if (denied) return denied;
+      const result = await runStreamWithDone(repo.listRecordSummaries(listOptions));
+      if (Result.isFailure(result)) {
+        const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return failResponse(result, status);
+      }
+      const allResults = result.success.data as ReadonlyArray<{
+        type: string,
+        key: string,
+        [key: string]: unknown,
+      }>;
+
+      const transformedResults = allResults.map(entry => {
+        switch (entry.type) {
+          case 'published':
+          case 'published-summary':
+            return documentSummaryToJsonApi(
+              { ...entry, type: 'published-summary' } as Parameters<typeof documentSummaryToJsonApi>[0],
+            );
+          case 'unpublished':
+          case 'unpublished-summary':
+            return unpublishedSummaryToJsonApi(
+              { ...entry, type: 'unpublished-summary' } as Parameters<typeof unpublishedSummaryToJsonApi>[0],
+            );
+          case 'folder':
+          case 'folder-summary':
+            return folderSummaryToJsonApi(
+              { ...entry, type: 'folder-summary' } as Parameters<typeof folderSummaryToJsonApi>[0],
+            );
+          default:
+            throw new Error(`Unknown entry type: ${entry.type}`);
+        }
+      });
+
+      return respondCollection(
+        request,
+        transformedResults,
+        r => r,
+        `${url.origin}${url.pathname}`,
+        basePath,
+        { total: result.success.done.total },
+        result.success.recoverableErrors,
+      );
+    };
+
+    // ===== CAPABILITIES =====
+    // Mirror of /storage-api's `/capabilities`: surface the documents repo's
+    // own capabilities so the proxy client can introspect what's supported.
+    if (resource === 'capabilities' && request.method === 'GET') {
+      const denied = await authorizeAction({ action: 'getCapabilities' });
+      if (denied) return denied;
+      const result = await firstResult(repo.getCapabilities());
+      if (Result.isFailure(result)) {
+        const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return failResponse(result, status);
+      }
+      return json({
+        data: {
+          type: 'documents-capabilities',
+          id: 'self',
+          attributes: result.success,
+          links: { self: `${basePath}/capabilities` },
+        },
+      });
+    }
+
+    // ===== CHANGE SIGNALS =====
+    // Capability-gated: repositories that don't support change signals fail
+    // with NotImplementedError, which maps to HTTP 501 and re-hydrates into
+    // the same typed error on the proxy side.
+    if (resource === 'sync-token' && request.method === 'GET') {
+      const folder = queryParams['filter[folder]'];
+      const denied = await authorizeAction({
+        action: 'getSyncToken',
+        options: folder ? { folder } : undefined,
+      });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.getSyncToken(folder ? { folder } : undefined),
+        token => ({
+          type: 'sync-token',
+          id: folder ?? 'self',
+          attributes: { syncToken: token as string, ...(folder ? { folder } : {}) },
+        }),
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    // ===== ADVISORY LOCKS (ADR-007) =====
+    // Capability-gated on `getCapabilities().locks`; a repository that does not
+    // support locking fails with NotImplementedError, which maps to 501 and
+    // re-hydrates as the same typed error on the proxy side, so a client can
+    // degrade to "locking unsupported" instead of guessing.
+    //
+    // The token is minted server-side and returned ONLY on acquire/refresh. GET
+    // deliberately returns the public projection, so polling to render "being
+    // edited by X" never hands out the ability to steal or release the lock.
+    if (resource === 'locks' && key) {
+      // A lock conflict carries the current holder in `meta.lock` so the client
+      // can render the banner from the rejection itself, with no second fetch.
+      const lockFailure = async (failure: ContentiaError): Promise<Response> => {
+        const status = ErrorCodeToStatusMap[failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        if (failure.code !== errorCode.LOCK_CONFLICT) return failResponse(Result.fail(failure), status);
+        const current = await firstResult(repo.getLock(key));
+        const body = errorToJsonApiMapper(Result.fail(failure), logger);
+        const holder = Result.isSuccess(current) && current.success ? current.success : undefined;
+        onError?.(failure);
+        return json(holder ? { ...body, meta: { lock: lockToJsonApiAttributes(holder) } } : body, status);
+      };
+
+      if (request.method === 'GET') {
+        const denied = await authorizeAction({ action: 'getLock', key });
+        if (denied) return denied;
+        const result = await firstResult(repo.getLock(key));
+        if (Result.isFailure(result)) return lockFailure(result.failure);
+        return json({
+          data: result.success
+            ? {
+              type: 'lock',
+              id: key,
+              attributes: lockToJsonApiAttributes(result.success),
+              links: { self: `${basePath}/locks/${encodeURIComponent(key)}` },
+            }
+            : null,
+        });
+      }
+
+      if (request.method === 'POST' && action === 'refresh') {
+        const bodyResult = await parseBody(request, decodeLockRefreshBody);
+        if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+        const { token, owner, ttlMs } = bodyResult.success.data.attributes;
+        const denied = await authorizeAction({ action: 'refreshLock', key });
+        if (denied) return denied;
+        const result = await firstResult(
+          repo.refreshLock(key, LockToken.make(token), owner, ttlMs === undefined ? undefined : { ttlMs }),
+        );
+        if (Result.isFailure(result)) return lockFailure(result.failure);
+        return json({ data: ownedLockToJsonApi(result.success, basePath) });
+      }
+
+      if (request.method === 'POST' && !action) {
+        const bodyResult = await parseBody(request, decodeLockAcquireBody);
+        if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+        const { owner, ttlMs, force } = bodyResult.success.data.attributes;
+        const denied = await authorizeAction({ action: 'acquireLock', key });
+        if (denied) return denied;
+        const result = await firstResult(
+          repo.acquireLock(key, owner, {
+            ...(ttlMs === undefined ? {} : { ttlMs }),
+            ...(force === undefined ? {} : { force }),
+          }),
+        );
+        if (Result.isFailure(result)) return lockFailure(result.failure);
+        return json({ data: ownedLockToJsonApi(result.success, basePath) }, 201);
+      }
+
+      if (request.method === 'DELETE') {
+        const bodyResult = await parseBody(request, decodeLockReleaseBody);
+        if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+        const denied = await authorizeAction({ action: 'releaseLock', key });
+        if (denied) return denied;
+        const result = await firstResult(
+          repo.releaseLock(key, LockToken.make(bodyResult.success.data.attributes.token)),
+        );
+        if (Result.isFailure(result)) return lockFailure(result.failure);
+        // 200 + meta envelope, matching every other DELETE on this API, rather
+        // than a bodiless 204 the JSON:API client cannot parse.
+        return json({ meta: { released: true } });
+      }
+    }
+
+    if (resource === 'changes' && request.method === 'GET') {
+      const since = queryParams['filter[since]'];
+      if (!since) {
+        return failResponse(
+          Result.fail(
+            new BadRequestError('filter[since] is required: pass a sync token obtained from GET /sync-token'),
+          ),
+          400,
+        );
+      }
+      const folder = queryParams['filter[folder]'];
+      const changesOptions = { since: SyncToken.make(since), ...(folder ? { folder } : {}) };
+      const denied = await authorizeAction({ action: 'listChanges', options: changesOptions });
+      if (denied) return denied;
+      const result = await runStreamWithDone(repo.listChanges(changesOptions));
+      if (Result.isFailure(result)) {
+        const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return failResponse(result, status);
+      }
+      return respondCollection(
+        request,
+        result.success.data,
+        change => ({
+          type: 'change-summary',
+          id: change.key,
+          attributes: {
+            deleted: change.deleted,
+            ...(change.version !== undefined ? { version: change.version } : {}),
+          },
+        }),
+        `${url.origin}${url.pathname}`,
+        basePath,
+        { total: result.success.done.total, syncToken: result.success.done.syncToken as string },
+        result.success.recoverableErrors,
+      );
+    }
+
+    // ===== RECORDS =====
+    if (resource === 'records' && request.method === 'GET') {
+      return listFullRecords();
+    }
+
+    if (resource === 'record-summaries' && request.method === 'GET') {
+      return listRecordSummaries();
+    }
+
+    // ===== DOCUMENTS (PUBLISHED) =====
+    if (resource === 'published' && request.method === 'GET' && key) {
+      const denied = await authorizeAction({ action: 'getDocument', key });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.getDocument(key),
+        documentToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (
+      resource === 'published'
+      && action === 'unpublish'
+      && request.method === 'POST'
+      && key
+    ) {
+      const bodyResult = await parseBody(request, decodeUnpublishBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data } = bodyResult.success;
+      const denied = await authorizeAction({ action: 'unpublish', key, status: data.attributes.status });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.unpublish(key, data.attributes.status),
+        unpublishedToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (resource === 'published' && request.method === 'POST') {
+      const bodyResult = await parseBody(request, decodeDocumentCreateBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data } = bodyResult.success;
+      if (!data.id) {
+        return failResponse(
+          Result.fail(new BadRequestError("data.id is required — provide the document key (e.g. 'posts/my-doc')")),
+          400,
+        );
+      }
+      const createData = documentCreateFromJsonApi({
+        type: 'published',
+        id: data.id,
+        attributes: data.attributes,
+      } as DocumentCreateJsonApi);
+      const denied = await authorizeAction({ action: 'createDocument', data: createData });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.createDocument(createData),
+        documentToJsonApi,
+        basePath,
+        onError,
+        201,
+        logger,
+      );
+    }
+
+    if (resource === 'published' && request.method === 'PATCH' && key) {
+      const bodyResult = await parseBody(request, decodeDocumentCreateBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data } = bodyResult.success;
+      if (!data.id) {
+        return failResponse(
+          Result.fail(new BadRequestError('data.id is required — must match the {key} in the URL')),
+          400,
+        );
+      }
+      if (data.id !== key) {
+        return failResponse(
+          Result.fail(
+            new ConflictError(
+              `Body data.id ('${data.id}') does not match URL key ('${key}'). Use the URL key as the resource identifier.`,
+            ),
+          ),
+          409,
+        );
+      }
+      const updateData = {
+        key,
+        ...data.attributes,
+      };
+      const denied = await authorizeAction({ action: 'updateDocument', data: updateData });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.updateDocument(updateData),
+        documentToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (resource === 'published' && request.method === 'DELETE' && key) {
+      const denied = await authorizeAction({ action: 'deleteDocument', key });
+      if (denied) return denied;
+      return respondVoidWithWarnings(repo.deleteDocument(key), onError, logger);
+    }
+
+    if (resource === 'unpublished' && request.method === 'GET' && key) {
+      const denied = await authorizeAction({ action: 'getUnpublished', key });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.getUnpublished(key),
+        unpublishedToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (
+      resource === 'unpublished'
+      && action === 'publish'
+      && request.method === 'POST'
+      && key
+    ) {
+      const denied = await authorizeAction({ action: 'publish', key });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.publish(key),
+        documentToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (resource === 'unpublished' && request.method === 'POST') {
+      const bodyResult = await parseBody(request, decodeUnpublishedCreateBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data } = bodyResult.success;
+      if (!data.id) {
+        return failResponse(
+          Result.fail(new BadRequestError("data.id is required — provide the document key (e.g. 'posts/my-doc')")),
+          400,
+        );
+      }
+      const createData = unpublishedCreateFromJsonApi({
+        type: 'unpublished',
+        id: data.id,
+        attributes: data.attributes,
+      } as UnpublishedCreateJsonApi);
+      const denied = await authorizeAction({ action: 'createUnpublished', data: createData });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.createUnpublished(createData),
+        unpublishedToJsonApi,
+        basePath,
+        onError,
+        201,
+        logger,
+      );
+    }
+
+    if (resource === 'unpublished' && request.method === 'PATCH' && key) {
+      const bodyResult = await parseBody(request, decodeUnpublishedUpdateBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data: bodyData } = bodyResult.success;
+      if (bodyData.id !== key) {
+        return failResponse(
+          Result.fail(
+            new ConflictError(
+              `Body data.id ('${bodyData.id}') does not match URL key ('${key}'). Use the URL key as the resource identifier.`,
+            ),
+          ),
+          409,
+        );
+      }
+      const updateData = unpublishedUpdateFromJsonApi({
+        type: 'unpublished',
+        id: bodyData.id,
+        attributes: bodyData.attributes,
+      } as UnpublishedUpdateJsonApi);
+      const denied = await authorizeAction({ action: 'updateUnpublished', data: { ...updateData, key } });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.updateUnpublished({ ...updateData, key }),
+        unpublishedToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    if (resource === 'unpublished' && request.method === 'DELETE' && key) {
+      const denied = await authorizeAction({ action: 'deleteUnpublished', key });
+      if (denied) return denied;
+      return respondVoidWithWarnings(repo.deleteUnpublished(key), onError, logger);
+    }
+
+    // ===== REVISIONS =====
+    if (resource === 'revisions' && request.method === 'POST') {
+      const bodyResult = await parseBody(request, decodeRevisionCreateBody);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { data } = bodyResult.success;
+      if (!data.id) {
+        return failResponse(
+          Result.fail(new BadRequestError("data.id is required — provide the document key (e.g. 'posts/my-doc')")),
+          400,
+        );
+      }
+      if (typeof data.attributes.revision !== 'string' || !data.attributes.revision) {
+        return failResponse(
+          Result.fail(
+            new BadRequestError(
+              "data.attributes.revision is required — provide a revision identifier (e.g. 'v1', 'rev-001')",
+            ),
+          ),
+          400,
+        );
+      }
+      const createData = revisionCreateFromJsonApi({
+        type: 'revision',
+        id: data.id,
+        attributes: data.attributes,
+      } as RevisionCreateJsonApi);
+      const denied = await authorizeAction({ action: 'createRevision', data: createData });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.createRevision(createData),
+        revisionToJsonApi,
+        basePath,
+        onError,
+        201,
+        logger,
+      );
+    }
+
+    if (
+      resource === 'revisions'
+      && request.method === 'GET'
+      && key
+      && !action
+    ) {
+      const cursorRejection = await rejectUnsupportedCursor();
+      if (cursorRejection) return cursorRejection;
+      const denied = await authorizeAction({ action: 'listRevisions', key });
+      if (denied) return denied;
+      const result = await runStreamWithDone(
+        repo.listRevisions(key, { pagination: parsePaginationQuery(queryParams) }),
+      );
+      if (Result.isFailure(result)) {
+        const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
+        return failResponse(result, status);
+      }
+
+      return respondCollection(
+        request,
+        result.success.data as ReadonlyArray<Parameters<typeof revisionSummaryToJsonApi>[0]>,
+        revisionSummaryToJsonApi,
+        `${url.origin}${url.pathname}`,
+        basePath,
+        { total: result.success.done.total },
+        result.success.recoverableErrors,
+      );
+    }
+
+    if (
+      resource === 'revisions'
+      && request.method === 'GET'
+      && key
+      && action
+    ) {
+      const denied = await authorizeAction({ action: 'getRevision', key, revisionId: action });
+      if (denied) return denied;
+      return respondResourceWithWarnings(
+        repo.getRevision(key, action),
+        revisionToJsonApi,
+        basePath,
+        onError,
+        undefined,
+        logger,
+      );
+    }
+
+    // ===== BATCH OPERATIONS =====
+    if (resource === 'operations' && request.method === 'POST') {
+      const bodyResult = await parseBody(request, decodeOperations);
+      if (Result.isFailure(bodyResult)) return failResponse(bodyResult, 400);
+      const { operations: ops } = bodyResult.success;
+
+      // (a) Pre-flight: validate every op for request-shape errors before any I/O.
+      // Any shape failure → HTTP 400, zero writes.
+      const preflight: Array<{ index: number, error: ContentiaError }> = [];
+      for (let i = 0; i < ops.length; i++) {
+        const err = validateOperationShape(ops[i]!, i);
+        if (err) preflight.push({ index: i, error: err });
+      }
+      if (preflight.length > 0) {
+        const errors = preflight.map(({ index, error }) => {
+          const jsonApiErr = errorToJsonApiMapper(error, logger);
+          return { ...jsonApiErr.errors[0]!, source: { pointer: `/operations/${index}` } };
+        });
+        return json({ errors }, 400);
+      }
+
+      // (a2) Authorize every sub-operation up front, mapped to its granular
+      // action. A single denial rejects the whole batch before any write.
+      for (const operation of ops) {
+        let authAction: DocumentsAuthorizeAction | undefined;
+        if (operation.op === 'add' && 'data' in operation && operation.data.type === 'unpublished') {
+          const op = operation as AddUnpublishedOp;
+          authAction = {
+            action: 'createUnpublished',
+            data: unpublishedCreateFromJsonApi({
+              type: 'unpublished',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as UnpublishedCreateJsonApi),
+          };
+        } else if (operation.op === 'add' && 'data' in operation && operation.data.type === 'published') {
+          const op = operation as AddDocumentOp;
+          authAction = {
+            action: 'createDocument',
+            data: documentCreateFromJsonApi({
+              type: 'published',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as DocumentCreateJsonApi),
+          };
+        } else if (operation.op === 'update' && 'href' in operation && 'ref' in operation) {
+          const { href, ref, data } = operation as StateTransitionOp;
+          if (href === '/publish') authAction = { action: 'publish', key: ref.id };
+          else if (href === '/unpublish') {
+            authAction = { action: 'unpublish', key: ref.id, status: data?.attributes.status ?? '' };
+          }
+        } else if (operation.op === 'update' && 'data' in operation) {
+          const op = operation as UpdateUnpublishedOp;
+          authAction = {
+            action: 'updateUnpublished',
+            data: unpublishedUpdateFromJsonApi({
+              type: 'unpublished',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as UnpublishedUpdateJsonApi),
+          };
+        } else if (operation.op === 'remove') {
+          const { ref } = operation as RemoveOp;
+          if (ref.type === 'document') authAction = { action: 'deleteDocument', key: ref.id };
+          else if (ref.type === 'unpublished') authAction = { action: 'deleteUnpublished', key: ref.id };
+        }
+        if (authAction) {
+          const denied = await authorizeAction(authAction);
+          if (denied) return denied;
+        }
+      }
+
+      // (b) Execute ops sequentially; stop at first repository failure.
+      // A mid-batch failure leaves prior ops applied — this is a fail-fast
+      // batch, not a transaction. The remaining deviation is stated explicitly
+      // in the OpenAPI description and docs/api-reference.md.
+      type OpEntry = {
+        op: ContentiaResult<unknown>,
+        operation: AtomicOperation,
+        transformer: ((data: unknown) => JsonApiResource) | null,
+      };
+      const opEntries: OpEntry[] = [];
+      for (let i = 0; i < ops.length; i++) {
+        const operation = ops[i]!;
+        let result: ContentiaResult<unknown>;
+        let transformer: ((data: unknown) => JsonApiResource) | null = null;
+
+        if (operation.op === 'add') {
+          if ('data' in operation && operation.data.type === 'unpublished') {
+            const op = operation as AddUnpublishedOp;
+            const createData = unpublishedCreateFromJsonApi({
+              type: 'unpublished',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as UnpublishedCreateJsonApi);
+            result = await firstResultWithMetadata(repo.createUnpublished(createData));
+            transformer = unpublishedToJsonApi as (data: unknown) => JsonApiResource;
+          } else if ('data' in operation && operation.data.type === 'published') {
+            const op = operation as AddDocumentOp;
+            const createData = documentCreateFromJsonApi({
+              type: 'published',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as DocumentCreateJsonApi);
+            result = await firstResultWithMetadata(repo.createDocument(createData));
+            transformer = documentToJsonApi as (data: unknown) => JsonApiResource;
+          } else {
+            result = Result.fail(
+              new BadRequestError(`Cannot add type: ${(operation as { data?: { type?: string } }).data?.type}`),
+            );
+          }
+        } else if (operation.op === 'update') {
+          if ('href' in operation && 'ref' in operation) {
+            const { href, ref, data } = operation as StateTransitionOp;
+            switch (href) {
+              case '/publish':
+                result = await firstResultWithMetadata(repo.publish(ref.id));
+                transformer = documentToJsonApi as (data: unknown) => JsonApiResource;
+                break;
+              case '/unpublish':
+                result = await firstResultWithMetadata(repo.unpublish(ref.id, data!.attributes.status));
+                transformer = unpublishedToJsonApi as (data: unknown) => JsonApiResource;
+                break;
+              default:
+                result = Result.fail(new BadRequestError(`Unknown action: ${href}`));
+            }
+          } else if ('data' in operation) {
+            const op = operation as UpdateUnpublishedOp;
+            const updateData = unpublishedUpdateFromJsonApi({
+              type: 'unpublished',
+              id: op.data.id,
+              attributes: op.data.attributes,
+            } as UnpublishedUpdateJsonApi);
+            result = await firstResultWithMetadata(repo.updateUnpublished(updateData));
+            transformer = unpublishedToJsonApi as (data: unknown) => JsonApiResource;
+          } else {
+            result = Result.fail(new BadRequestError('Invalid update operation'));
+          }
+        } else if (operation.op === 'remove') {
+          const { ref } = operation as RemoveOp;
+          if (ref.type === 'document') {
+            result = await firstResultWithMetadata(repo.deleteDocument(ref.id));
+          } else if (ref.type === 'unpublished') {
+            result = await firstResultWithMetadata(repo.deleteUnpublished(ref.id));
+          } else {
+            result = Result.fail(new BadRequestError(`Cannot remove ${ref.type}`));
+          }
+        } else {
+          result = Result.fail(
+            new BadRequestError(`Unsupported operation: ${(operation as { op?: string }).op}`),
+          );
+        }
+
+        opEntries.push({ op: result, operation, transformer });
+        if (Result.isFailure(result)) break;
+      }
+
+      const results = opEntries.map(({ op, operation, transformer }) => {
+        if (Result.isFailure(op)) {
+          const failure = op.failure as ContentiaError;
+          const status = String(ErrorCodeToStatusMap[failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500);
+          return { errors: [{ status, title: 'Operation Failed', detail: failure.message }] };
+        }
+
+        if (operation.op === 'remove') {
+          const removeOp = operation as RemoveOp;
+          const carrier = op.success as
+            | { value: void, recoverableErrors: ReadonlyArray<ContentiaError> }
+            | undefined;
+          const warnings = carrier ? recoverableErrorsToWarnings(carrier.recoverableErrors) : undefined;
+          return {
+            meta: warnings
+              ? { deleted: true, ref: removeOp.ref, warnings }
+              : { deleted: true, ref: removeOp.ref },
+          };
+        }
+
+        if (transformer) {
+          const carrier = op.success as {
+            value: unknown,
+            recoverableErrors: ReadonlyArray<ContentiaError>,
+          };
+          const warnings = recoverableErrorsToWarnings(carrier.recoverableErrors);
+          const data = transformer(carrier.value);
+          return warnings ? { data, meta: { warnings } } : { data };
+        }
+
+        return { data: null };
+      });
+
+      return json({ results });
+    }
+
+    options.logger?.debug('Documents endpoint not found:', path);
+    const error = new NotFoundError('Endpoint not found');
+
+    return failResponse(
+      Result.fail(error),
+      404,
+    );
+  }
+}

@@ -2,17 +2,17 @@
 # climbs up to the repo root. Installs here get their own lockfile and
 # node_modules and have zero effect on the main workspace.
 #
-# laikacms is declared as a workspace member (from the parent monorepo) so
+# contentia is declared as a workspace member (from the parent monorepo) so
 # pnpm treats it as an in-workspace package and can resolve its catalog:
 # specifiers using the catalogs defined below. Without workspace membership,
 # pnpm treats file: references as external and refuses catalog: deps entirely.
 packages:
-  - "../packages/laikacms"
+  - "../packages/contentia"
 
 allowBuilds:
   msgpackr-extract: true
 
-# Mirrors only the catalog entries that packages/laikacms/package.json
+# Mirrors only the catalog entries that packages/contentia/package.json
 # references. Must be kept in sync with the root pnpm-workspace.yaml.
 catalogs:
 

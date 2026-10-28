@@ -1,9 +1,9 @@
 /**
- * Type definitions for @laikacms/server/ai
+ * Type definitions for @contentia/server/ai
  */
 
 import type { LanguageModel, ToolSet } from 'ai';
-import type { Scope } from 'laikacms/auth';
+import type { Scope } from 'contentia/auth';
 import type { Translation } from './i18n/types.js';
 
 /**
@@ -12,7 +12,7 @@ import type { Translation } from './i18n/types.js';
  *
  * @example
  * ```typescript
- * declare module '@laikacms/server/ai' {
+ * declare module '@contentia/server/ai' {
  *   interface User {
  *     role: 'admin' | 'editor';
  *     organizationId: string;
@@ -26,7 +26,7 @@ export interface User {
   name?: string;
   /**
    * Scopes granted to the credential that authenticated this request, in the
-   * `resolveBearer` shape from `laikacms/auth` (`{ user, scopes }`): a
+   * `resolveBearer` shape from `contentia/auth` (`{ user, scopes }`): a
    * session token yields its full/granted scopes, a PAT yields its granted
    * subset. `authenticateAccessToken` should spread its `resolveBearer`
    * result as `{ ...ctx.user, scopes: ctx.scopes }` rather than treating
@@ -133,8 +133,8 @@ export interface Logger {
 export interface DecapAiConfig {
   /**
    * Authenticate a Bearer access token and return the user.
-   * This should be the same callback used in `@laikacms/server/api`, backed
-   * by the same `resolveBearer` seam from `laikacms/auth`:
+   * This should be the same callback used in `@contentia/server/api`, backed
+   * by the same `resolveBearer` seam from `contentia/auth`:
    * `{ ...ctx.user, scopes: ctx.scopes }`. Returning `scopes` lets `decapAi`
    * enforce `requiredScope` instead of granting every authenticated user
    * full AI/document access.
@@ -166,7 +166,7 @@ export interface DecapAiConfig {
    * **Replaces** the default prompt entirely — the built-in `getDocumentData`/`updateDocument`
    * tool guidance is discarded when this is set.
    * To extend the default rather than replace it, use the `messages` option instead:
-   * `import en from '@laikacms/server/ai/i18n/en';`
+   * `import en from '@contentia/server/ai/i18n/en';`
    * `messages: { ...en, systemPrompt: 'Your prefix.\n\n' + en.systemPrompt }`
    */
   systemPrompt?: string;
@@ -181,7 +181,7 @@ export interface DecapAiConfig {
    *
    * @example
    * ```typescript
-   * import { jsonSchema, tool } from '@laikacms/server/ai';
+   * import { jsonSchema, tool } from '@contentia/server/ai';
    *
    * tools: {
    *   getCmsConfig: tool({

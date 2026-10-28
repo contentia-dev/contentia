@@ -1,4 +1,4 @@
-import { WebDavStorageRepository } from 'laikacms/storage-webdav';
+import { WebDavStorageRepository } from 'contentia/storage-webdav';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -34,7 +34,7 @@ const readOptions = (raw: Record<string, unknown>): WebdavOptions => {
 
 export const webdavDriver: StorageDriver = {
   name: 'webdav',
-  packageName: 'laikacms',
+  packageName: 'contentia',
   version: '*',
   subpath: 'storage-webdav',
   description: 'WebDAV server (Nextcloud, ownCloud, mod_dav, rclone serve)',

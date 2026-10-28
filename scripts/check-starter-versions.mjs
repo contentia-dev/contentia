@@ -3,7 +3,7 @@
  * CI guard for starters/ (download-and-go apps). Fails if any starter:
  *   1. carries a workspace: / catalog: / link: / file: dependency protocol
  *      (unusable outside this monorepo — a downloaded starter would not install), or
- *   2. pins a laikacms / @laikacms/* dependency to anything other than a caret
+ *   2. pins a contentia / @contentia/* dependency to anything other than a caret
  *      range against the package's latest npm-published version (stale after a
  *      release, or bumped ahead of what's on npm).
  *

@@ -1,33 +1,33 @@
 /**
- * The Content Layer loader for Laika documents.
+ * The Content Layer loader for Contentia documents.
  *
- * A Laika document key is `<collection>/<rest>`, and an Astro collection maps
+ * A Contentia document key is `<collection>/<rest>`, and an Astro collection maps
  * onto that first segment — so `defineCollection` under the name `posts` reads
  * every published document under `posts/` with no further configuration.
  */
 
-import { collectStream, runTask } from 'laikacms/compat';
-import { NotFoundError } from 'laikacms/core/errors';
-import type { DocumentsRepository } from 'laikacms/documents';
+import { collectStream, runTask } from 'contentia/compat';
+import { NotFoundError } from 'contentia/core/errors';
+import type { DocumentsRepository } from 'contentia/documents';
 
+import type { CatalogProvider } from 'contentia/catalog';
 import type { JSONSchema7 } from 'json-schema';
-import type { CatalogProvider } from 'laikacms/catalog';
 
 import { inferTypeScript } from './infer-types.js';
 import { jsonSchemaToTypeScript, renderEntryModule } from './json-schema-to-types.js';
 import { jsonSchemaToZod, type ZodNamespace } from './json-schema-to-zod.js';
 import {
+  type ContentiaLoader,
+  type ContentiaLoaderContext,
   DEFAULT_BODY_FIELD,
   entryIdOf,
   type EntryOptions,
-  type LaikaLoader,
-  type LaikaLoaderContext,
   type RenderOptions,
   type SourceRecord,
   stripBodyField,
   toDataEntry,
 } from './mapping.js';
-import { type LaikaRepositoryOptions, resolveCatalogProvider, resolveRepositories } from './repositories.js';
+import { type ContentiaRepositoryOptions, resolveCatalogProvider, resolveRepositories } from './repositories.js';
 import { type KeyChange, runSync, type SyncOptions, type SyncSource } from './sync.js';
 
 /** Pagination shapes the repositories accept; re-declared to keep Effect types out of the API. */
@@ -53,15 +53,15 @@ export interface DocumentSelectOptions {
   pagination?: LoaderPagination;
 }
 
-export interface DocumentsLoaderOptions extends LaikaRepositoryOptions {
+export interface DocumentsLoaderOptions extends ContentiaRepositoryOptions {
   /**
    * The documents repository to read. Highest precedence — when given, no
-   * repository is constructed and the rest of {@link LaikaRepositoryOptions} is
-   * ignored. This is how you read from a remote Laika server: pass a
+   * repository is constructed and the rest of {@link ContentiaRepositoryOptions} is
+   * ignored. This is how you read from a remote Contentia server: pass a
    * `DocumentsJsonApiProxyRepository`.
    */
   documents?: DocumentsRepository;
-  /** The Laika collection key. Defaults to the Astro collection name. */
+  /** The Contentia collection key. Defaults to the Astro collection name. */
   collection?: string;
   select?: DocumentSelectOptions;
   entry?: EntryOptions;
@@ -81,16 +81,16 @@ export interface DocumentsLoaderOptions extends LaikaRepositoryOptions {
   z?: ZodNamespace;
   /** Astro project root, for resolving a relative `dir` before `load` runs. */
   root?: string;
-  /** Loader name, which is what `refreshContent({ loaders })` targets. Defaults to `'laikacms'`. */
+  /** Loader name, which is what `refreshContent({ loaders })` targets. Defaults to `'contentia'`. */
   name?: string;
 }
 
-export const DEFAULT_LOADER_NAME = 'laikacms';
+export const DEFAULT_LOADER_NAME = 'contentia';
 const DEFAULT_DEPTH = 64;
 const DEFAULT_PER_PAGE = 1000;
 
-/** A Content Layer loader over a Laika {@link DocumentsRepository}. */
-export function documentsLoader(options: DocumentsLoaderOptions = {}): LaikaLoader {
+/** A Content Layer loader over a Contentia {@link DocumentsRepository}. */
+export function documentsLoader(options: DocumentsLoaderOptions = {}): ContentiaLoader {
   return {
     name: options.name ?? DEFAULT_LOADER_NAME,
     // Only offered when it can actually be answered. Astro treats the presence
@@ -102,7 +102,7 @@ export function documentsLoader(options: DocumentsLoaderOptions = {}): LaikaLoad
           createSchemaFor(options as DocumentsLoaderOptions & { z: ZodNamespace, collection: string }),
       }
       : {}),
-    load: async (context: LaikaLoaderContext) => {
+    load: async (context: ContentiaLoaderContext) => {
       const collection = options.collection ?? context.collection;
       const documents = options.documents
         ?? resolveRepositories(options, context.config.root.pathname).documents;

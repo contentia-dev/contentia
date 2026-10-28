@@ -7,21 +7,22 @@ status: accepted
 
 # ADR-004: `documents-api` POST `/operations` — fail-fast batch semantics, not JSON:API atomic operations
 
-**Date:** 2026-07-12 **Status:** Accepted **Deciders:** LaikaCMS maintainers
+**Date:** 2026-07-12 **Status:** Accepted **Deciders:** Contentia maintainers
 
 ## Context
 
-`POST /operations` in `packages/laikacms/src/api/documents-api/server.ts` accepts an
+`POST /operations` in `packages/contentia/src/api/documents-api/server.ts` accepts an
 `atomic:operations` array and returns `atomic:results`, borrowing the vocabulary of the **JSON:API
 Atomic Operations extension**, whose contract is all-or-nothing:
 
 > "If any operation fails, the server MUST NOT process any subsequent operations, and MUST roll back
 > the effects of any previously processed operations."
 
-The implementation honours **neither** clause. It `.map()`s each op to an independent `LaikaResult`,
-applies every one regardless of earlier failures, and returns HTTP `200` even when some ops errored.
-A partially-failing batch leaves the repository **partially mutated** while the response advertises
-an extension that promises the opposite. A client trusting the extension corrupts its own state.
+The implementation honours **neither** clause. It `.map()`s each op to an independent
+`ContentiaResult`, applies every one regardless of earlier failures, and returns HTTP `200` even
+when some ops errored. A partially-failing batch leaves the repository **partially mutated** while
+the response advertises an extension that promises the opposite. A client trusting the extension
+corrupts its own state.
 
 This is long-standing behaviour — LCMS-401 (#695) did not introduce it — but #695's new mixed-batch
 tests now _pin_ it, so the cost of changing it only grows.
@@ -107,7 +108,7 @@ Tracked by **LCMS-402**, whose acceptance criteria are rewritten to this decisio
 
 ## Amendment — 2026-07-12: the rename ships as a **major**, not a minor
 
-Recorded at merge time of [#696](https://github.com/laikacms/laikacms/pull/696).
+Recorded at merge time of [#696](https://github.com/contentia-dev/contentia/pull/696).
 
 This ADR justified the clean break (dropping `atomic:*` rather than aliasing it) on the finding that
 there are **zero in-repo consumers** of the documents-api `/operations` vocabulary. That finding is
@@ -115,7 +116,7 @@ correct and was re-verified at merge: the Decap backend does not call `/operatio
 `storage-jsonapi-proxy` posts `ref: { type: "atom" }` — the **storage-api** vocabulary, whose
 `/operations` endpoint this ADR deliberately leaves untouched.
 
-**But "no in-repo consumers" is not "no consumers."** `laikacms` is published on npm (1.1.0) and
+**But "no in-repo consumers" is not "no consumers."** `contentia` is published on npm (1.1.0) and
 `./documents/api` is a **public export**. Downstream users stand up this server and point their own
 HTTP clients at it; the `atomic:operations` → `operations` rename breaks those clients. The PR
 originally carried a `minor` changeset, which would have let them auto-upgrade on `^1.x` into a

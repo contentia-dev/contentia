@@ -1,7 +1,7 @@
-import type { ChangeListener, ChangeSummary } from 'laikacms/storage';
+import type { ChangeListener, ChangeSummary } from 'contentia/storage';
 import { describe, expect, it } from 'vitest';
 
-import type { LaikaRepositories } from './backend.js';
+import type { ContentiaRepositories } from './backend.js';
 import {
   createRepositoryChangeChannel,
   type HmrFullReloadPayload,
@@ -55,7 +55,7 @@ function fakeRepos(opts: { unsupported?: boolean } = {}) {
   const repos = {
     storage,
     documents: {},
-  } as unknown as LaikaRepositories;
+  } as unknown as ContentiaRepositories;
   const trigger = (changes: ChangeSummary[]) => listener?.(changes);
   return { repos, trigger, state, isActive: () => listener !== undefined };
 }
@@ -63,7 +63,7 @@ function fakeRepos(opts: { unsupported?: boolean } = {}) {
 describe('createRepositoryChangeChannel', () => {
   it('invalidates the changed store module and sends a full reload', () => {
     const { server, invalidated, sent, addModule } = fakeServer();
-    const mod = addModule('\0laika:store/posts/hello');
+    const mod = addModule('\0contentia:store/posts/hello');
     const { repos, trigger } = fakeRepos();
 
     const dispose = createRepositoryChangeChannel(repos, server);
@@ -77,7 +77,7 @@ describe('createRepositoryChangeChannel', () => {
 
   it('handles deletions the same way (invalidate + reload)', () => {
     const { server, invalidated, sent, addModule } = fakeServer();
-    const mod = addModule('\0laika:store/posts/gone');
+    const mod = addModule('\0contentia:store/posts/gone');
     const { repos, trigger } = fakeRepos();
 
     const dispose = createRepositoryChangeChannel(repos, server);
@@ -102,11 +102,11 @@ describe('createRepositoryChangeChannel', () => {
     dispose();
   });
 
-  it('coarse mode invalidates every laika virtual module, leaving others alone', () => {
+  it('coarse mode invalidates every contentia virtual module, leaving others alone', () => {
     const { server, invalidated, sent, addModule } = fakeServer();
-    const a = addModule('\0laika:store/a');
-    const b = addModule('\0laika:doc/b');
-    addModule('/src/main.ts'); // non-laika module, must not be invalidated
+    const a = addModule('\0contentia:store/a');
+    const b = addModule('\0contentia:doc/b');
+    addModule('/src/main.ts'); // non-contentia module, must not be invalidated
     const { repos, trigger } = fakeRepos();
 
     const dispose = createRepositoryChangeChannel(repos, server, { coarse: true });
@@ -121,7 +121,7 @@ describe('createRepositoryChangeChannel', () => {
 
   it('dispose unsubscribes so later changes are ignored', () => {
     const { server, sent, addModule } = fakeServer();
-    addModule('\0laika:store/x');
+    addModule('\0contentia:store/x');
     const { repos, trigger, state, isActive } = fakeRepos();
 
     const dispose = createRepositoryChangeChannel(repos, server);

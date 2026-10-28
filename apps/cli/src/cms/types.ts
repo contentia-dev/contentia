@@ -6,7 +6,7 @@
  * default, exactly as it skips the starter question while one starter exists.
  *
  * Note the vocabulary clash with `../drivers/types.ts`: a *storage* driver
- * decides where LaikaCMS keeps content, while a *CMS backend* is one of the
+ * decides where Contentia keeps content, while a *CMS backend* is one of the
  * content sources the admin UI itself can talk to. They are separate axes.
  */
 
@@ -28,7 +28,7 @@ export interface CmsSelection {
   readonly widgets: readonly string[];
   /**
    * Entry-file codecs (`markdown`, `yaml`, `toml`, `json`). Git-style
-   * backends read raw files and need one per stored format; the laika
+   * backends read raw files and need one per stored format; the contentia
    * backend serves entries as JSON and needs none.
    */
   readonly codecs: readonly string[];
@@ -45,7 +45,7 @@ export interface CmsConfigDiscovery {
 }
 
 /**
- * A CMS whose collection config lives in a file that `laika local generate`
+ * A CMS whose collection config lives in a file that `contentia local generate`
  * can turn into a typed TypeScript module. Adapters whose config is authored
  * in TypeScript to begin with leave `CmsAdapter.config` undefined.
  */

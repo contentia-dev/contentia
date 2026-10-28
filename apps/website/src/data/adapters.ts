@@ -1,6 +1,6 @@
 /**
  * Adapter logos, read from the repo-root `adapters.yaml` — the same list the docs' Adapters section
- * is compiled from — so a backend Laika ships an adapter for shows one logo everywhere.
+ * is compiled from — so a backend Contentia ships an adapter for shows one logo everywhere.
  *
  * Server-only (it reads the filesystem): import it from components that are rendered at build
  * time, never from an island.

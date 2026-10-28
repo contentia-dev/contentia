@@ -11,15 +11,15 @@
 import { serve, type ServerType } from '@hono/node-server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { laikaApi } from './index.js';
-import type { LaikaApiOptions, User } from './index.js';
+import { contentiaApi } from './index.js';
+import type { ContentiaApiOptions, User } from './index.js';
 
 const MOCK_USER: User = { id: 'u1', email: 'test@example.com', name: 'Test User' };
 const ADMIN_ORIGIN = 'http://localhost:5000';
 
-const api = laikaApi({
-  documents: {} as LaikaApiOptions['documents'],
-  storage: {} as LaikaApiOptions['storage'],
+const api = contentiaApi({
+  documents: {} as ContentiaApiOptions['documents'],
+  storage: {} as ContentiaApiOptions['storage'],
   authenticateAccessToken: vi.fn().mockResolvedValue(MOCK_USER),
   authorize: () => true,
   cors: { origins: [ADMIN_ORIGIN] },

@@ -2,24 +2,24 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import type { DocumentCollectionSettings } from 'laikacms/catalog';
-import { ConventionCatalogProvider } from 'laikacms/catalog-convention';
-import { LaikaTask } from 'laikacms/core';
+import type { DocumentCollectionSettings } from 'contentia/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { ContentiaTask } from 'contentia/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createFsStorage, createRepositories, type LaikaRepositories, listKeys, readItem } from './backend.js';
+import { type ContentiaRepositories, createFsStorage, createRepositories, listKeys, readItem } from './backend.js';
 
 let tmpDir: string;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-backend-'));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-backend-'));
 });
 
 afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-function makeRepos(): LaikaRepositories {
+function makeRepos(): ContentiaRepositories {
   return createRepositories(createFsStorage({ dir: tmpDir }));
 }
 
@@ -30,16 +30,16 @@ function makeRepos(): LaikaRepositories {
  * collection's documents are reachable directly but invisible to a full
  * enumerate.
  */
-async function registerCollection(repos: LaikaRepositories, name: string): Promise<void> {
+async function registerCollection(repos: ContentiaRepositories, name: string): Promise<void> {
   const settingsProvider = new ConventionCatalogProvider({ storage: repos.storage });
   const settings: DocumentCollectionSettings = { type: 'document', key: name, directory: name };
-  await LaikaTask.runPromise(settingsProvider.putDocumentCollectionSettings(name, settings));
+  await ContentiaTask.runPromise(settingsProvider.putDocumentCollectionSettings(name, settings));
 }
 
 describe('readItem', () => {
   it('reads a store object, shaping meta from the object envelope', async () => {
     const repos = makeRepos();
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.storage.createObject({ key: 'notes/hello', content: { title: 'Hi' } }),
     );
 
@@ -53,7 +53,7 @@ describe('readItem', () => {
   it('reads a document, shaping meta from language/status instead of the storage envelope', async () => {
     const repos = makeRepos();
     await registerCollection(repos, 'posts');
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.documents.createDocument({
         key: 'posts/hello',
         type: 'published',
@@ -77,9 +77,9 @@ describe('readItem', () => {
 describe('listKeys — store namespace', () => {
   it('lists only keys under an explicit folder', async () => {
     const repos = makeRepos();
-    await LaikaTask.runPromise(repos.storage.createObject({ key: 'notes/a', content: {} }));
-    await LaikaTask.runPromise(repos.storage.createObject({ key: 'notes/b', content: {} }));
-    await LaikaTask.runPromise(repos.storage.createObject({ key: 'other/c', content: {} }));
+    await ContentiaTask.runPromise(repos.storage.createObject({ key: 'notes/a', content: {} }));
+    await ContentiaTask.runPromise(repos.storage.createObject({ key: 'notes/b', content: {} }));
+    await ContentiaTask.runPromise(repos.storage.createObject({ key: 'other/c', content: {} }));
 
     const keys = await listKeys(repos, 'store', 'notes');
 
@@ -88,8 +88,8 @@ describe('listKeys — store namespace', () => {
 
   it('enumerates every key in the namespace when folder is undefined', async () => {
     const repos = makeRepos();
-    await LaikaTask.runPromise(repos.storage.createObject({ key: 'notes/a', content: {} }));
-    await LaikaTask.runPromise(repos.storage.createObject({ key: 'other/nested/c', content: {} }));
+    await ContentiaTask.runPromise(repos.storage.createObject({ key: 'notes/a', content: {} }));
+    await ContentiaTask.runPromise(repos.storage.createObject({ key: 'other/nested/c', content: {} }));
 
     const keys = await listKeys(repos, 'store', undefined);
 
@@ -102,7 +102,7 @@ describe('listKeys — doc namespace', () => {
     const repos = makeRepos();
     await registerCollection(repos, 'posts');
     await registerCollection(repos, 'pages');
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.documents.createDocument({
         key: 'posts/one',
         type: 'published',
@@ -111,7 +111,7 @@ describe('listKeys — doc namespace', () => {
         content: {},
       }),
     );
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.documents.createDocument({
         key: 'pages/about',
         type: 'published',
@@ -132,7 +132,7 @@ describe('listKeys — doc namespace', () => {
       const repos = makeRepos();
       await registerCollection(repos, 'posts');
       await registerCollection(repos, 'pages');
-      await LaikaTask.runPromise(
+      await ContentiaTask.runPromise(
         repos.documents.createDocument({
           key: 'posts/one',
           type: 'published',
@@ -141,7 +141,7 @@ describe('listKeys — doc namespace', () => {
           content: {},
         }),
       );
-      await LaikaTask.runPromise(
+      await ContentiaTask.runPromise(
         repos.documents.createDocument({
           key: 'posts/two',
           type: 'published',
@@ -150,7 +150,7 @@ describe('listKeys — doc namespace', () => {
           content: {},
         }),
       );
-      await LaikaTask.runPromise(
+      await ContentiaTask.runPromise(
         repos.documents.createDocument({
           key: 'pages/about',
           type: 'published',
@@ -169,7 +169,7 @@ describe('listKeys — doc namespace', () => {
   it('omits unregistered collections from the full enumerate (root listing walks configured folders only)', async () => {
     const repos = makeRepos();
     await registerCollection(repos, 'posts');
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.documents.createDocument({
         key: 'posts/one',
         type: 'published',
@@ -180,7 +180,7 @@ describe('listKeys — doc namespace', () => {
     );
     // Reachable directly (default collection settings), but never registered
     // in the catalog, so it does not surface as a root folder.
-    await LaikaTask.runPromise(
+    await ContentiaTask.runPromise(
       repos.documents.createDocument({
         key: 'drafts/orphan',
         type: 'published',

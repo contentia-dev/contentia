@@ -1,9 +1,9 @@
 /**
- * Local mode — mount LaikaCMS's own JSON:API over the dev server.
+ * Local mode — mount Contentia's own JSON:API over the dev server.
  *
  * While `vite dev` is running, {@link mountLocalApi} exposes the plugin's own
  * `storage`/`documents`/`assets` repositories through the same JSON:API contract the
- * Decap laika-backend already speaks, so a JSON:API client (the Decap admin,
+ * Decap contentia-backend already speaks, so a JSON:API client (the Decap admin,
  * or any other) can read and write content locally instead of a remote
  * backend. Unauthenticated by design — see the module-level warning below —
  * and reachable only through the dev server, because {@link mountLocalApi} is
@@ -22,17 +22,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 
-import { buildAssetsApi } from 'laikacms/assets-api';
-import { buildJsonApi as buildDocumentsJsonApi } from 'laikacms/documents-api';
-import { allowAll } from 'laikacms/json-api';
-import { buildJsonApi as buildStorageJsonApi } from 'laikacms/storage-api';
+import { buildAssetsApi } from 'contentia/assets-api';
+import { buildJsonApi as buildDocumentsJsonApi } from 'contentia/documents-api';
+import { allowAll } from 'contentia/json-api';
+import { buildJsonApi as buildStorageJsonApi } from 'contentia/storage-api';
 
-import type { LaikaRepositories } from './backend.js';
+import type { ContentiaRepositories } from './backend.js';
 
 /** Default base path both local-mode sub-APIs mount under. */
-export const DEFAULT_LOCAL_API_BASE_PATH = '/__laika';
+export const DEFAULT_LOCAL_API_BASE_PATH = '/__contentia';
 
-export interface LaikaLocalApiOptions {
+export interface ContentiaLocalApiOptions {
   /**
    * Base path the `storage`/`documents`/`assets` sub-routes mount under.
    * Defaults to {@link DEFAULT_LOCAL_API_BASE_PATH}.
@@ -123,7 +123,7 @@ async function writeFetchResponse(response: Response, res: ServerResponse): Prom
  * performs no real auth (see the module doc), so this is a fixed stub, not a
  * lookup — every request gets the same response.
  */
-const LOCAL_SESSION_USER = { name: 'Local Dev', email: 'local-dev@laikacms.local' };
+const LOCAL_SESSION_USER = { name: 'Local Dev', email: 'local-dev@contentia.local' };
 
 /**
  * A trivial `${basePath}/session` responder. `resolveLaikaBackend`'s local
@@ -163,14 +163,14 @@ function toConnectMiddleware(fetchHandler: (request: Request) => Promise<Respons
 }
 
 /**
- * Mount LaikaCMS's own JSON:API over `repos` at `${basePath}/storage`,
+ * Mount Contentia's own JSON:API over `repos` at `${basePath}/storage`,
  * `${basePath}/documents`, and `${basePath}/assets`. No auth, no CORS — call
  * this only from `configureServer`.
  */
 export function mountLocalApi(
   server: LocalApiServer,
-  repos: LaikaRepositories,
-  options: LaikaLocalApiOptions | true,
+  repos: ContentiaRepositories,
+  options: ContentiaLocalApiOptions | true,
 ): void {
   const resolved = options === true ? {} : options;
   const basePath = resolved.basePath ?? DEFAULT_LOCAL_API_BASE_PATH;
@@ -178,7 +178,7 @@ export function mountLocalApi(
   if (!isLoopbackHost(server.config.server.host)) {
     const warn = server.config.logger?.warn ?? ((msg: string) => console.warn(msg));
     warn(
-      `[@laikacms/vite-plugin] localApi is mounted at "${basePath}" with no authentication, `
+      `[@contentia/vite-plugin] localApi is mounted at "${basePath}" with no authentication, `
         + `and the dev server host is not loopback (--host). Anyone who can reach this host `
         + 'can read and write your content unauthenticated.',
     );

@@ -7,10 +7,10 @@ export {
   wrapAmbientModule,
 } from './compiler-emit.js';
 export {
+  ContentiaTypegen,
+  type ContentiaTypegenOptions,
   createBackendReader,
   createTypegen,
-  LaikaTypegen,
-  type LaikaTypegenOptions,
   regenerateAll,
   regenerateItem,
   removeItem,

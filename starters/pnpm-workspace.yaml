@@ -2,24 +2,24 @@
 # up to the repo root. Installs here get their own lockfile and node_modules
 # and have zero effect on the main workspace.
 #
-# Unlike examples/ (which lists ../packages/laikacms as a member to build
+# Unlike examples/ (which lists ../packages/contentia as a member to build
 # against the working tree), this workspace canonically links nothing from the
 # monorepo: starters ship as download-and-go templates pinned to published
-# LaikaCMS versions, and installing them here must resolve exactly what a user
+# Contentia versions, and installing them here must resolve exactly what a user
 # who downloaded one folder would get, except for temporary overrides documented
 # below. CI enforces this with `pnpm check:starters` (no workspace:/catalog:
 # protocols, ranges in sync with the current release).
 packages:
   - "starter-*"
 
-# Dedupe laikacms to the starters' own range. @laikacms/decap-cms@4.x declares
-# an older laikacms dependency, and without this pnpm installs a second copy
-# whose repository types are incompatible with the starters' laikacms@6 — the
-# opfs starter, which injects repositories into the laika backend, then fails
+# Dedupe contentia to the starters' own range. @laikacms/decap-cms@4.x declares
+# an older contentia dependency, and without this pnpm installs a second copy
+# whose repository types are incompatible with the starters' contentia@6 — the
+# opfs starter, which injects repositories into the contentia backend, then fails
 # to typecheck. Mirrors the `overrides` block in starter-opfs-blog/package.json
 # (honored on a standalone install; ignored for members of this workspace).
 overrides:
-  laikacms: "^6.0.0"
+  contentia: "^6.0.0"
 
 # Dependencies whose install scripts are allowed to run (pnpm blocks build
 # scripts by default). esbuild ships its platform binary via postinstall.
@@ -30,7 +30,7 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - '@esbuild/openharmony-arm64@0.28.2'
-  - '@laikacms/astro@6.0.0'
-  - '@laikacms/server@6.0.0'
-  - '@laikacms/vite-plugin@6.0.0'
-  - laikacms@6.0.0
+  - '@contentia/astro@6.0.0'
+  - '@contentia/server@6.0.0'
+  - '@contentia/vite-plugin@6.0.0'
+  - contentia@6.0.0

@@ -1,38 +1,38 @@
 /**
- * Cloudflare Workers + R2 blog starter for LaikaCMS.
+ * Cloudflare Workers + R2 blog starter for Contentia.
  *
  * Unlike the Node.js starters (Astro, Next, Hono, Express) this app cannot use
- * `createEmbeddedLaika` — that helper hardcodes `FileSystemStorageRepository`
+ * `createEmbeddedContentia` — that helper hardcodes `FileSystemStorageRepository`
  * which requires `node:fs` and is incompatible with the Workers runtime.
  *
- * Instead we wire the lower-level `laikaApi` by hand:
+ * Instead we wire the lower-level `contentiaApi` by hand:
  *   R2StorageRepository (native Cloudflare R2 binding)
  *   → DecapCatalogProvider (reads Decap config from R2)
  *   → CatalogDocumentsRepository
  *   → CatalogAssetsRepository
- *   → laikaApi({ documents, storage, assets, basePath, auth })
+ *   → contentiaApi({ documents, storage, assets, basePath, auth })
  *
- * Doc gap surfaced: there is no `createEmbeddedLaika` equivalent for edge
- * runtimes.  If you need one, open an issue at github.com/laikacms/laikacms.
+ * Doc gap surfaced: there is no `createEmbeddedContentia` equivalent for edge
+ * runtimes.  If you need one, open an issue at github.com/contentia-dev/contentia.
  */
-import { CatalogAssetsRepository } from 'laikacms/assets-catalog';
-import { collectStream, runTask } from 'laikacms/compat';
-import { DecapCatalogProvider } from 'laikacms/catalog-decap';
-import { CatalogDocumentsRepository } from 'laikacms/documents-catalog';
-import { jsonSerializer } from 'laikacms/storage-serializers-json';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { rawSerializer } from 'laikacms/storage-serializers-raw';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
-import { R2StorageRepository } from 'laikacms/storage/r2';
+import { CatalogAssetsRepository } from 'contentia/assets-catalog';
+import { collectStream, runTask } from 'contentia/compat';
+import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { jsonSerializer } from 'contentia/storage-serializers-json';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { rawSerializer } from 'contentia/storage-serializers-raw';
+import { yamlSerializer } from 'contentia/storage-serializers-yaml';
+import { R2StorageRepository } from 'contentia/storage/r2';
 
-import { laikaApi } from '@laikacms/server/api';
+import { contentiaApi } from '@contentia/server/api';
 
 import { decapConfig } from './decap-config.js';
 
 export interface Env {
   /** R2 bucket binding — set via `[[r2_buckets]]` in wrangler.toml. */
-  LAIKACMS_BUCKET: R2Bucket;
-  /** Optional override for the dev bearer token (defaults to 'dev-local-laika-token'). */
+  CONTENTIA_BUCKET: R2Bucket;
+  /** Optional override for the dev bearer token (defaults to 'dev-local-contentia-token'). */
   DEV_TOKEN?: string;
 }
 
@@ -44,32 +44,32 @@ const serializers = {
   txt: rawSerializer,
 };
 
-interface LaikaResources {
-  api: ReturnType<typeof laikaApi>;
+interface ContentiaResources {
+  api: ReturnType<typeof contentiaApi>;
   documents: CatalogDocumentsRepository;
 }
 
 // ── Per-isolate cache ─────────────────────────────────────────────────────────
 // Workers re-use isolates across requests; cache the initialized API so we
 // don't pay the R2 config round-trip on every single request.
-let cached: LaikaResources | null = null;
+let cached: ContentiaResources | null = null;
 
-async function getOrCreate(env: Env): Promise<LaikaResources> {
+async function getOrCreate(env: Env): Promise<ContentiaResources> {
   if (cached) return cached;
 
-  const storage = new R2StorageRepository(env.LAIKACMS_BUCKET, serializers, 'md');
+  const storage = new R2StorageRepository(env.CONTENTIA_BUCKET, serializers, 'md');
 
   // Seed config.yml into R2 on first use so DecapCatalogProvider
-  // can read it.  Mirrors what createEmbeddedLaika does via ensureConfigOnDisk.
+  // can read it.  Mirrors what createEmbeddedContentia does via ensureConfigOnDisk.
   await ensureConfig(storage);
 
   const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
   const documents = new CatalogDocumentsRepository(storage, settings);
   const assets = new CatalogAssetsRepository(storage, settings);
 
-  const devToken = env.DEV_TOKEN ?? 'dev-local-laika-token';
+  const devToken = env.DEV_TOKEN ?? 'dev-local-contentia-token';
 
-  const api = laikaApi({
+  const api = contentiaApi({
     documents,
     storage,
     assets,
@@ -124,7 +124,7 @@ a{color:#0070f3}nav{margin-bottom:2rem}</style></head>
   );
 }
 
-// The bundle (bare, non-laika Decap app + the registrations in src/cms.ts +
+// The bundle (bare, non-contentia Decap app + the registrations in src/cms.ts +
 // the config from src/admin-client.ts) is pre-built by esbuild
 // (pnpm build:admin) and served as a Workers static asset from public/.
 const adminHtml = `<!doctype html><html lang="en"><head>

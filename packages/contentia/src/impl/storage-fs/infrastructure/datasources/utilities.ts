@@ -1,0 +1,136 @@
+import { ContentiaError, ErrorCode, ErrorCodeToClassMap, InternalError } from 'contentia/core';
+import type { TranslationKey } from 'contentia/i18n';
+import { isError } from 'effect/Predicate';
+
+// Common system errors#
+// This is a list of system errors commonly-encountered when writing a Node.js program. For a comprehensive list, see the errno(3) man page.
+
+// EACCES (Permission denied): An attempt was made to access a file in a way forbidden by its file access permissions. Node.js uses single-S EACCES (not EACCESS).
+
+// EADDRINUSE (Address already in use): An attempt to bind a server (net, http, or https) to a local address failed due to another server on the local system already occupying that address.
+
+// ECONNREFUSED (Connection refused): No connection could be made because the target machine actively refused it. This usually results from trying to connect to a service that is inactive on the foreign host.
+
+// ECONNRESET (Connection reset by peer): A connection was forcibly closed by a peer. This normally results from a loss of the connection on the remote socket due to a timeout or reboot. Commonly encountered via the http and net modules.
+
+// EEXIST (File exists): An existing file was the target of an operation that required that the target not exist.
+
+// EISDIR (Is a directory): An operation expected a file, but the given pathname was a directory.
+
+// EMFILE (Too many open files in system): Maximum number of file descriptors allowable on the system has been reached, and requests for another descriptor cannot be fulfilled until at least one has been closed. This is encountered when opening many files at once in parallel, especially on systems (in particular, macOS) where there is a low file descriptor limit for processes. To remedy a low limit, run ulimit -n 2048 in the same shell that will run the Node.js process.
+
+// ENOENT (No such file or directory): Commonly raised by fs operations to indicate that a component of the specified pathname does not exist. No entity (file or directory) could be found by the given path.
+
+// ENOTDIR (Not a directory): A component of the given pathname existed, but was not a directory as expected. Commonly raised by fs.readdir.
+
+// ENOTEMPTY (Directory not empty): A directory with entries was the target of an operation that requires an empty directory, usually fs.unlink.
+
+// ENOTFOUND (DNS lookup failed): Indicates a DNS failure of either EAI_NODATA or EAI_NONAME. This is not a standard POSIX error.
+
+// EPERM (Operation not permitted): An attempt was made to perform an operation that requires elevated privileges.
+
+// EPIPE (Broken pipe): A write on a pipe, socket, or FIFO for which there is no process to read the data. Commonly encountered at the net and http layers, indicative that the remote side of the stream being written to has been closed.
+
+// ETIMEDOUT (Operation timed out): A connect or send request failed because the connected party did not properly respond after a period of time. Usually encountered by http or net. Often a sign that a socket.end() was not properly called.
+
+// `translationKey` follows the convention documented at
+// docs/concepts/recoverable-warning-translations.md — each entry reuses the closest matching
+// `storage.fs.*` key from the shared i18n catalog rather than minting a per-errno key.
+const systemErrors = {
+  EACCES: {
+    publicMessage: 'Permission denied',
+    contentiaCode: 'forbidden',
+    translationKey: 'storage.fs.permissionDenied',
+  },
+  EADDRINUSE: {
+    contentiaCode: 'conflict',
+    publicMessage: 'Address already in use',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+  ECONNREFUSED: {
+    publicMessage: 'Connection refused',
+    contentiaCode: 'bad_request',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+  ECONNRESET: {
+    publicMessage: 'Connection reset by peer',
+    contentiaCode: 'bad_request',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+  EEXIST: {
+    publicMessage: 'File exists',
+    contentiaCode: 'conflict',
+    translationKey: 'storage.fs.entryAlreadyExists',
+  },
+  EISDIR: {
+    publicMessage: 'Is a directory',
+    contentiaCode: 'conflict',
+    translationKey: 'storage.fs.expectedFileFoundDirectory',
+  },
+  EMFILE: {
+    publicMessage: 'Too many open files in system',
+    contentiaCode: 'service_unavailable',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+  ENAMETOOLONG: {
+    publicMessage: 'Key or path segment too long (max 255 bytes per path component)',
+    contentiaCode: 'bad_request',
+    translationKey: 'storage.fs.invalidRequest',
+  },
+  ENOENT: {
+    publicMessage: 'No such file or directory',
+    contentiaCode: 'not_found',
+    translationKey: 'storage.fs.fileNotFound',
+  },
+  ENOTDIR: {
+    publicMessage: 'Not a directory',
+    contentiaCode: 'bad_request',
+    translationKey: 'storage.fs.expectedDirectoryFoundFile',
+  },
+  ENOTEMPTY: {
+    publicMessage: 'Directory not empty',
+    contentiaCode: 'conflict',
+    translationKey: 'storage.fs.directoryNotEmpty',
+  },
+  ENOTFOUND: {
+    publicMessage: 'DNS lookup failed',
+    contentiaCode: 'not_found',
+    translationKey: 'storage.fs.fileNotFound',
+  },
+  EPERM: {
+    publicMessage: 'Operation not permitted',
+    contentiaCode: 'forbidden',
+    translationKey: 'storage.fs.permissionDenied',
+  },
+  EPIPE: {
+    publicMessage: 'Broken pipe',
+    contentiaCode: 'bad_request',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+  ETIMEDOUT: {
+    publicMessage: 'Operation timed out',
+    contentiaCode: 'gateway_timeout',
+    translationKey: 'storage.fs.unexpectedFileSystemError',
+  },
+} as const satisfies Record<
+  string,
+  { publicMessage: string, contentiaCode: ErrorCode, translationKey: TranslationKey }
+>;
+
+export const mapFsErrorToContentiaError = (error: unknown): ContentiaError => {
+  if (isError(error)) {
+    if (error instanceof ContentiaError) return error;
+    if ('code' in error && typeof error.code === 'string') {
+      if (error.code in systemErrors) {
+        const { publicMessage: description, contentiaCode, translationKey } =
+          systemErrors[error.code as keyof typeof systemErrors];
+        const ErrorClass = ErrorCodeToClassMap[contentiaCode];
+        return new ErrorClass(description, { cause: error, translation: { message: translationKey } });
+      }
+    }
+  }
+  return new InternalError(`An unexpected error occurred while accessing the file system.`, {
+    cause: error,
+    translation: { message: 'storage.fs.unexpectedFileSystemError' },
+  });
+};

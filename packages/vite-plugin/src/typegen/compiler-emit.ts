@@ -7,7 +7,7 @@
  *
  * `typescript` is loaded lazily and treated as optional: if it cannot be
  * resolved (or emit fails), the caller gets `null` and falls back to the
- * generic ambient `laika:*` module so imports still compile.
+ * generic ambient `contentia:*` module so imports still compile.
  */
 
 type TypeScriptApi = typeof import('typescript');
@@ -56,14 +56,14 @@ export function wrapAmbientModule(specifier: string, dts: string): string {
 }
 
 /**
- * The generic, lowest-specificity fallback so that any `laika:*` import type-
+ * The generic, lowest-specificity fallback so that any `contentia:*` import type-
  * checks even before its exact block has been generated (cold start), or when
- * `typescript` is unavailable. Exact `declare module 'laika:doc/…'` blocks win
+ * `typescript` is unavailable. Exact `declare module 'contentia:doc/…'` blocks win
  * over this wildcard.
  */
 export function genericFallbackModule(): string {
   return [
-    "declare module 'laika:*' {",
+    "declare module 'contentia:*' {",
     '  const data: Record<string, unknown>;',
     '  export default data;',
     '  export const $key: string;',
@@ -87,8 +87,8 @@ export async function emitDeclarations(
     return null;
   }
 
-  const fileName = 'laika-item.ts';
-  const dtsName = 'laika-item.d.ts';
+  const fileName = 'contentia-item.ts';
+  const dtsName = 'contentia-item.d.ts';
   const options: import('typescript').CompilerOptions = {
     declaration: true,
     emitDeclarationOnly: true,

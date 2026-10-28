@@ -1,5 +1,5 @@
 /**
- * Shared identifier helpers for the `@laikacms/vite-plugin` virtual module
+ * Shared identifier helpers for the `@contentia/vite-plugin` virtual module
  * surface. Both the runtime module builder (module.ts) and the typegen renderer
  * must agree on which content keys can become named ESM exports, so the logic
  * lives here and is imported by both.

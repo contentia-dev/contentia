@@ -1,10 +1,10 @@
 {
-  "name": "@laikacms/bitbucket",
+  "name": "@contentia/bitbucket",
   "version": "2.0.0",
   "publishConfig": {
     "access": "public"
   },
-  "description": "Bitbucket-backed StorageRepository for Laika CMS via the Cloud REST v2 API. Authenticates with an app password or OAuth2 bearer token. Runtime-agnostic — only depends on `fetch`.",
+  "description": "Bitbucket-backed StorageRepository for Contentia via the Cloud REST v2 API. Authenticates with an app password or OAuth2 bearer token. Runtime-agnostic — only depends on `fetch`.",
   "keywords": [
     "headless-cms",
     "content-management",
@@ -16,13 +16,13 @@
     "email": "sem@laikacms.com",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/laikacms/laikacms",
+  "homepage": "https://github.com/contentia-dev/contentia",
   "bugs": {
     "email": "sem@laikacms.com",
-    "url": "https://github.com/laikacms/laikacms/issues"
+    "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/laikacms/laikacms",
+  "repository": "https://github.com/contentia-dev/contentia",
   "type": "module",
   "sideEffects": false,
   "files": [
@@ -48,7 +48,7 @@
     "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"
   },
   "dependencies": {
-    "laikacms": "workspace:*",
+    "contentia": "workspace:*",
     "effect": "catalog:default",
     "minimatch": "catalog:"
   },

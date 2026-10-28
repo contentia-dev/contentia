@@ -1,23 +1,23 @@
 /**
- * A Laika JSON:API served from an Astro route.
+ * A Contentia JSON:API served from an Astro route.
  *
  * Astro hands a route handler a WHATWG `Request` and expects a `Response`, which
- * is exactly what the `laikacms` sub-API builders speak — so this is a router
+ * is exactly what the `contentia` sub-API builders speak — so this is a router
  * over three of them and nothing more. There is no Node bridging here (unlike
  * the dev-server mount, which has to adapt Connect) and no authentication (see
  * `api-access.ts`).
  */
 
-import { buildAssetsApi } from 'laikacms/assets/api';
-import { buildJsonApi as buildDocumentsApi } from 'laikacms/documents/api';
-import { buildJsonApi as buildStorageApi } from 'laikacms/storage/api';
+import { buildAssetsApi } from 'contentia/assets/api';
+import { buildJsonApi as buildDocumentsApi } from 'contentia/documents/api';
+import { buildJsonApi as buildStorageApi } from 'contentia/storage/api';
 
 import { type ApiAccess, authorizersFor } from './api-access.js';
-import type { LaikaRepositories } from './repositories.js';
+import type { ContentiaRepositories } from './repositories.js';
 
 export interface ApiHandlerOptions {
-  repositories: LaikaRepositories;
-  /** Path the sub-routes mount under, e.g. `/api/laika`. */
+  repositories: ContentiaRepositories;
+  /** Path the sub-routes mount under, e.g. `/api/contentia`. */
   basePath: string;
   /** Defaults to `'published'`. */
   access?: ApiAccess;
@@ -59,7 +59,7 @@ export function createApiHandler(options: ApiHandlerOptions): ApiHandler {
           status: '404',
           code: 'not_found',
           title: 'Not Found',
-          detail: `No Laika API at ${pathname}. Available: ${basePath}/documents, ${basePath}/storage, `
+          detail: `No Contentia API at ${pathname}. Available: ${basePath}/documents, ${basePath}/storage, `
             + `${basePath}/assets.`,
         }],
       },

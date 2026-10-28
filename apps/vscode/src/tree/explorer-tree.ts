@@ -77,7 +77,7 @@ export class ExplorerTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
             : vscode.ThemeIcon.File;
           item.description = entry.kind === 'record' ? `${entry.status} · ${entry.language}` : undefined;
           item.command = {
-            command: 'laika.open',
+            command: 'contentia.open',
             title: 'Open',
             arguments: [contentUri(connection.name, this.source, entry)],
           };
@@ -87,7 +87,7 @@ export class ExplorerTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
       case 'more': {
         const item = new vscode.TreeItem('Load more…');
         item.iconPath = new vscode.ThemeIcon('ellipsis');
-        item.command = { command: 'laika.loadMore', title: 'Load more', arguments: [this, node] };
+        item.command = { command: 'contentia.loadMore', title: 'Load more', arguments: [this, node] };
         return item;
       }
       case 'message': {
@@ -124,7 +124,7 @@ export class ExplorerTree implements vscode.TreeDataProvider<Node>, vscode.Dispo
       ];
       state.nextPage = page.nextPage;
     } catch (error) {
-      void vscode.window.showErrorMessage(`Laika: ${this.describe(error)}`);
+      void vscode.window.showErrorMessage(`Contentia: ${this.describe(error)}`);
     }
     this.emitter.fire(node.parent);
   }

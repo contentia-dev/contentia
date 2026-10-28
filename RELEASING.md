@@ -1,7 +1,7 @@
 # Releasing
 
-All four public packages (`laikacms`, `@laikacms/server`, `@laikacms/vite-plugin`,
-`@laikacms/astro`) are version-fixed via changesets and released together with `changeset publish`.
+All four public packages (`contentia`, `@contentia/server`, `@contentia/vite-plugin`,
+`@contentia/astro`) are version-fixed via changesets and released together with `changeset publish`.
 Publishing MUST go through pnpm (never `npm publish`): pnpm resolves `catalog:` dependency ranges
 into the tarball, npm does not — `prepack` guards against this via
 `scripts/check-no-pnpm-catalog-deps.mjs`. `changeset publish` is safe here: it detects pnpm from the
@@ -26,7 +26,7 @@ git push origin develop v1.3.0-alpha.0
 
 While `.changeset/pre.json` exists (pre mode), `changeset publish` automatically publishes under the
 prerelease dist-tag (`alpha`, likewise `beta`/`rc`), so `latest` keeps pointing at the last stable
-release. Consumers install with `npm install laikacms@alpha`.
+release. Consumers install with `npm install contentia@alpha`.
 
 End the alpha cycle with `pnpm changeset pre exit` before versioning the stable release.
 
@@ -43,16 +43,16 @@ Afterwards, push the `v*` tag so `.github/workflows/create-release.yml` creates 
 
 ## Git platform packages
 
-`@laikacms/github`, `@laikacms/gitlab`, and `@laikacms/bitbucket` are **not** part of the changeset
-`fixed` group — they version independently. To publish one:
+`@contentia/github`, `@contentia/gitlab`, and `@contentia/bitbucket` are **not** part of the
+changeset `fixed` group — they version independently. To publish one:
 
 ```sh
 pnpm changeset                           # select the git platform package(s) only
 pnpm changeset version                   # bumps its version
-git commit -am "chore(release): bump @laikacms/github to X.Y.Z"
-pnpm --filter @laikacms/github release   # or @laikacms/gitlab / @laikacms/bitbucket
-git tag @laikacms/github@X.Y.Z
-git push origin develop @laikacms/github@X.Y.Z
+git commit -am "chore(release): bump @contentia/github to X.Y.Z"
+pnpm --filter @contentia/github release   # or @contentia/gitlab / @contentia/bitbucket
+git tag @contentia/github@X.Y.Z
+git push origin develop @contentia/github@X.Y.Z
 ```
 
 Publishing requires owner npm credentials (same as for the four core packages). The `prepack` guard
@@ -61,13 +61,13 @@ Publishing requires owner npm credentials (same as for the four core packages). 
 
 ## SBOM (Software Bill of Materials)
 
-`pnpm gen-sbom` generates a CycloneDX SBOM for each published package (`laikacms`,
-`@laikacms/server`, `@laikacms/vite-plugin`, `@laikacms/astro`, `@laikacms/github`,
-`@laikacms/gitlab`, `@laikacms/bitbucket`) via pnpm's built-in `pnpm sbom` command — no extra
-dependency needed. Output goes to `sbom/laikacms.cdx.json`, `sbom/laikacms-server.cdx.json`,
-`sbom/laikacms-vite-plugin.cdx.json`, `sbom/laikacms-astro.cdx.json`,
-`sbom/laikacms-github.cdx.json`, `sbom/laikacms-gitlab.cdx.json`, and
-`sbom/laikacms-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
+`pnpm gen-sbom` generates a CycloneDX SBOM for each published package (`contentia`,
+`@contentia/server`, `@contentia/vite-plugin`, `@contentia/astro`, `@contentia/github`,
+`@contentia/gitlab`, `@contentia/bitbucket`) via pnpm's built-in `pnpm sbom` command — no extra
+dependency needed. Output goes to `sbom/contentia.cdx.json`, `sbom/contentia-server.cdx.json`,
+`sbom/contentia-vite-plugin.cdx.json`, `sbom/contentia-astro.cdx.json`,
+`sbom/contentia-github.cdx.json`, `sbom/contentia-gitlab.cdx.json`, and
+`sbom/contentia-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
 `scripts/generate-sbom.mjs`.
 
 This is intentionally a local/publish-time step, not a GitHub Actions workflow step — GH Actions

@@ -1,9 +1,9 @@
 {
-  "name": "laikacms-examples",
+  "name": "contentia-examples",
   "private": true,
-  "description": "Standalone examples for Laika CMS. Not part of the pnpm workspace and never published.",
+  "description": "Standalone examples for Contentia. Not part of the pnpm workspace and never published.",
   "type": "module",
   "dependencies": {
-    "laikacms": "workspace:*"
+    "contentia": "workspace:*"
   }
 }

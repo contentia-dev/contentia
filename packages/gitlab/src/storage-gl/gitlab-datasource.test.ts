@@ -1,6 +1,6 @@
 import * as Result from 'effect/Result';
 
-import { ForbiddenError, InternalError, UpstreamUnAuthorizedError } from 'laikacms/core';
+import { ForbiddenError, InternalError, UpstreamUnAuthorizedError } from 'contentia/core';
 import { describe, expect, it } from 'vitest';
 
 import { GitlabDataSource } from './gitlab-datasource.js';

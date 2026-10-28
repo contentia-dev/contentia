@@ -1,8 +1,8 @@
 {
-  "name": "@laikacms/starter-opfs-blog",
+  "name": "@contentia/starter-opfs-blog",
   "version": "0.0.1",
   "private": true,
-  "description": "Starter blog that runs LaikaCMS entirely in the browser — no server. Content lives in the origin-private file system (OPFS) by default, or in a real on-disk folder the user picks via showDirectoryPicker() (Chromium).",
+  "description": "Starter blog that runs Contentia entirely in the browser — no server. Content lives in the origin-private file system (OPFS) by default, or in a real on-disk folder the user picks via showDirectoryPicker() (Chromium).",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@laikacms/decap-cms": "^4.1.0",
-    "laikacms": "^6.0.0",
+    "contentia": "^6.0.0",
     "prismjs": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.4"
   },
   "overrides": {
-    "laikacms": "$laikacms"
+    "contentia": "$contentia"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

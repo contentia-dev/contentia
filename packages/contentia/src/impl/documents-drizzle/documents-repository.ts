@@ -1,0 +1,548 @@
+import * as Effect from 'effect/Effect';
+
+import { type ContentiaError, ContentiaStream, ContentiaTask, InvalidData, NotFoundError } from 'contentia/core';
+import type {
+  Document,
+  DocumentCreate,
+  DocumentUpdate,
+  ListRecordsDone,
+  ListRecordsOptions,
+  ListRecordSummaries,
+  ListRevisionsDone,
+  ListRevisionsOptions,
+  Record as DocumentRecord,
+  RecordSummary,
+  Revision,
+  RevisionCreate,
+  RevisionSummary,
+  Unpublished,
+  UnpublishedCreate,
+  UnpublishedUpdate,
+} from 'contentia/documents';
+import {
+  type DocumentsCapabilities,
+  DocumentsCompatibilityDate,
+  DocumentsRepository,
+  pathToSegments,
+} from 'contentia/documents';
+import { type StorageObjectContent } from 'contentia/storage';
+
+const PUBLISHED_STATUS = 'published';
+
+export type DocumentModel = {
+  key: string,
+  depth: number,
+  status: string | null | undefined,
+  language: string | null | undefined,
+  content: string,
+  createdAt: string,
+  updatedAt: string,
+};
+
+export type DocumentModelStrict = DocumentModel & {
+  status: string,
+  language: string,
+};
+
+export type RevisionModel = {
+  key: string,
+  depth: number,
+  revision: string,
+  language: string | null | undefined,
+  content: string,
+  createdAt: string,
+  updatedAt: string,
+};
+
+export type RevisionModelStrict = RevisionModel & {
+  revision: string,
+  language: string,
+};
+
+export interface DrizzleDocumentsRepositoryOptions<CKE, CKSW, CSE, CSNE, CSI, CDLTE, CA, RKE, RE, RA> {
+  logger?: Pick<Console, 'error' | 'warn' | 'info' | 'debug'> | undefined;
+  documentQueryBuilders: {
+    keyEquals: (value: string) => CKE,
+    keyStartsWith: (prefix: string) => CKSW,
+    statusEquals: (value: string) => CSE,
+    statusNotEquals: (value: string) => CSNE,
+    statusIn: (values: string[]) => CSI,
+    depthLte: (value: number) => CDLTE,
+    and: (...conditions: (CKE | CKSW | CSE | CSNE | CSI | CDLTE | CA)[]) => CA,
+  };
+  revisionQueryBuilders: {
+    keyEquals: (value: string) => RKE,
+    revisionEquals: (value: string) => RE,
+    and: (...conditions: (RKE | RE | RA)[]) => RA,
+  };
+  callbacks: {
+    documents: {
+      insert: (query: { values: DocumentModelStrict }) => Promise<DocumentModel[]>,
+      update: (query: {
+        where: CKE | CSNE | CSE | CKSW | CSI | CDLTE | CA,
+        values: Partial<DocumentModelStrict>,
+      }) => Promise<DocumentModel[]>,
+      delete: (query: { where: CKE | CSNE | CSE | CKSW | CSI | CDLTE | CA }) => Promise<DocumentModel[]>,
+      select: (query: {
+        where: CKE | CSNE | CSE | CKSW | CSI | CDLTE | CA,
+        excludeContent?: boolean,
+        limit?: number,
+        offset?: number,
+      }) => Promise<DocumentModel[]>,
+      /**
+       * Optional. Return the total number of rows matching `where` (no LIMIT/OFFSET).
+       * When provided, `listRecords` / `listRecordSummaries` populate `done.total` with the
+       * full matching count instead of the page count, enabling correct `meta.page.total`
+       * in the Documents JSON:API.
+       */
+      count?: (query: { where: CKE | CSNE | CSE | CKSW | CSI | CDLTE | CA }) => Promise<number>,
+    },
+    revisions: {
+      insert: (query: { values: RevisionModelStrict }) => Promise<RevisionModel[]>,
+      update: (query: {
+        where: RKE | RE | RA,
+        values: Partial<RevisionModelStrict>,
+      }) => Promise<RevisionModel[]>,
+      delete: (query: { where: RKE | RE | RA }) => Promise<RevisionModel[]>,
+      select: (query: {
+        where: RKE | RE | RA,
+        limit?: number,
+        offset?: number,
+        excludeContent?: boolean,
+      }) => Promise<RevisionModel[]>,
+      /**
+       * Optional. Return the total number of revision rows matching `where` (no LIMIT/OFFSET).
+       * When provided, `listRevisions` populates `done.total` with the full count instead of the
+       * page count, enabling correct `meta.page.total` in the Documents JSON:API.
+       */
+      count?: (query: { where: RKE | RE | RA }) => Promise<number>,
+    },
+  };
+}
+
+const parseContent = (raw: string): Effect.Effect<StorageObjectContent, ContentiaError> =>
+  Effect.try({
+    try: () => JSON.parse(raw) as StorageObjectContent,
+    catch: e =>
+      new InvalidData(
+        `Invalid JSON content format: ${e instanceof Error ? e.message : 'Unknown error'}`,
+      ),
+  });
+
+export class DrizzleDocumentsRepository<CKE, CKSW, CSE, CSNE, CSI, CDLTE, CA, RKE, RE, RA> extends DocumentsRepository {
+  constructor(
+    private options: DrizzleDocumentsRepositoryOptions<CKE, CKSW, CSE, CSNE, CSI, CDLTE, CA, RKE, RE, RA>,
+  ) {
+    super();
+  }
+
+  private debug(op: string, key?: string): void {
+    if (!this.options.logger) return;
+    const msg = key !== undefined ? `[documents-drizzle] ${op} key="${key}"` : `[documents-drizzle] ${op}`;
+    this.options.logger.debug(msg);
+  }
+
+  getCapabilities(): ContentiaTask.ContentiaTask<DocumentsCapabilities> {
+    return ContentiaTask.succeed<DocumentsCapabilities>({
+      compatibilityDate: DocumentsCompatibilityDate.make('2026-05-11'),
+      pagination: {
+        supported: true,
+        description: 'Backed by SQL OFFSET/LIMIT and page-based windowing.',
+        styles: { offset: true, page: true, cursor: false },
+      },
+      versionTracking: {
+        supported: false,
+        description: 'Rows carry no version token column.',
+      },
+      changes: {
+        supported: false,
+        description: 'No change log table; getSyncToken/listChanges are not implemented.',
+      },
+    });
+  }
+
+  getDocument(key: string): ContentiaTask.ContentiaTask<Document> {
+    return ContentiaTask.make<Document>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('getDocument', key);
+        const qb = this.options.documentQueryBuilders;
+        const rows = yield* Effect.promise(() =>
+          this.options.callbacks.documents.select({
+            where: qb.and(qb.keyEquals(key), qb.statusEquals(PUBLISHED_STATUS)),
+            limit: 1,
+          })
+        );
+        if (rows.length === 0) {
+          return yield* Effect.fail(new NotFoundError(`Document not found: ${key}`));
+        }
+        const row = rows[0]!;
+        const content = yield* parseContent(row.content);
+        return {
+          type: 'published' as const,
+          key: row.key,
+          status: 'published' as const,
+          content,
+          language: row.language ?? 'und',
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      })
+    );
+  }
+
+  createDocument(create: DocumentCreate): ContentiaTask.ContentiaTask<Document> {
+    return ContentiaTask.make<Document>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('createDocument', create.key);
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.insert({
+            values: {
+              key: create.key,
+              depth: pathToSegments(create.key).length,
+              status: PUBLISHED_STATUS,
+              language: create.language,
+              content: JSON.stringify(create.content),
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getDocument(create.key));
+      })
+    );
+  }
+
+  updateDocument(update: DocumentUpdate): ContentiaTask.ContentiaTask<Document> {
+    return ContentiaTask.make<Document>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('updateDocument', update.key);
+        const qb = this.options.documentQueryBuilders;
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.update({
+            where: qb.and(qb.keyEquals(update.key), qb.statusEquals(PUBLISHED_STATUS)),
+            values: {
+              updatedAt: now,
+              ...(update.content ? { content: JSON.stringify(update.content) } : {}),
+              ...(update.language ? { language: update.language } : {}),
+            },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getDocument(update.key));
+      })
+    );
+  }
+
+  deleteDocument(key: string): ContentiaTask.ContentiaTask<void> {
+    return ContentiaTask.make<void>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('deleteDocument', key);
+        const qb = this.options.documentQueryBuilders;
+        yield* Effect.promise(() => this.options.callbacks.documents.delete({ where: qb.keyEquals(key) }));
+      })
+    );
+  }
+
+  getUnpublished(key: string): ContentiaTask.ContentiaTask<Unpublished> {
+    return ContentiaTask.make<Unpublished>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('getUnpublished', key);
+        const qb = this.options.documentQueryBuilders;
+        const rows = yield* Effect.promise(() =>
+          this.options.callbacks.documents.select({
+            where: qb.and(qb.keyEquals(key), qb.statusNotEquals(PUBLISHED_STATUS)),
+            limit: 1,
+          })
+        );
+        if (rows.length === 0) {
+          return yield* Effect.fail(new NotFoundError(`Unpublished document not found: ${key}`));
+        }
+        const row = rows[0]!;
+        const content = yield* parseContent(row.content);
+        return {
+          type: 'unpublished' as const,
+          key: row.key,
+          status: row.status ?? 'published',
+          language: row.language ?? 'und',
+          content,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      })
+    );
+  }
+
+  createUnpublished(create: UnpublishedCreate): ContentiaTask.ContentiaTask<Unpublished> {
+    return ContentiaTask.make<Unpublished>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('createUnpublished', create.key);
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.insert({
+            values: {
+              key: create.key,
+              depth: pathToSegments(create.key).length,
+              status: create.status,
+              language: create.language,
+              content: JSON.stringify(create.content),
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getUnpublished(create.key));
+      })
+    );
+  }
+
+  updateUnpublished(update: UnpublishedUpdate): ContentiaTask.ContentiaTask<Unpublished> {
+    return ContentiaTask.make<Unpublished>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('updateUnpublished', update.key);
+        const qb = this.options.documentQueryBuilders;
+        const now = new Date().toISOString();
+        const values: Partial<DocumentModelStrict> = {
+          updatedAt: now,
+          language: update.language ?? 'und',
+        };
+        if (update.status) values.status = update.status;
+        if (update.content) values.content = JSON.stringify(update.content);
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.update({
+            where: qb.and(qb.keyEquals(update.key), qb.statusNotEquals(PUBLISHED_STATUS)),
+            values,
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getUnpublished(update.key));
+      })
+    );
+  }
+
+  deleteUnpublished(key: string): ContentiaTask.ContentiaTask<void> {
+    return ContentiaTask.make<void>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('deleteUnpublished', key);
+        const qb = this.options.documentQueryBuilders;
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.delete({
+            where: qb.and(qb.keyEquals(key), qb.statusNotEquals(PUBLISHED_STATUS)),
+          })
+        );
+      })
+    );
+  }
+
+  publish(key: string): ContentiaTask.ContentiaTask<Document> {
+    return ContentiaTask.make<Document>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('publish', key);
+        // Verify unpublished exists
+        yield* ContentiaTask.runValue(this.getUnpublished(key));
+        const qb = this.options.documentQueryBuilders;
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.update({
+            where: qb.keyEquals(key),
+            values: { status: PUBLISHED_STATUS, updatedAt: now },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getDocument(key));
+      })
+    );
+  }
+
+  unpublish(key: string, status: string): ContentiaTask.ContentiaTask<Unpublished> {
+    return ContentiaTask.make<Unpublished>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('unpublish', key);
+        // Verify document exists
+        yield* ContentiaTask.runValue(this.getDocument(key));
+        const qb = this.options.documentQueryBuilders;
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.documents.update({
+            where: qb.keyEquals(key),
+            values: { status, updatedAt: now },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getUnpublished(key));
+      })
+    );
+  }
+
+  listRecords(options: ListRecordsOptions): ContentiaStream.ContentiaStream<DocumentRecord, ListRecordsDone> {
+    return this.listRecordsInternal<DocumentRecord>(options, false);
+  }
+
+  listRecordSummaries(
+    options: ListRecordSummaries,
+  ): ContentiaStream.ContentiaStream<RecordSummary, ListRecordsDone> {
+    return this.listRecordsInternal<RecordSummary>(options, true);
+  }
+
+  private listRecordsInternal<T extends DocumentRecord | RecordSummary>(
+    options: ListRecordsOptions,
+    summaryOnly: boolean,
+  ): ContentiaStream.ContentiaStream<T, ListRecordsDone> {
+    return ContentiaStream.make<T, ListRecordsDone>(emit =>
+      Effect.gen({ self: this }, function*() {
+        this.debug(summaryOnly ? 'listRecordSummaries' : 'listRecords', options.folder);
+        const qb = this.options.documentQueryBuilders;
+        const where = qb.and(...[
+          options.type === 'published' ? qb.statusEquals(PUBLISHED_STATUS) : undefined,
+          options.type === 'unpublished' ? qb.statusNotEquals(PUBLISHED_STATUS) : undefined,
+          options.statuses ? qb.statusIn(options.statuses) : undefined,
+          options.folder ? qb.keyStartsWith(options.folder + '/') : undefined,
+          qb.depthLte((options.folder ? pathToSegments(options.folder).length : 0) + options.depth),
+        ].filter((x): x is NonNullable<typeof x> => x !== undefined));
+
+        const offset = 'offset' in options.pagination
+          ? options.pagination.offset
+          : 'page' in options.pagination
+          ? (options.pagination.page - 1) * (options.pagination.perPage ?? 100)
+          : 0;
+        const limit = 'offset' in options.pagination
+          ? (options.pagination.limit ?? 100)
+          : 'page' in options.pagination
+          ? (options.pagination.perPage ?? 100)
+          : 100;
+
+        const [rows, fullCount] = yield* Effect.all([
+          Effect.promise(() =>
+            this.options.callbacks.documents.select({ excludeContent: summaryOnly, where, offset, limit })
+          ),
+          this.options.callbacks.documents.count
+            ? Effect.promise(() => this.options.callbacks.documents.count!({ where }))
+            : Effect.succeed(null),
+        ]);
+
+        let emitted = 0;
+        for (const row of rows) {
+          const isPublished = (row.status ?? PUBLISHED_STATUS) === PUBLISHED_STATUS;
+          if (summaryOnly) {
+            yield* emit.data({
+              type: isPublished ? 'published-summary' : 'unpublished-summary',
+              key: row.key,
+              status: row.status ?? PUBLISHED_STATUS,
+              language: row.language ?? 'und',
+              createdAt: row.createdAt,
+              updatedAt: row.updatedAt,
+            } as T);
+            emitted += 1;
+            continue;
+          }
+          const parsed = yield* Effect.result(parseContent(row.content));
+          if (parsed._tag === 'Failure') {
+            yield* emit.recoverableError(parsed.failure);
+            continue;
+          }
+          yield* emit.data({
+            type: isPublished ? 'published' : 'unpublished',
+            key: row.key,
+            status: row.status ?? PUBLISHED_STATUS,
+            language: row.language ?? 'und',
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            content: parsed.success,
+          } as T);
+          emitted += 1;
+        }
+        return { total: fullCount ?? emitted };
+      })
+    );
+  }
+
+  getRevision(key: string, revision: string): ContentiaTask.ContentiaTask<Revision> {
+    return ContentiaTask.make<Revision>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('getRevision', `${key}/${revision}`);
+        const qb = this.options.revisionQueryBuilders;
+        const rows = yield* Effect.promise(() =>
+          this.options.callbacks.revisions.select({
+            where: qb.and(qb.keyEquals(key), qb.revisionEquals(revision)),
+            limit: 1,
+          })
+        );
+        if (rows.length === 0) {
+          return yield* Effect.fail(new NotFoundError(`Revision not found: ${key}/${revision}`));
+        }
+        const row = rows[0]!;
+        const content = yield* parseContent(row.content);
+        return {
+          type: 'revision' as const,
+          key: row.key,
+          revision: row.revision,
+          language: row.language ?? 'und',
+          content,
+          createdAt: row.createdAt,
+          updatedAt: row.updatedAt,
+        };
+      })
+    );
+  }
+
+  createRevision(create: RevisionCreate): ContentiaTask.ContentiaTask<Revision> {
+    return ContentiaTask.make<Revision>(() =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('createRevision', `${create.key}/${create.revision}`);
+        const now = new Date().toISOString();
+        yield* Effect.promise(() =>
+          this.options.callbacks.revisions.insert({
+            values: {
+              key: create.key,
+              depth: pathToSegments(create.key).length,
+              revision: create.revision,
+              language: create.language,
+              content: JSON.stringify(create.content),
+              createdAt: now,
+              updatedAt: now,
+            },
+          })
+        );
+        return yield* ContentiaTask.runValue(this.getRevision(create.key, create.revision));
+      })
+    );
+  }
+
+  listRevisions(
+    key: string,
+    options: ListRevisionsOptions,
+  ): ContentiaStream.ContentiaStream<RevisionSummary, ListRevisionsDone> {
+    return ContentiaStream.make<RevisionSummary, ListRevisionsDone>(emit =>
+      Effect.gen({ self: this }, function*() {
+        this.debug('listRevisions', key);
+        const qb = this.options.revisionQueryBuilders;
+        const pagination = options.pagination;
+        const offset = 'offset' in pagination
+          ? pagination.offset
+          : 'page' in pagination
+          ? (pagination.page - 1) * (pagination.perPage ?? 100)
+          : 0;
+        const limit = 'offset' in pagination
+          ? (pagination.limit ?? 100)
+          : 'page' in pagination
+          ? (pagination.perPage ?? 100)
+          : 100;
+        const where = qb.keyEquals(key);
+        const [rows, fullCount] = yield* Effect.all([
+          Effect.promise(() => this.options.callbacks.revisions.select({ where, limit, offset, excludeContent: true })),
+          this.options.callbacks.revisions.count
+            ? Effect.promise(() => this.options.callbacks.revisions.count!({ where }))
+            : Effect.succeed(null),
+        ]);
+        for (const row of rows) {
+          yield* emit.data({
+            type: 'revision-summary' as const,
+            key,
+            revision: row.revision,
+            language: row.language ?? 'und',
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          });
+        }
+        return { total: fullCount ?? rows.length };
+      })
+    );
+  }
+}

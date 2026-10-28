@@ -1,13 +1,13 @@
-# @laikacms/astro
+# @contentia/astro
 
 ## 6.0.0
 
 ### Minor Changes
 
-- 06b4a5a: Add `@laikacms/astro`: a first-class Astro integration built on the Content Layer.
+- 06b4a5a: Add `@contentia/astro`: a first-class Astro integration built on the Content Layer.
 
   - `documentsLoader()` / `objectsLoader()` for `defineCollection({ loader })`, so Astro pages use
-    `getCollection`, `getEntry` and `render` instead of the `laika:` import protocol.
+    `getCollection`, `getEntry` and `render` instead of the `contentia:` import protocol.
   - Incremental sync with four tiers — change feed, version tokens, content digest, full reload —
     chosen from what the repository advertises through `getCapabilities()`, degrading cleanly to the
     digest tier on repositories (including the filesystem/Catalog default) that advertise nothing.
@@ -15,7 +15,7 @@
     are generated from your existing CMS config, so fields are declared in one place. Collections
     whose catalog describes no fields get entry types inferred from their content instead. Both go
     through Astro's own `Loader.createSchema()`, landing in `.astro/loaders/`.
-  - `laika()` integration mounting the dev-only JSON:API and bridging repository change
+  - `contentia()` integration mounting the dev-only JSON:API and bridging repository change
     notifications to Astro's `refreshContent`, so CMS edits appear without restarting the dev
     server.
   - `api.mode: 'route'` for deployments: an injected on-demand route serving the same JSON:API,
@@ -31,11 +31,11 @@
   config decides.
 
   **Live collections are no longer `Record<string, unknown>`.** Astro gives a live loader no
-  `createSchema()` hook, so `laika()` now reads the catalog at `astro:config:done` and emits a
-  `LaikaLiveCollections` augmentation into `.astro/`. Passing an explicit `collection` to
+  `createSchema()` hook, so `contentia()` now reads the catalog at `astro:config:done` and emits a
+  `ContentiaLiveCollections` augmentation into `.astro/`. Passing an explicit `collection` to
   `liveDocumentsLoader()` picks up that collection's shape; a collection the catalog cannot describe
   is not a member and stays `Record<string, unknown>`, as does omitting `collection`. A project can
-  override any member by augmenting `@laikacms/astro/live-collections` itself.
+  override any member by augmenting `@contentia/astro/live-collections` itself.
 
   Dates come through as `string | Date` there rather than `Date`: nothing coerces on the live path
   unless that loader opted into validation, and the build-time `Date` would have been a claim the
@@ -70,5 +70,5 @@
 - Updated dependencies [14df4cf]
 - Updated dependencies [e8ab49b]
 - Updated dependencies [6b918c6]
-  - laikacms@6.0.0
-  - @laikacms/vite-plugin@6.0.0
+  - contentia@6.0.0
+  - @contentia/vite-plugin@6.0.0

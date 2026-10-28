@@ -5,7 +5,7 @@
  * catalog fields at all, and a convention catalog describes a document
  * collection only permissively. Those collections would otherwise reach a
  * template as `unknown`, which is where the Vite plugin's typegen earns its
- * keep — it types `laika:store/*` imports from the real data on disk.
+ * keep — it types `contentia:store/*` imports from the real data on disk.
  *
  * This is that idea for the Content Layer: read what is actually there, and
  * describe it. The result is a union across every entry in the collection, so a

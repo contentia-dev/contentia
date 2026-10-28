@@ -1,5 +1,5 @@
+import { ForbiddenError, InternalError, ServiceUnavailableError, UpstreamUnAuthorizedError } from 'contentia/core';
 import * as Result from 'effect/Result';
-import { ForbiddenError, InternalError, ServiceUnavailableError, UpstreamUnAuthorizedError } from 'laikacms/core';
 import { describe, expect, it } from 'vitest';
 
 import { BitbucketDataSource } from './bitbucket-datasource.js';

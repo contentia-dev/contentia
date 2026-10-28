@@ -1,0 +1,71 @@
+---
+name: contentia-docs
+description: >-
+  Find and read the contentia documentation that matches the exact version
+  installed in the current project. Use whenever the user asks how to do
+  something with contentia, references a contentia export/API/error/package
+  (buildJsonApi, contentiaApi, a storage repository or serializer, a ContentiaError),
+  or needs version-accurate guides, concepts, or JSON:API reference instead of
+  guessing from memory.
+license: MIT
+---
+
+# contentia docs
+
+contentia ships no docs inside its npm package — they live in the `contentia-dev/contentia` GitHub
+repo under `docs/`, and they change between versions. Do **not** answer contentia questions from
+memory. Instead, resolve the docs for the version the project actually has installed, then read only
+the page(s) you need.
+
+A bundled zero-dependency Node script does the version detection, ref resolution, and listing. Run
+it from the **project root** (so it can read that project's `node_modules`).
+
+## Workflow
+
+1. **List the docs tree for the installed version:**
+
+   ```bash
+   node <skill-dir>/scripts/contentia-docs.mjs index
+   ```
+
+   `<skill-dir>` is wherever this skill was installed — typically `.claude/skills/contentia-docs`.
+   The output shows the installed version, the resolved git ref (and whether it is version-pinned),
+   a "Start here" list of orientation docs, and the full docs tree grouped by section.
+
+2. **Read the specific page(s)** the task needs — pass the `docs/...` path:
+
+   ```bash
+   node <skill-dir>/scripts/contentia-docs.mjs get docs/guides/getting-started.md
+   ```
+
+   Prefer reading one or two targeted pages over dumping the whole tree into context. Good entry
+   points: `docs/index.md`, `docs/guides/getting-started.md`, `docs/reference/imports.md`, and the
+   section index files.
+
+3. **Answer from what you read**, citing the doc path. If the ref was not version-pinned (see
+   below), tell the user the docs may be newer than their installed version.
+
+## How the version is resolved (anchor ladder)
+
+The script picks the most precise ref it can, in this order:
+
+1. `gitHead` in the installed `package.json` — exact commit the package was built from.
+2. Git tag `contentia@<version>` — exact release (only if that tag is pushed to GitHub).
+3. The repo's default branch — always works, but is "latest" and may be ahead of the installed
+   version. The script prints a ⚠ warning when it falls back here.
+
+`resolve` shows just the version + ref without listing:
+
+```bash
+node <skill-dir>/scripts/contentia-docs.mjs resolve
+```
+
+Add `--json` to `index` / `resolve` for machine-readable output (paths, groups, `browseUrl`,
+`rawUrlTemplate`).
+
+## Notes
+
+- Needs network access to `api.github.com` (falls back to the jsDelivr CDN if the GitHub API is
+  rate-limited). Set `GITHUB_TOKEN` to raise the API limit from 60 to 5000 requests/hour.
+- If contentia is not installed in the project, the script still works and shows the latest docs
+  from the default branch.

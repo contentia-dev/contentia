@@ -1,5 +1,5 @@
 /**
- * Decap CMS collection config shared between the embedded server (laika.ts)
+ * Decap CMS collection config shared between the embedded server (contentia.ts)
  * and the admin UI (pages/admin/index.astro).
  *
  * Keep backend, media_folder, and public_folder out of this object — those are

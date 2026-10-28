@@ -11,16 +11,16 @@ importers:
       '@laikacms/decap-cms':
         specifier: ^4.1.0
         version: 4.1.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(@types/react@19.2.18)(react@19.2.8))(@types/node@26.1.2)(@types/react@19.2.18)(prop-types@15.8.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)(yjs@13.6.32)(zod@4.4.3)
-      '@laikacms/server':
+      '@contentia/server':
         specifier: ^5.0.0
         version: 5.0.0
-      '@laikacms/vite-plugin':
+      '@contentia/vite-plugin':
         specifier: ^5.0.0
         version: 5.0.0(rolldown@1.2.3)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(yaml@2.9.0))
       astro:
         specifier: ^7.1.6
         version: 7.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.3)(@types/node@26.1.2)(yaml@2.9.0)
-      laikacms:
+      contentia:
         specifier: ^5.0.0
         version: 5.0.0
       react:
@@ -887,11 +887,11 @@ packages:
       zod:
         optional: true
 
-  '@laikacms/server@5.0.0':
+  '@contentia/server@5.0.0':
     resolution: {integrity: sha512-M/lPV+zzc20NsUYpefjtwm+WDCMMRBMMPM9E7WW7HDWauAABvN+j3b2MKumkplKuolLU51ak//8ZtX6Pp1+ZEA==}
     engines: {node: '>=24.0.0'}
 
-  '@laikacms/vite-plugin@5.0.0':
+  '@contentia/vite-plugin@5.0.0':
     resolution: {integrity: sha512-T55J8tbKgVGx5aCgl+eBIfV8IVsTa5kFiN1Ex5Gn5q2A5+Gp1MenAHLUHVsmmwm9d/TJj7hcockPyKnq947RJA==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -2260,7 +2260,7 @@ packages:
   kubernetes-types@1.30.0:
     resolution: {integrity: sha512-Dew1okvhM/SQcIa2rcgujNndZwU8VnSapDgdxlYoB84ZlpAD43U6KLAFqYo17ykSFGHNPrg0qry0bP+GJd9v7Q==}
 
-  laikacms@2.1.1:
+  contentia@2.1.1:
     resolution: {integrity: sha512-yrMd12NBstqx+ghPTVJQiXeaJYBQ+BE0f6HO3DgrGx53qgcpCRQ5WRefRbrDLtiyvp5JMXsO4B00+zfbHbst5w==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
@@ -2275,7 +2275,7 @@ packages:
       hono:
         optional: true
 
-  laikacms@5.0.0:
+  contentia@5.0.0:
     resolution: {integrity: sha512-G5clEE9R8Fgx75ShtxmDv8fOVK35HPudgyO8XMKzMc+vp06Mw7t5xtiNZvUkueeE20hXdV47QBlAzrx67YerOw==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
@@ -4510,7 +4510,7 @@ snapshots:
       immer: 11.1.15
       ini: 7.0.0
       jwt-decode: 4.0.0
-      laikacms: 2.1.1
+      contentia: 2.1.1
       lexical: 0.48.0(typescript@6.0.3)
       lodash-es: 4.18.1
       mdast-util-from-markdown: 2.0.3
@@ -4558,18 +4558,18 @@ snapshots:
       - utf-8-validate
       - yjs
 
-  '@laikacms/server@5.0.0':
+  '@contentia/server@5.0.0':
     dependencies:
-      laikacms: 5.0.0
+      contentia: 5.0.0
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
       - '@hono/node-server'
       - hono
 
-  '@laikacms/vite-plugin@5.0.0(rolldown@1.2.3)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(yaml@2.9.0))':
+  '@contentia/vite-plugin@5.0.0(rolldown@1.2.3)(typescript@6.0.3)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(yaml@2.9.0))':
     dependencies:
       es-module-lexer: 2.3.1
-      laikacms: 5.0.0
+      contentia: 5.0.0
       magic-string: 1.1.0
       minimatch: 10.2.6
     optionalDependencies:
@@ -6034,7 +6034,7 @@ snapshots:
 
   kubernetes-types@1.30.0: {}
 
-  laikacms@2.1.1:
+  contentia@2.1.1:
     dependencies:
       '@standard-schema/spec': 1.1.0
       bcryptjs: 3.0.3
@@ -6045,7 +6045,7 @@ snapshots:
       minimatch: 10.2.6
       trash: 10.1.1
 
-  laikacms@5.0.0:
+  contentia@5.0.0:
     dependencies:
       '@standard-schema/spec': 1.1.0
       bcryptjs: 3.0.3

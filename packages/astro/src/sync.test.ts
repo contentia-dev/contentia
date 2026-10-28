@@ -250,7 +250,7 @@ describe('incrementality', () => {
 });
 
 describe('tier resolution', () => {
-  const strategyUsed = (fake: FakeLoaderContext) => fake.meta.get('laika:strategy');
+  const strategyUsed = (fake: FakeLoaderContext) => fake.meta.get('contentia:strategy');
 
   it('auto takes the change feed when the repository advertises one', async () => {
     const fake = createFakeLoaderContext();
@@ -290,13 +290,13 @@ describe('the sync token', () => {
     const repo = createSource({ records: SEED, changes: true });
 
     await runSync(repo.source, contextFor(fake), { strategy: 'changes' });
-    const first = fake.meta.get('laika:syncToken');
+    const first = fake.meta.get('contentia:syncToken');
     expect(first).toBeDefined();
 
     repo.write('posts/c', { title: 'C' });
     await runSync(repo.source, contextFor(fake), { strategy: 'changes' });
 
-    expect(fake.meta.get('laika:syncToken')).not.toBe(first);
+    expect(fake.meta.get('contentia:syncToken')).not.toBe(first);
     expect(fake.snapshot().has('c')).toBe(true);
   });
 
@@ -316,7 +316,7 @@ describe('store invalidation', () => {
   it('clears when the collection this store was built for changed', async () => {
     const fake = createFakeLoaderContext({
       collection: 'posts',
-      meta: { 'laika:collection': 'pages', 'laika:mappingVersion': MAPPING_VERSION },
+      meta: { 'contentia:collection': 'pages', 'contentia:mappingVersion': MAPPING_VERSION },
       entries: [{ id: 'stale', data: {} }],
     });
     const repo = createSource({ records: SEED });
@@ -330,7 +330,7 @@ describe('store invalidation', () => {
 
   it('clears when the entry mapping changed, so an upgrade cannot serve stale entries', async () => {
     const fake = createFakeLoaderContext({
-      meta: { 'laika:collection': 'posts', 'laika:mappingVersion': 'ancient' },
+      meta: { 'contentia:collection': 'posts', 'contentia:mappingVersion': 'ancient' },
       entries: [{ id: 'stale', data: {} }],
     });
     const repo = createSource({ records: SEED });
@@ -344,9 +344,9 @@ describe('store invalidation', () => {
   it('drops a sync token it can no longer trust', async () => {
     const fake = createFakeLoaderContext({
       meta: {
-        'laika:collection': 'pages',
-        'laika:mappingVersion': MAPPING_VERSION,
-        'laika:syncToken': '99',
+        'contentia:collection': 'pages',
+        'contentia:mappingVersion': MAPPING_VERSION,
+        'contentia:syncToken': '99',
       },
     });
     const repo = createSource({ records: SEED, changes: true });
@@ -355,7 +355,7 @@ describe('store invalidation', () => {
 
     // A cold start after invalidation, not a resume from the stale token.
     expect([...fake.snapshot().keys()].sort()).toEqual(['a', 'b']);
-    expect(fake.meta.get('laika:syncToken')).toBe('2');
+    expect(fake.meta.get('contentia:syncToken')).toBe('2');
   });
 });
 
@@ -372,7 +372,7 @@ describe('pushed changes from the dev server', () => {
 
     await runSync(repo.source, {
       ...contextFor(fake),
-      refreshContextData: { laika: { changes: [{ key: 'posts/a', deleted: false }] } },
+      refreshContextData: { contentia: { changes: [{ key: 'posts/a', deleted: false }] } },
     }, {});
 
     expect(repo.reads.listRecords).toBe(0);
@@ -390,7 +390,7 @@ describe('pushed changes from the dev server', () => {
     fake.resetTraffic();
     await runSync(repo.source, {
       ...contextFor(fake),
-      refreshContextData: { laika: { changes: [{ key: 'posts/b', deleted: true }] } },
+      refreshContextData: { contentia: { changes: [{ key: 'posts/b', deleted: true }] } },
     }, {});
 
     expect(fake.traffic.delete).toEqual(['b']);
@@ -407,7 +407,7 @@ describe('pushed changes from the dev server', () => {
       // A Decap collection whose directory differs from its name produces
       // storage keys this collection cannot map. Falling back is correct;
       // guessing would risk writing the wrong entry.
-      refreshContextData: { laika: { changes: [{ key: 'src/posts/a', deleted: false }] } },
+      refreshContextData: { contentia: { changes: [{ key: 'src/posts/a', deleted: false }] } },
     }, {});
 
     expect(repo.reads.listRecords).toBe(1);
@@ -421,7 +421,7 @@ describe('pushed changes from the dev server', () => {
     fake.resetTraffic();
     await runSync(repo.source, {
       ...contextFor(fake),
-      refreshContextData: { laika: { changes: [{ key: 'posts/ghost', deleted: false }] } },
+      refreshContextData: { contentia: { changes: [{ key: 'posts/ghost', deleted: false }] } },
     }, {});
 
     expect(fake.traffic.delete).toEqual(['ghost']);

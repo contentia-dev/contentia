@@ -352,14 +352,14 @@ describe('aggregation and message format', () => {
     expect(error).toBeInstanceOf(UnsafeRuntimeError);
     const message = error!.message;
     expect(message.startsWith(
-      '@laikacms/server/oauth2 refused to start: this environment cannot uphold guarantees the package makes.\n\n',
+      '@contentia/server/oauth2 refused to start: this environment cannot uphold guarantees the package makes.\n\n',
     )).toBe(true);
     const spec = UNSAFE_REASONS.LCMS_OAUTH2_INSECURE_CONTEXT;
     expect(message).toContain(`[LCMS_OAUTH2_INSECURE_CONTEXT] ${spec.title}`);
     expect(message).toContain(`  Risk:   ${spec.risk}`);
     expect(message).toContain(`  Remedy: ${spec.remedy}`);
     expect(message).toContain(
-      "Override only if you accept the risk:\n  laikaOauth2({ ..., ignoreUnsafeReasons: ['LCMS_OAUTH2_INSECURE_CONTEXT'] })",
+      "Override only if you accept the risk:\n  contentiaOauth2({ ..., ignoreUnsafeReasons: ['LCMS_OAUTH2_INSECURE_CONTEXT'] })",
     );
   });
 });

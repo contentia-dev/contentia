@@ -6,5 +6,5 @@ dist/
 .env.local
 .env.*.local
 *.tsbuildinfo
-content/.laika/
+content/.contentia/
 public/admin/bundle.js

@@ -8,7 +8,7 @@ import { bootstrapApplication, parseIgnoredBuilds } from './bootstrap.js';
 
 describe('bootstrapApplication', () => {
   it('copies and configures the Astro starter without installing', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'my-blog');
 
     const result = await bootstrapApplication({
@@ -38,7 +38,7 @@ describe('bootstrapApplication', () => {
     // bundle directly (bare or styled) — the wizard-generated cms.ts owns that.
     expect(admin).not.toContain("from '@laikacms/decap-cms/");
     // src/cms.ts is regenerated from the (default) selection: the bare,
-    // non-laika app plus explicit registrations.
+    // non-contentia app plus explicit registrations.
     const cms = await readFile(path.join(destination, 'src/cms.ts'), 'utf8');
     expect(cms).toContain("from '@laikacms/decap-cms/laika-app/bare'");
     expect(cms).toContain(`CMS.registerLocale('en', en);`);
@@ -50,7 +50,7 @@ describe('bootstrapApplication', () => {
   });
 
   it('writes src/cms.ts from a custom backend/widget/locale selection', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'my-blog');
 
     const selection = {
@@ -70,7 +70,7 @@ describe('bootstrapApplication', () => {
   });
 
   it('configures Yarn with a scannable node_modules install', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'yarn-blog');
 
     await bootstrapApplication({
@@ -84,7 +84,7 @@ describe('bootstrapApplication', () => {
   });
 
   it('installs optional peers imported by selected CMS extensions', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'map-blog');
 
     await bootstrapApplication({
@@ -100,7 +100,7 @@ describe('bootstrapApplication', () => {
   }, 120_000);
 
   it('rejects an invalid selection before touching the destination', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'my-blog');
 
     await expect(bootstrapApplication({
@@ -112,7 +112,7 @@ describe('bootstrapApplication', () => {
   });
 
   it('rejects an unknown CMS before touching the destination', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'my-blog');
 
     await expect(bootstrapApplication({
@@ -143,7 +143,7 @@ describe('bootstrapApplication', () => {
   });
 
   it('refuses to overwrite a non-empty destination', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'laikacli-bootstrap-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'contentia-bootstrap-'));
     const destination = path.join(root, 'existing');
     await mkdir(destination);
     await writeFile(path.join(destination, 'keep.txt'), 'keep');

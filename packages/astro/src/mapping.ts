@@ -1,7 +1,7 @@
 /**
- * Translating a Laika record into an Astro `DataEntry`.
+ * Translating a Contentia record into an Astro `DataEntry`.
  *
- * The two models disagree in exactly one interesting place. Laika keeps a
+ * The two models disagree in exactly one interesting place. Contentia keeps a
  * document's whole payload in one open `content` bag — frontmatter fields and
  * the prose body side by side — because storage serializers do not know which
  * field is prose. Astro splits them: `data` is validated against the collection
@@ -25,9 +25,9 @@ import type { JSONSchema7 } from 'json-schema';
  * functions, not the site's build configuration.
  *
  * Parameter position makes this safe: a function accepting less is assignable to
- * one accepting more, so `LaikaLoader` remains a valid Astro `Loader`.
+ * one accepting more, so `ContentiaLoader` remains a valid Astro `Loader`.
  */
-export interface LaikaLoaderContext {
+export interface ContentiaLoaderContext {
   collection: string;
   store: DataStore;
   meta: MetaStore;
@@ -47,9 +47,9 @@ export interface LaikaLoaderContext {
 }
 
 /** The loader shape these loaders produce. Assignable to Astro's `Loader`. */
-export interface LaikaLoader {
+export interface ContentiaLoader {
   name: string;
-  load: (context: LaikaLoaderContext) => Promise<void>;
+  load: (context: ContentiaLoaderContext) => Promise<void>;
   /**
    * Supplies the collection schema *and* the TypeScript source describing it.
    * Astro calls this when the collection declares no schema of its own, writes
@@ -73,9 +73,9 @@ export type DataEntry = NonNullable<ReturnType<DataStore['get']>>;
 export const DEFAULT_BODY_FIELD = 'body';
 
 export interface EntryOptions {
-  /** Derive the Astro entry id from a Laika key. Defaults to stripping the collection prefix. */
+  /** Derive the Astro entry id from a Contentia key. Defaults to stripping the collection prefix. */
   id?: (context: { key: string, collection: string }) => string;
-  /** Copy the full Laika key into `data` under this name. Off by default. */
+  /** Copy the full Contentia key into `data` under this name. Off by default. */
   keyField?: string;
   /** Copy the record's version token into `data` under this name. Off by default. */
   versionField?: string;
@@ -98,7 +98,7 @@ export interface RenderOptions {
   bodyField?: string;
   /** Keep the raw body on the entry. Defaults to `true`. */
   retainBody?: boolean;
-  /** Resolve a Laika key to an on-disk path, for `mode: 'deferred'`. */
+  /** Resolve a Contentia key to an on-disk path, for `mode: 'deferred'`. */
   filePath?: (context: { key: string, collection: string }) => string | undefined;
 }
 
@@ -126,7 +126,7 @@ export interface MappingContext {
 }
 
 /**
- * Derive an Astro entry id from a Laika key.
+ * Derive an Astro entry id from a Contentia key.
  *
  * The default strips the collection prefix and keeps everything after it,
  * slashes included: `posts/2026/hello` in collection `posts` becomes

@@ -2,7 +2,7 @@
 //   1. /capabilities endpoint on every API
 //   2. resource-level links.self
 //   3. pagination via links (not meta)
-//   4. meta.page.total from LaikaDone
+//   4. meta.page.total from ContentiaDone
 //   5. capability sharing: FS storage caps bubble up through catalog
 //      repos and out via documents-api + assets-api /capabilities.
 //
@@ -13,17 +13,17 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 
-import { buildAssetsApi } from 'laikacms/assets-api';
-import { CatalogAssetsRepository } from 'laikacms/assets-catalog';
-import { ConventionCatalogProvider } from 'laikacms/catalog-convention';
-import { buildJsonApi as buildDocumentsApi } from 'laikacms/documents-api';
-import { CatalogDocumentsRepository } from 'laikacms/documents-catalog';
-import { allowAll } from 'laikacms/json-api';
-import { buildJsonApi as buildStorageApi } from 'laikacms/storage-api';
-import { FileSystemStorageRepository } from 'laikacms/storage-fs';
-import { jsonSerializer } from 'laikacms/storage-serializers-json';
-import { markdownSerializer } from 'laikacms/storage-serializers-markdown';
-import { yamlSerializer } from 'laikacms/storage-serializers-yaml';
+import { buildAssetsApi } from 'contentia/assets-api';
+import { CatalogAssetsRepository } from 'contentia/assets-catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { buildJsonApi as buildDocumentsApi } from 'contentia/documents-api';
+import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { allowAll } from 'contentia/json-api';
+import { buildJsonApi as buildStorageApi } from 'contentia/storage-api';
+import { FileSystemStorageRepository } from 'contentia/storage-fs';
+import { jsonSerializer } from 'contentia/storage-serializers-json';
+import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { yamlSerializer } from 'contentia/storage-serializers-yaml';
 
 const ROOT = '/tmp/cap-test-content';
 
@@ -33,7 +33,7 @@ await mkdir(`${ROOT}/posts`, { recursive: true });
 await mkdir(`${ROOT}/uploads`, { recursive: true });
 await mkdir(`${ROOT}/.catalog`, { recursive: true });
 // Pre-seed catalog settings so the lazy bootstrap doesn't run during the test.
-await writeFile(`${ROOT}/.laika/catalog.json`, JSON.stringify({ collections: {} }));
+await writeFile(`${ROOT}/.contentia/catalog.json`, JSON.stringify({ collections: {} }));
 const frontmatter = n => `---\ntitle: Post ${n}\nbody: hello ${n}\n---\n`;
 for (const n of ['001', '002', '003']) {
   await writeFile(`${ROOT}/posts/${n}.md`, frontmatter(n));
@@ -152,10 +152,10 @@ assert(
 
 console.log('\n[5] documents list: links.self per item + pagination via links');
 // Diagnostic: probe storage layer (works) → docs layer (hangs?) to bisect.
-console.log('  (probing storage.getObject for missing .laika/catalog…)');
+console.log('  (probing storage.getObject for missing .contentia/catalog…)');
 const sGet = await Promise.race([
   (async () => {
-    const it = storage.getObject('.laika/catalog')[Symbol.asyncIterator]();
+    const it = storage.getObject('.contentia/catalog')[Symbol.asyncIterator]();
     while (true) {
       const step = await it.next();
       if (step.done) return `value=${JSON.stringify(step.value)?.slice(0, 80)}`;
@@ -163,7 +163,7 @@ const sGet = await Promise.race([
   })(),
   new Promise((_, rej) => setTimeout(() => rej(new Error('getObject timed out')), 3000)),
 ]).catch(e => `ERR: ${(e as Error).message}`);
-console.log(`  storage.getObject('.laika/catalog') → ${sGet}`);
+console.log(`  storage.getObject('.contentia/catalog') → ${sGet}`);
 
 console.log('  (probing settings.getCatalog…)');
 const sSet = await Promise.race([

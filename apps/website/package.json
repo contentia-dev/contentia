@@ -1,6 +1,6 @@
 {
-  "name": "@laikacms/website",
-  "description": "laikacms.com \u2014 the marketing website for Laika.",
+  "name": "@contentia/website",
+  "description": "contentia.dev \u2014 the marketing website for Contentia.",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -18,7 +18,7 @@
     "@astrojs/check": "catalog:astro",
     "@astrojs/mdx": "catalog:astro",
     "@astrojs/react": "catalog:astro",
-    "@laikacms/astro": "workspace:*",
+    "@contentia/astro": "workspace:*",
     "@tailwindcss/vite": "catalog:default",
     "@types/mdx": "catalog:types",
     "@types/react": "catalog:types",

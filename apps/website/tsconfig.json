@@ -6,6 +6,6 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
-  "include": [".astro/types.d.ts", "src", "laika-env.d.ts", "astro.config.mjs"],
+  "include": [".astro/types.d.ts", "src", "contentia-env.d.ts", "astro.config.mjs"],
   "exclude": ["dist", "node_modules"]
 }

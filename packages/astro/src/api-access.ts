@@ -1,5 +1,5 @@
 /**
- * What a served Laika API is allowed to do.
+ * What a served Contentia API is allowed to do.
  *
  * Serving your content as a public read API from the same Astro site is a
  * legitimate thing to want — a static build already ships that content in its
@@ -7,7 +7,7 @@
  *
  * Two things do *not* follow from that, and this module is where they are held:
  *
- * 1. **Writes are not public.** The Laika JSON:API is full CRUD. "The content
+ * 1. **Writes are not public.** The Contentia JSON:API is full CRUD. "The content
  *    is public" is an argument about reads; it says nothing about letting
  *    anyone create, edit or delete it.
  * 2. **Drafts are not public.** Unpublished documents, revisions and locks are
@@ -23,9 +23,9 @@
  * distinguish callers, which none of these do.
  */
 
-import type { AssetsAuthorizeInput } from 'laikacms/assets/api';
-import type { DocumentsAuthorizeInput } from 'laikacms/documents/api';
-import type { StorageAuthorizeInput } from 'laikacms/storage/api';
+import type { AssetsAuthorizeInput } from 'contentia/assets/api';
+import type { DocumentsAuthorizeInput } from 'contentia/documents/api';
+import type { StorageAuthorizeInput } from 'contentia/storage/api';
 
 /**
  * How open a served API is.
@@ -87,7 +87,7 @@ const ASSETS_READ_ACTIONS = new Set([
 /**
  * Build the authorize callbacks for an access level.
  *
- * Allowlists, not denylists: an action added to `laikacms` in a later version is
+ * Allowlists, not denylists: an action added to `contentia` in a later version is
  * denied here until someone decides it belongs, rather than silently becoming
  * public the moment a dependency updates.
  */

@@ -5,10 +5,10 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createFsStorage, createRepositories, readItem } from './backend.js';
-import { rewriteLaikaGlobs } from './glob.js';
+import { rewriteContentiaGlobs } from './glob.js';
 import { renderModule } from './module.js';
-import { laikacms } from './plugin.js';
-import { parseLaikaId, toVirtualId } from './protocol.js';
+import { contentia } from './plugin.js';
+import { parseContentiaId, toVirtualId } from './protocol.js';
 
 let tmpDir: string;
 
@@ -20,17 +20,17 @@ async function writeObject(key: string, content: unknown): Promise<void> {
 }
 
 /** Plugins created via `makePlugin` this test, so afterEach can flush their typegen. */
-let activePlugins: Array<ReturnType<typeof laikacms>>;
+let activePlugins: Array<ReturnType<typeof contentia>>;
 
 beforeEach(async () => {
-  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-loader-'));
+  tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-loader-'));
   activePlugins = [];
 });
 
 afterEach(async () => {
   // `load()` fires the typegen's `ingest()` without awaiting it (by design — it
   // must not block module resolution), which schedules a debounced write of
-  // `.laika/vite-generated/types.d.ts` a tick later. Left unflushed, that write can land after
+  // `.contentia/vite-generated/types.d.ts` a tick later. Left unflushed, that write can land after
   // (or mid-) the `rm` below and recreate an entry the recursive delete already
   // listed, failing with ENOTEMPTY under load. `closeBundle` — the same hook a
   // real Vite build calls — awaits the typegen's `dispose()`, which flushes (or
@@ -61,14 +61,14 @@ describe('renderModule', () => {
   });
 
   it('keeps the compiled body out of the default export', () => {
-    // `import data from 'laika:…'` must stay pure data — pulling the component
+    // `import data from 'contentia:…'` must stay pure data — pulling the component
     // in would drag the MDX runtime into every consumer of the item.
     const code = renderModule({
       content: { title: 'Hello', body: 'Prose.' },
       meta: { key: 'platform' },
-      mdxSpecifier: '/.laika/vite-generated/bodies/store/platform.mdx',
+      mdxSpecifier: '/.contentia/vite-generated/bodies/store/platform.mdx',
     });
-    expect(code).toContain('export { default as Body } from "/.laika/vite-generated/bodies/store/platform.mdx";');
+    expect(code).toContain('export { default as Body } from "/.contentia/vite-generated/bodies/store/platform.mdx";');
     expect(code).toMatch(/export default \{[^}]*"body"/);
     expect(code).not.toMatch(/export default \{[^}]*Body:/);
   });
@@ -78,7 +78,7 @@ describe('renderModule', () => {
       renderModule({
         content: { Body: 'mine', body: 'Prose.' },
         meta: { key: 'platform' },
-        mdxSpecifier: '/.laika/vite-generated/bodies/store/platform.mdx',
+        mdxSpecifier: '/.contentia/vite-generated/bodies/store/platform.mdx',
       })
     ).toThrow(/"Body" field/);
   });
@@ -88,7 +88,7 @@ describe('repositories', () => {
   it('reads a storage object as content + meta', async () => {
     await writeObject('posts/hello', { title: 'Hello', body: 'Body' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    const { content, meta } = await readItem(repos, parseLaikaId('laika:store/posts/hello'));
+    const { content, meta } = await readItem(repos, parseContentiaId('contentia:store/posts/hello'));
     expect(content).toMatchObject({ title: 'Hello', body: 'Body' });
     expect(meta['key']).toBe('posts/hello');
   });
@@ -99,8 +99,8 @@ describe('plugin hooks', () => {
    * Resolve the config too — `root` defaults to `process.cwd()`, so a plugin
    * that skips this step writes its generated output into the package itself.
    */
-  const makePlugin = (options: Parameters<typeof laikacms>[0] = {}) => {
-    const plugin = laikacms({ storage: createFsStorage({ dir: path.join(tmpDir, 'content') }), ...options });
+  const makePlugin = (options: Parameters<typeof contentia>[0] = {}) => {
+    const plugin = contentia({ storage: createFsStorage({ dir: path.join(tmpDir, 'content') }), ...options });
     (plugin.configResolved as (c: { root: string, command: string }) => void)({
       root: tmpDir,
       command: 'build',
@@ -109,14 +109,14 @@ describe('plugin hooks', () => {
     return plugin;
   };
 
-  it('resolves laika: sources to a virtual id', () => {
+  it('resolves contentia: sources to a virtual id', () => {
     const plugin = makePlugin();
     const resolve = plugin.resolveId as (s: string) => string | null;
-    expect(resolve('laika:doc/posts/hello')).toBe(toVirtualId({ namespace: 'doc', key: 'posts/hello' }));
+    expect(resolve('contentia:doc/posts/hello')).toBe(toVirtualId({ namespace: 'doc', key: 'posts/hello' }));
   });
 
   it('rewrites globs for the dependency scanner, which skips user transforms', async () => {
-    // Without this the scan aborts on the first laika: glob and dev silently
+    // Without this the scan aborts on the first contentia: glob and dev silently
     // starts with dependency pre-bundling disabled.
     await writeObject('posts/a', { title: 'A' });
     const plugin = makePlugin();
@@ -129,9 +129,9 @@ describe('plugin hooks', () => {
     };
     const scanPlugin = config().optimizeDeps.rolldownOptions.plugins[0]!;
     const out = await scanPlugin.transform.handler(
-      `const posts = import.meta.glob('laika:store/posts/*');`,
+      `const posts = import.meta.glob('contentia:store/posts/*');`,
     );
-    expect(out?.code).toContain('() => import("laika:store/posts/a")');
+    expect(out?.code).toContain('() => import("contentia:store/posts/a")');
   });
 
   it('loads a virtual id into a module with per-field exports', async () => {
@@ -149,99 +149,99 @@ describe('plugin hooks', () => {
     const load = plugin.load as (id: string) => Promise<{ code: string } | null>;
     const result = await load(toVirtualId({ namespace: 'store', key: 'posts/hello' }));
     expect(result?.code).not.toContain('Body');
-    await expect(fs.access(path.join(tmpDir, '.laika', 'vite-generated', 'bodies'))).rejects.toThrow();
+    await expect(fs.access(path.join(tmpDir, '.contentia', 'vite-generated', 'bodies'))).rejects.toThrow();
   });
 
   it('writes the body chunk before handing back the module that imports it', async () => {
     // Ordering is the point: the bundler resolves the import as soon as `load`
     // returns, so a chunk written any later is a missing file.
-    await writeObject('pages/platform', { badge: 'Soon', body: 'Self-install `laika-gateway`.' });
+    await writeObject('pages/platform', { badge: 'Soon', body: 'Self-install `contentia-gateway`.' });
     const plugin = makePlugin({ mdx: true });
     const load = plugin.load as (id: string) => Promise<{ code: string } | null>;
     const result = await load(toVirtualId({ namespace: 'store', key: 'pages/platform' }));
 
-    const chunk = path.join(tmpDir, '.laika', 'vite-generated', 'bodies', 'store', 'pages', 'platform.mdx');
-    expect(await fs.readFile(chunk, 'utf8')).toBe('Self-install `laika-gateway`.\n');
+    const chunk = path.join(tmpDir, '.contentia', 'vite-generated', 'bodies', 'store', 'pages', 'platform.mdx');
+    expect(await fs.readFile(chunk, 'utf8')).toBe('Self-install `contentia-gateway`.\n');
     expect(result?.code).toContain(
-      'export { default as Body } from "/.laika/vite-generated/bodies/store/pages/platform.mdx";',
+      'export { default as Body } from "/.contentia/vite-generated/bodies/store/pages/platform.mdx";',
     );
     // The raw string stays exported too, for anything that wants the source.
     expect(result?.code).toMatch(/export const body = __f1;/);
   });
 });
 
-describe('rewriteLaikaGlobs', () => {
+describe('rewriteContentiaGlobs', () => {
   it('expands an eager glob with a single field into a map', async () => {
     await writeObject('posts/a', { title: 'A', body: 'x' });
     await writeObject('posts/b', { title: 'B', body: 'y' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    const code = `const posts = import.meta.glob('laika:store/posts/*', { import: 'title', eager: true });`;
-    const out = await rewriteLaikaGlobs(code, repos);
+    const code = `const posts = import.meta.glob('contentia:store/posts/*', { import: 'title', eager: true });`;
+    const out = await rewriteContentiaGlobs(code, repos);
     expect(out).not.toBeNull();
-    expect(out?.code).toContain('import { title as __laikaGlob0 } from "laika:store/posts/a"');
-    expect(out?.code).toContain('import { title as __laikaGlob1 } from "laika:store/posts/b"');
-    expect(out?.code).toContain('"laika:store/posts/a": __laikaGlob0');
+    expect(out?.code).toContain('import { title as __contentiaGlob0 } from "contentia:store/posts/a"');
+    expect(out?.code).toContain('import { title as __contentiaGlob1 } from "contentia:store/posts/b"');
+    expect(out?.code).toContain('"contentia:store/posts/a": __contentiaGlob0');
   });
 
   it('expands a glob written with a TypeScript type argument', async () => {
     // The transform runs `pre`, so a .ts module still carries `<Post>` here.
     await writeObject('posts/a', { title: 'A' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    const out = await rewriteLaikaGlobs(
-      `const posts = import.meta.glob<Record<string, Post>>('laika:store/posts/*', { eager: true });`,
+    const out = await rewriteContentiaGlobs(
+      `const posts = import.meta.glob<Record<string, Post>>('contentia:store/posts/*', { eager: true });`,
       repos,
     );
-    expect(out?.code).toContain('import * as __laikaGlob0 from "laika:store/posts/a"');
+    expect(out?.code).toContain('import * as __contentiaGlob0 from "contentia:store/posts/a"');
     expect(out?.code).not.toContain('import.meta.glob');
   });
 
   it('expands a lazy glob into dynamic import thunks', async () => {
     await writeObject('posts/a', { title: 'A' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    const out = await rewriteLaikaGlobs(`import.meta.glob('laika:store/posts/*')`, repos);
-    expect(out?.code).toContain('() => import("laika:store/posts/a")');
+    const out = await rewriteContentiaGlobs(`import.meta.glob('contentia:store/posts/*')`, repos);
+    expect(out?.code).toContain('() => import("contentia:store/posts/a")');
   });
 
   it('returns a sourcemap for a rewritten module', async () => {
     await writeObject('posts/a', { title: 'A' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    const out = await rewriteLaikaGlobs(`import.meta.glob('laika:store/posts/*')`, repos);
+    const out = await rewriteContentiaGlobs(`import.meta.glob('contentia:store/posts/*')`, repos);
     expect(out).not.toBeNull();
     expect(out?.map).toBeTruthy();
     expect(out?.map.mappings).toBeTypeOf('string');
     expect(out?.map.mappings.length).toBeGreaterThan(0);
   });
 
-  it('leaves non-laika globs untouched', async () => {
+  it('leaves non-contentia globs untouched', async () => {
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
-    expect(await rewriteLaikaGlobs(`import.meta.glob('./pages/*.js')`, repos)).toBeNull();
+    expect(await rewriteContentiaGlobs(`import.meta.glob('./pages/*.js')`, repos)).toBeNull();
   });
 
-  it('never rewrites a laika glob that only appears in a string or comment', async () => {
+  it('never rewrites a contentia glob that only appears in a string or comment', async () => {
     await writeObject('posts/a', { title: 'A' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
     const code = [
-      `const s = "import.meta.glob('laika:store/posts/*')";`,
-      `// import.meta.glob('laika:store/posts/*')`,
-      `/* import.meta.glob('laika:store/posts/*') */`,
+      `const s = "import.meta.glob('contentia:store/posts/*')";`,
+      `// import.meta.glob('contentia:store/posts/*')`,
+      `/* import.meta.glob('contentia:store/posts/*') */`,
     ].join('\n');
-    // No real call — the `laika:` occurrences live inside a string and comments.
-    expect(await rewriteLaikaGlobs(code, repos)).toBeNull();
+    // No real call — the `contentia:` occurrences live inside a string and comments.
+    expect(await rewriteContentiaGlobs(code, repos)).toBeNull();
   });
 
   it('rewrites only the real call, leaving a string-literal occurrence intact', async () => {
     await writeObject('posts/a', { title: 'A' });
     const repos = createRepositories(createFsStorage({ dir: path.join(tmpDir, 'content') }));
     const code = [
-      `const s = "import.meta.glob('laika:store/posts/*')";`,
-      `const real = import.meta.glob('laika:store/posts/*');`,
+      `const s = "import.meta.glob('contentia:store/posts/*')";`,
+      `const real = import.meta.glob('contentia:store/posts/*');`,
     ].join('\n');
-    const out = await rewriteLaikaGlobs(code, repos);
+    const out = await rewriteContentiaGlobs(code, repos);
     expect(out).not.toBeNull();
     // The string literal is preserved verbatim, not expanded.
-    expect(out?.code).toContain(`const s = "import.meta.glob('laika:store/posts/*')";`);
+    expect(out?.code).toContain(`const s = "import.meta.glob('contentia:store/posts/*')";`);
     // The real call is expanded to a thunk map.
-    expect(out?.code).toContain('() => import("laika:store/posts/a")');
+    expect(out?.code).toContain('() => import("contentia:store/posts/a")');
   });
 
   it('rewrites a glob in a module whose JSX es-module-lexer cannot parse', async () => {
@@ -253,12 +253,12 @@ describe('rewriteLaikaGlobs', () => {
       `export function C({ x, y }) {`,
       `  return <div className="card">{x < y ? 'a' : 'b'}</div>;`,
       `}`,
-      `const posts = import.meta.glob('laika:store/posts/*');`,
+      `const posts = import.meta.glob('contentia:store/posts/*');`,
     ].join('\n');
-    const out = await rewriteLaikaGlobs(code, repos);
+    const out = await rewriteContentiaGlobs(code, repos);
     expect(out).not.toBeNull();
     expect(out?.code).not.toContain('import.meta.glob');
-    expect(out?.code).toContain('() => import("laika:store/posts/a")');
+    expect(out?.code).toContain('() => import("contentia:store/posts/a")');
     // The JSX is untouched.
     expect(out?.code).toContain(`<div className="card">`);
   });
@@ -269,10 +269,10 @@ describe('rewriteLaikaGlobs', () => {
     // JSX forces the lexer fallback; masking must still keep these from rewriting.
     const code = [
       `export const El = () => <p>hello</p>;`,
-      `const s = "import.meta.glob('laika:store/posts/*')";`,
-      `// import.meta.glob('laika:store/posts/*')`,
+      `const s = "import.meta.glob('contentia:store/posts/*')";`,
+      `// import.meta.glob('contentia:store/posts/*')`,
     ].join('\n');
-    expect(await rewriteLaikaGlobs(code, repos)).toBeNull();
+    expect(await rewriteContentiaGlobs(code, repos)).toBeNull();
   });
 });
 
@@ -283,8 +283,8 @@ describe('vite build (end-to-end tree-shaking)', () => {
     await fs.writeFile(
       path.join(tmpDir, 'entry.js'),
       [
-        `import { title } from 'laika:store/posts/hello';`,
-        `const titles = import.meta.glob('laika:store/posts/*', { import: 'title', eager: true });`,
+        `import { title } from 'contentia:store/posts/hello';`,
+        `const titles = import.meta.glob('contentia:store/posts/*', { import: 'title', eager: true });`,
         `export { title, titles };`,
       ].join('\n'),
       'utf8',
@@ -294,7 +294,7 @@ describe('vite build (end-to-end tree-shaking)', () => {
     const result = await build({
       root: tmpDir,
       logLevel: 'silent',
-      plugins: [laikacms({ dir: 'content' })],
+      plugins: [contentia({ dir: 'content' })],
       build: {
         write: false,
         minify: false,
@@ -319,7 +319,7 @@ describe('vite build (end-to-end typegen)', () => {
     await writeObject('posts/hello', { title: 'Hello', tags: ['a', 'b'], draft: false });
     await fs.writeFile(
       path.join(tmpDir, 'entry.js'),
-      `import { title } from 'laika:store/posts/hello';\nexport { title };\n`,
+      `import { title } from 'contentia:store/posts/hello';\nexport { title };\n`,
       'utf8',
     );
 
@@ -327,7 +327,7 @@ describe('vite build (end-to-end typegen)', () => {
     await build({
       root: tmpDir,
       logLevel: 'silent',
-      plugins: [laikacms({ dir: 'content' })],
+      plugins: [contentia({ dir: 'content' })],
       build: {
         write: false,
         minify: false,
@@ -337,14 +337,14 @@ describe('vite build (end-to-end typegen)', () => {
 
     // buildStart → regenerateAll wrote the declaration file, and the TS compiler
     // (not us) inferred the field types from the real data.
-    const dts = await fs.readFile(path.join(tmpDir, '.laika', 'vite-generated', 'types.d.ts'), 'utf8');
-    expect(dts).toContain(`declare module 'laika:store/posts/hello'`);
+    const dts = await fs.readFile(path.join(tmpDir, '.contentia', 'vite-generated', 'types.d.ts'), 'utf8');
+    expect(dts).toContain(`declare module 'contentia:store/posts/hello'`);
     expect(dts).toMatch(/title:\s*string/);
     expect(dts).toMatch(/tags:\s*(string\[\]|Array<string>)/);
     expect(dts).toMatch(/draft:\s*boolean/);
 
     // The committed one-line reference file is scaffolded at the project root.
-    const env = await fs.readFile(path.join(tmpDir, 'laika-env.d.ts'), 'utf8');
-    expect(env).toContain('.laika/vite-generated/types.d.ts');
+    const env = await fs.readFile(path.join(tmpDir, 'contentia-env.d.ts'), 'utf8');
+    expect(env).toContain('.contentia/vite-generated/types.d.ts');
   }, 60_000);
 });

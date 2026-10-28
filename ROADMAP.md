@@ -2,17 +2,17 @@
 
 ## Positioning caveats
 
-Deliberate cautions to avoid over-positioning Laika before adoption earns it.
+Deliberate cautions to avoid over-positioning Contentia before adoption earns it.
 
 - **A spec with one implementation is not a standard — it's API docs.** The "open spec + reference
   implementation + cloud" three-tier split is the open-core playbook (MongoDB, Elastic, Supabase),
   but it only earns its name once _someone other than us_ implements the spec. Until a second,
-  independent implementer exists, do not brand a separate "Laika Spec" / "Laika Standard" — it
-  claims authority we haven't earned. Ship the open interface as part of `laikacms`; reserve a name
-  like "Laika Protocol" for the day a third party builds against it.
+  independent implementer exists, do not brand a separate "Contentia Spec" / "Contentia Standard" —
+  it claims authority we haven't earned. Ship the open interface as part of `contentia`; reserve a
+  name like "Contentia Protocol" for the day a third party builds against it.
 - **The "open standard / not-another-proprietary-CMS" story is architect-bait.** Architects
-  evaluate; they don't adopt. The people who actually pick Laika up — solo devs and small teams —
-  want a fast win on their own stack, not a repository-contract abstraction. Lead positioning with
+  evaluate; they don't adopt. The people who actually pick Contentia up — solo devs and small teams
+  — want a fast win on their own stack, not a repository-contract abstraction. Lead positioning with
   the concrete "use your own backend, one CMS" benefit; keep the spec/interop story as supporting
   proof, never the headline.
 
@@ -33,10 +33,11 @@ Deliberate cautions to avoid over-positioning Laika before adoption earns it.
       _Note: Not currently necessary since Decap doesn't support paging, so everything is downloaded
       locally and capabilities like search can be done client-side. However, this is vital for
       supporting bigger datasets in the future._
-- [ ] White paper for the open Laika interface — defer the "Spec" / "Standard" / "Protocol" name
+- [ ] White paper for the open Contentia interface — defer the "Spec" / "Standard" / "Protocol" name
       until a second, independent implementer exists (see Positioning caveats)
-- [ ] Laika creates a homogeneous, backend-agnostic RAG architecture
-- [ ] Bundle skills using vercel's skills package. Skills identify how one could use laika cli to
+- [ ] Contentia creates a homogeneous, backend-agnostic RAG architecture
+- [ ] Bundle skills using vercel's skills package. Skills identify how one could use contentia cli
+      to
 
 ## Completed
 
@@ -48,11 +49,11 @@ Deliberate cautions to avoid over-positioning Laika before adoption earns it.
 - [x] Editorial workflow
 - [x] SBOM — `pnpm gen-sbom` (see RELEASING.md), local/publish-time only, no GitHub Actions
       dependency
-- [x] Effect-based repository contracts + recoverable-warning pipeline — `LaikaTask` / `LaikaStream`
-      (Effect Channel-backed) carry data, recoverable warnings, progress events, and a terminal
-      value/done. Every storage / documents / assets repository interface returns them;
-      Promise-shaped escape hatches (`runPromise`, `runPromiseCollect`, `runPromiseResult`) keep
-      non-Effect consumers ergonomic. Every in-tree backend (R2, FS, WebDAV, Drizzle, JSON:API
+- [x] Effect-based repository contracts + recoverable-warning pipeline — `ContentiaTask` /
+      `ContentiaStream` (Effect Channel-backed) carry data, recoverable warnings, progress events,
+      and a terminal value/done. Every storage / documents / assets repository interface returns
+      them; Promise-shaped escape hatches (`runPromise`, `runPromiseCollect`, `runPromiseResult`)
+      keep non-Effect consumers ergonomic. Every in-tree backend (R2, FS, WebDAV, Drizzle, JSON:API
       proxy, catalog, obsidian) emits recoverable warnings on partial-success paths instead of
       bailing fatally; R2 readback fallbacks synthesize the resource + emit a warning rather than
       failing. Delegation between repositories forwards warnings via `runValueForwarding` /
@@ -66,9 +67,10 @@ Deliberate cautions to avoid over-positioning Laika before adoption earns it.
 - [x] i18n for recoverable warning messages across every storage/document backend — see
       `docs/concepts/recoverable-warning-translations.md` ("Rollout status": Done, no backends
       outstanding).
-- [x] Netlify git-gateway compatible HTTP handler (`@laikacms/git-gateway`) — lets Decap CMS
-      configured with `backend: git-gateway` point at a Laika worker without changing client config
-- [x] Hosted multi-tenant gateway app (`laika-gateway`, moved to its own repo June 2026) — one
+- [x] Netlify git-gateway compatible HTTP handler (`@contentia/git-gateway`) — lets Decap CMS
+      configured with `backend: git-gateway` point at a Contentia worker without changing client
+      config
+- [x] Hosted multi-tenant gateway app (`contentia-gateway`, moved to its own repo June 2026) — one
       GitHub App that anyone can install on their repo; tenants point Decap at the gateway URL
       (`/github/{owner}/{repo}/api/decap`) instead of standing up their own Worker. Namespaced URL
       scheme leaves room for `/gitlab/...` etc. later.

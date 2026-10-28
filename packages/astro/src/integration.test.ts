@@ -13,12 +13,12 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createFsStorage, createRepositories } from '@laikacms/vite-plugin';
-import { NotImplementedError } from 'laikacms/core/errors';
+import { createFsStorage, createRepositories } from '@contentia/vite-plugin';
+import { NotImplementedError } from 'contentia/core/errors';
 
-import { collectStream } from 'laikacms/compat';
+import { collectStream } from 'contentia/compat';
 
-import { laika } from './integration.js';
+import { contentia } from './integration.js';
 import { resolveRepositories } from './repositories.js';
 
 const tempDirs: string[] = [];
@@ -28,7 +28,7 @@ afterEach(async () => {
 });
 
 async function createContentDir(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-int-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-int-'));
   tempDirs.push(dir);
   await fs.mkdir(path.join(dir, 'posts'), { recursive: true });
   return dir;
@@ -69,7 +69,7 @@ const silentLogger = {
   fork: () => silentLogger,
 } as never;
 
-type Hooks = ReturnType<typeof laika>['hooks'];
+type Hooks = ReturnType<typeof contentia>['hooks'];
 
 function callSetup(hooks: Hooks, root: string): void {
   const watched: string[] = [];
@@ -83,7 +83,7 @@ function callSetup(hooks: Hooks, root: string): void {
 describe('astro:server:setup', () => {
   it('mounts the JSON:API on the dev server', async () => {
     const dir = await createContentDir();
-    const integration = laika({ dir });
+    const integration = contentia({ dir });
     callSetup(integration.hooks, dir);
 
     const { server, used } = fakeServer();
@@ -99,7 +99,7 @@ describe('astro:server:setup', () => {
 
   it('does not mount the API when it is switched off', async () => {
     const dir = await createContentDir();
-    const integration = laika({ dir, api: false, refresh: false });
+    const integration = contentia({ dir, api: false, refresh: false });
     callSetup(integration.hooks, dir);
 
     const { server, used } = fakeServer();
@@ -114,7 +114,7 @@ describe('astro:server:setup', () => {
 
   it('refreshes content when a file changes, and names the changed key', async () => {
     const dir = await createContentDir();
-    const integration = laika({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
+    const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
     callSetup(integration.hooks, dir);
 
     const refreshContent = vi.fn(async () => {});
@@ -129,16 +129,16 @@ describe('astro:server:setup', () => {
     await vi.waitFor(() => expect(refreshContent).toHaveBeenCalled(), { timeout: 3000 });
 
     const context = refreshContent.mock.calls[0]?.[0] as {
-      context: { laika: { changes: Array<{ key: string, deleted: boolean }> } },
+      context: { contentia: { changes: Array<{ key: string, deleted: boolean }> } },
     };
-    expect(context.context.laika.changes).toContainEqual({ key: 'posts/hello', deleted: false });
+    expect(context.context.contentia.changes).toContainEqual({ key: 'posts/hello', deleted: false });
 
     await integration.hooks['astro:server:done']?.({ logger: silentLogger } as never);
   });
 
   it('coalesces a burst of writes into a single refresh', async () => {
     const dir = await createContentDir();
-    const integration = laika({ dir, defaultExtension: 'md', refresh: { debounceMs: 60 } });
+    const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 60 } });
     callSetup(integration.hooks, dir);
 
     const refreshContent = vi.fn(async () => {});
@@ -158,11 +158,11 @@ describe('astro:server:setup', () => {
 
     expect(refreshContent).toHaveBeenCalledTimes(1);
     const context = refreshContent.mock.calls[0]?.[0] as {
-      context: { laika: { changes: Array<{ key: string }> } },
+      context: { contentia: { changes: Array<{ key: string }> } },
     };
     // A recursive watch also reports the directories themselves; what matters
     // is that all three content keys arrived in one batch.
-    const keys = context.context.laika.changes.map(change => change.key);
+    const keys = context.context.contentia.changes.map(change => change.key);
     expect(keys).toEqual(expect.arrayContaining(['posts/a', 'posts/b', 'posts/c']));
 
     await integration.hooks['astro:server:done']?.({ logger: silentLogger } as never);
@@ -170,7 +170,7 @@ describe('astro:server:setup', () => {
 
   it('stops refreshing once the server shuts down', async () => {
     const dir = await createContentDir();
-    const integration = laika({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
+    const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
     callSetup(integration.hooks, dir);
 
     const refreshContent = vi.fn(async () => {});
@@ -191,7 +191,7 @@ describe('astro:server:setup', () => {
   it('warns rather than failing when the repository has no change channel', async () => {
     const warn = vi.fn();
     const logger = { ...silentLogger, warn } as never;
-    const integration = laika({ repositories: await createRepositoriesWithoutChangeChannel() });
+    const integration = contentia({ repositories: await createRepositoriesWithoutChangeChannel() });
 
     const { server } = fakeServer();
     await integration.hooks['astro:server:setup']?.({
@@ -207,7 +207,7 @@ describe('astro:server:setup', () => {
   it('warns when the Astro version predates refreshContent', async () => {
     const warn = vi.fn();
     const dir = await createContentDir();
-    const integration = laika({ dir });
+    const integration = contentia({ dir });
     callSetup(integration.hooks, dir);
 
     const { server } = fakeServer();
@@ -224,7 +224,7 @@ describe('astro:server:setup', () => {
 describe('astro:config:done', () => {
   it('emits types by default', () => {
     const injectTypes = vi.fn();
-    laika().hooks['astro:config:done']?.({ injectTypes, logger: silentLogger } as never);
+    contentia().hooks['astro:config:done']?.({ injectTypes, logger: silentLogger } as never);
 
     expect(injectTypes).toHaveBeenCalledOnce();
     expect(injectTypes.mock.calls[0]?.[0]).toMatchObject({ filename: 'types.d.ts' });
@@ -232,7 +232,7 @@ describe('astro:config:done', () => {
 
   it('emits nothing when types are switched off', () => {
     const injectTypes = vi.fn();
-    laika({ types: false }).hooks['astro:config:done']?.({
+    contentia({ types: false }).hooks['astro:config:done']?.({
       injectTypes,
       logger: silentLogger,
     } as never);
@@ -244,7 +244,7 @@ describe('astro:config:done', () => {
 describe('astro:config:done — live-collection types', () => {
   const DECAP_CONFIG = `
 backend:
-  name: laika
+  name: contentia
 collections:
   - name: posts
     folder: posts
@@ -260,7 +260,7 @@ collections:
 `;
 
   async function createDecapProject(config = DECAP_CONFIG): Promise<string> {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-live-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-live-'));
     tempDirs.push(dir);
     await fs.writeFile(path.join(dir, 'config.yml'), config);
     return dir;
@@ -268,7 +268,7 @@ collections:
 
   const emitted = async (options: Record<string, unknown>): Promise<string | undefined> => {
     const injectTypes = vi.fn();
-    await laika(options).hooks['astro:config:done']?.({
+    await contentia(options).hooks['astro:config:done']?.({
       injectTypes,
       logger: silentLogger,
     } as never);
@@ -284,8 +284,8 @@ collections:
     const content = await emitted({ dir, catalog: 'decap' });
 
     expect(content).toBeDefined();
-    expect(content).toContain(`declare module '@laikacms/astro/live-collections'`);
-    expect(content).toContain('interface LaikaLiveCollections');
+    expect(content).toContain(`declare module '@contentia/astro/live-collections'`);
+    expect(content).toContain('interface ContentiaLiveCollections');
     expect(content).toContain('posts: {');
     expect(content).toContain('title: string;');
     expect(content).toContain('draft?: boolean;');
@@ -319,7 +319,7 @@ collections:
   });
 
   it('does not fail the build when the catalog cannot be read', async () => {
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'laika-astro-live-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'contentia-astro-live-'));
     tempDirs.push(dir);
 
     // `catalog: 'decap'` with no config.yml at all.
@@ -338,13 +338,13 @@ describe('repository construction', () => {
     // A non-existent directory would throw eagerly if the integration built the
     // repository at construction time. `astro sync` and `astro build` never
     // reach the server hook, so eager construction would break both.
-    expect(() => laika({ dir: '/definitely/does/not/exist' })).not.toThrow();
+    expect(() => contentia({ dir: '/definitely/does/not/exist' })).not.toThrow();
   });
 
   it('uses supplied repositories verbatim', async () => {
     const dir = await createContentDir();
     const repositories = createRepositories(createFsStorage({ dir, defaultExtension: 'md' }));
-    const integration = laika({ repositories, refresh: false });
+    const integration = contentia({ repositories, refresh: false });
 
     const { server, used } = fakeServer();
     await integration.hooks['astro:server:setup']?.({

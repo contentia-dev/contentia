@@ -44,23 +44,23 @@ const NAV = {
     { label: 'Community', to: '/community' },
   ],
   githubLabel: 'GitHub',
-  githubHref: 'https://github.com/laikacms/laikacms',
+  githubHref: 'https://github.com/contentia-dev/contentia',
   cta: { label: 'Get started', href: '/docs/guides/getting-started' },
 };
 
 const FOOTER = {
   tagline:
     'An MIT-licensed content API for any backend. Self-hosted by default.',
-  legal: 'MIT · © 2026 Laika contributors',
+  legal: 'MIT · © 2026 Contentia contributors',
   columns: [
     {
       heading: 'Project',
       links: [
-        { label: 'GitHub', href: 'https://github.com/laikacms/laikacms' },
+        { label: 'GitHub', href: 'https://github.com/contentia-dev/contentia' },
         { label: 'Blog', href: '/blog' },
-        { label: 'Contributing', href: 'https://github.com/laikacms/laikacms/blob/develop/CONTRIBUTING.md' },
-        { label: 'Releases', href: 'https://github.com/laikacms/laikacms/releases' },
-        { label: 'Issues', href: 'https://github.com/laikacms/laikacms/issues' },
+        { label: 'Contributing', href: 'https://github.com/contentia-dev/contentia/blob/develop/CONTRIBUTING.md' },
+        { label: 'Releases', href: 'https://github.com/contentia-dev/contentia/releases' },
+        { label: 'Issues', href: 'https://github.com/contentia-dev/contentia/issues' },
       ],
     },
     {
@@ -74,13 +74,13 @@ const FOOTER = {
     },
     {
       heading: 'For machines',
-      links: [{ label: 'AGENTS.md', href: 'https://github.com/laikacms/laikacms/blob/develop/AGENTS.md' }],
+      links: [{ label: 'AGENTS.md', href: 'https://github.com/contentia-dev/contentia/blob/develop/AGENTS.md' }],
     },
     {
       heading: 'Trust',
       links: [
-        { label: 'MIT License', href: 'https://github.com/laikacms/laikacms/blob/develop/LICENSE' },
-        { label: 'Security policy', href: 'https://github.com/laikacms/laikacms/blob/develop/SECURITY.md' },
+        { label: 'MIT License', href: 'https://github.com/contentia-dev/contentia/blob/develop/LICENSE' },
+        { label: 'Security policy', href: 'https://github.com/contentia-dev/contentia/blob/develop/SECURITY.md' },
       ],
     },
   ],
@@ -91,24 +91,24 @@ const STRUCTURED_DATA = {
   '@graph': [
     {
       '@type': 'SoftwareApplication',
-      name: 'Laika',
+      name: 'Contentia',
       applicationCategory: 'DeveloperApplication',
       operatingSystem: 'Node, Bun, Deno, Cloudflare Workers, Browser',
       description:
         'Modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends.',
-      url: 'https://laikacms.com/',
+      url: 'https://contentia.dev/',
       license: 'https://opensource.org/licenses/MIT',
-      softwareHelp: 'https://laikacms.com/docs/',
+      softwareHelp: 'https://contentia.dev/docs/',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-      publisher: { '@id': 'https://laikacms.com/#org' },
+      publisher: { '@id': 'https://contentia.dev/#org' },
     },
     {
       '@type': 'Organization',
-      '@id': 'https://laikacms.com/#org',
-      name: 'Laika',
-      url: 'https://laikacms.com/',
-      logo: 'https://laikacms.com/assets/laika-icon.png',
-      sameAs: ['https://github.com/laikacms/laikacms'],
+      '@id': 'https://contentia.dev/#org',
+      name: 'Contentia',
+      url: 'https://contentia.dev/',
+      logo: 'https://contentia.dev/assets/contentia-icon.png',
+      sameAs: ['https://github.com/contentia-dev/contentia'],
     },
   ],
 };
@@ -137,11 +137,11 @@ const STRUCTURED_DATA = {
     <meta
       name="description"
       content={description
-      ?? 'Laika is a modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable.'}
+      ?? 'Contentia is a modular, runtime-agnostic, open-source CMS. One content interface across 40+ swappable storage backends. MIT-licensed and self-hostable.'}
     />
     <link rel="canonical" href={canonical} />
     <meta name="robots" content="index, follow" />
-    <meta name="author" content="Laika contributors" />
+    <meta name="author" content="Contentia contributors" />
     <meta name="theme-color" content="#3F51B5" />
 
     <!-- Open Graph — scrapers don't run JS, so these live statically here -->
@@ -155,27 +155,27 @@ const STRUCTURED_DATA = {
         </>
       )
     }
-    <meta property="og:site_name" content="Laika" />
+    <meta property="og:site_name" content="Contentia" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={DESCRIPTION} />
     <meta property="og:url" content={canonical} />
-    <meta property="og:image" content="https://laikacms.com/assets/og-image.png" />
+    <meta property="og:image" content="https://contentia.dev/assets/og-image.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Laika: one content API, 40+ swappable backends." />
+    <meta property="og:image:alt" content="Contentia: one content API, 40+ swappable backends." />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={DESCRIPTION} />
-    <meta name="twitter:image" content="https://laikacms.com/assets/og-image.png" />
-    <meta name="twitter:image:alt" content="Laika: one content API, 40+ swappable backends." />
+    <meta name="twitter:image" content="https://contentia.dev/assets/og-image.png" />
+    <meta name="twitter:image:alt" content="Contentia: one content API, 40+ swappable backends." />
 
-    <link rel="alternate" type="application/rss+xml" title="Laika blog" href="/blog/rss.xml" />
-    <link rel="icon" href="/assets/laika-icon.png" />
-    <link rel="apple-touch-icon" href="/assets/laika-icon.png" />
+    <link rel="alternate" type="application/rss+xml" title="Contentia blog" href="/blog/rss.xml" />
+    <link rel="icon" href="/assets/contentia-icon.png" />
+    <link rel="apple-touch-icon" href="/assets/contentia-icon.png" />
 
     <script type="application/ld+json" is:inline set:html={JSON.stringify(STRUCTURED_DATA)} />
 

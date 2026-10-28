@@ -1,5 +1,5 @@
 /**
- * Same-origin fetch shim standing in for the two HTTP endpoints the `laika`
+ * Same-origin fetch shim standing in for the two HTTP endpoints the `contentia`
  * Decap backend still expects even in `dev_token` mode: `GET <api>/session`
  * (who is logged in) and `GET <api>/health` (status polling). Everything else
  * the backend does goes through the repositories injected in `src/cms.ts`, so
@@ -11,7 +11,7 @@
  */
 
 export const LOCAL_API_BASE = '/__local';
-export const LOCAL_DEV_TOKEN = 'laika-local-dev';
+export const LOCAL_DEV_TOKEN = 'contentia-local-dev';
 
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), {

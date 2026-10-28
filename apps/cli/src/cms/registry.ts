@@ -1,7 +1,7 @@
 /**
- * The catalog of admin UIs `laika create` can scaffold. Adding a CMS means
+ * The catalog of admin UIs `contentia create` can scaffold. Adding a CMS means
  * writing a sibling of `./decap.ts` and listing it here — the wizard, the
- * `--cms` flag, and `laika local generate` all read this array.
+ * `--cms` flag, and `contentia local generate` all read this array.
  *
  * The first entry is the default: what `--yes`, a non-interactive run, and a
  * wizard with nothing to ask all fall back to.

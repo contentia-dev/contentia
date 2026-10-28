@@ -4,16 +4,16 @@
    storage key (see apps/website/src/layouts/Base.astro). */
 
 :root {
-  --laika-indigo: #3f51b5;
+  --contentia-indigo: #3f51b5;
 
   --vp-font-family-base: 'IBM Plex Sans', system-ui, sans-serif;
   --vp-font-family-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --laika-font-display: 'Archivo', system-ui, sans-serif;
+  --contentia-font-display: 'Archivo', system-ui, sans-serif;
 
-  --vp-c-brand-1: var(--laika-indigo);
-  --vp-c-brand-2: color-mix(in oklab, var(--laika-indigo), white 15%);
-  --vp-c-brand-3: var(--laika-indigo);
-  --vp-c-brand-soft: color-mix(in oklab, var(--laika-indigo), transparent 86%);
+  --vp-c-brand-1: var(--contentia-indigo);
+  --vp-c-brand-2: color-mix(in oklab, var(--contentia-indigo), white 15%);
+  --vp-c-brand-3: var(--contentia-indigo);
+  --vp-c-brand-soft: color-mix(in oklab, var(--contentia-indigo), transparent 86%);
 
   --vp-c-bg: #fbfbfd;
   --vp-c-bg-alt: #f5f6fa;
@@ -27,18 +27,18 @@
   --vp-c-gutter: #e8e9f1;
 
   --vp-code-block-bg: #f5f6fa;
-  --vp-button-brand-bg: var(--laika-indigo);
-  --vp-button-brand-hover-bg: color-mix(in oklab, var(--laika-indigo), black 24%);
-  --vp-button-brand-active-bg: color-mix(in oklab, var(--laika-indigo), black 40%);
+  --vp-button-brand-bg: var(--contentia-indigo);
+  --vp-button-brand-hover-bg: color-mix(in oklab, var(--contentia-indigo), black 24%);
+  --vp-button-brand-active-bg: color-mix(in oklab, var(--contentia-indigo), black 40%);
 }
 
 /* Matches the website's `.dark` palette. The indigo is lifted for text and
    accents; solid fills keep the logo value. */
 .dark {
-  --vp-c-brand-1: color-mix(in oklab, var(--laika-indigo), white 45%);
-  --vp-c-brand-2: color-mix(in oklab, var(--laika-indigo), white 30%);
-  --vp-c-brand-3: color-mix(in oklab, var(--laika-indigo), white 18%);
-  --vp-c-brand-soft: color-mix(in oklab, var(--laika-indigo), transparent 76%);
+  --vp-c-brand-1: color-mix(in oklab, var(--contentia-indigo), white 45%);
+  --vp-c-brand-2: color-mix(in oklab, var(--contentia-indigo), white 30%);
+  --vp-c-brand-3: color-mix(in oklab, var(--contentia-indigo), white 18%);
+  --vp-c-brand-soft: color-mix(in oklab, var(--contentia-indigo), transparent 76%);
 
   --vp-c-bg: #101119;
   --vp-c-bg-alt: #0c0d14;
@@ -52,9 +52,9 @@
   --vp-c-gutter: #0c0d14;
 
   --vp-code-block-bg: #161822;
-  --vp-button-brand-bg: color-mix(in oklab, var(--laika-indigo), white 18%);
-  --vp-button-brand-hover-bg: var(--laika-indigo);
-  --vp-button-brand-active-bg: color-mix(in oklab, var(--laika-indigo), black 12%);
+  --vp-button-brand-bg: color-mix(in oklab, var(--contentia-indigo), white 18%);
+  --vp-button-brand-hover-bg: var(--contentia-indigo);
+  --vp-button-brand-active-bg: color-mix(in oklab, var(--contentia-indigo), black 12%);
 }
 
 /* Display type: the website sets headings in Archivo, semibold, tight tracking. */
@@ -65,7 +65,7 @@
 .VPHero .name,
 .VPHero .text,
 .VPNavBarTitle .title {
-  font-family: var(--laika-font-display);
+  font-family: var(--contentia-font-display);
   letter-spacing: -0.02em;
 }
 
@@ -75,7 +75,7 @@
   font-weight: 600;
 }
 
-/* Wordmark: "Laika", like the website nav. */
+/* Wordmark: "Contentia", like the website nav. */
 .VPNavBarTitle .title {
   font-weight: 600;
   font-size: 19px;
@@ -85,12 +85,12 @@
   border-radius: 50%;
 }
 
-.laika-accent {
+.contentia-accent {
   color: var(--vp-c-brand-1);
 }
 
-/* Intro heading: neutral "Welcome to", brand-coloured "Laika". */
-.vp-doc h1 .laika-accent {
+/* Intro heading: neutral "Welcome to", brand-coloured "Contentia". */
+.vp-doc h1 .contentia-accent {
   color: var(--vp-c-brand-1);
 }
 

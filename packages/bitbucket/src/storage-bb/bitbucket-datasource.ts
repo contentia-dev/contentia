@@ -1,6 +1,6 @@
 import * as Result from 'effect/Result';
 
-import type { LaikaResult } from 'laikacms/core';
+import type { ContentiaResult } from 'contentia/core';
 import {
   ForbiddenError,
   InternalError,
@@ -8,7 +8,7 @@ import {
   ServiceUnavailableError,
   TooManyRequestsError,
   UpstreamUnAuthorizedError,
-} from 'laikacms/core';
+} from 'contentia/core';
 
 const DEFAULT_API_URL = 'https://api.bitbucket.org/2.0';
 
@@ -62,7 +62,7 @@ const safeText = async (response: Response): Promise<string> => {
   }
 };
 
-const errorForResponse = <T>(status: number, body: string, context: string): LaikaResult<T> => {
+const errorForResponse = <T>(status: number, body: string, context: string): ContentiaResult<T> => {
   let detail = '';
   try {
     const parsed = JSON.parse(body) as { error?: { message?: string }, type?: string };
@@ -166,7 +166,7 @@ export class BitbucketDataSource {
   }
 
   /** Fetch a file's raw content. */
-  async getFileContents(path: string): Promise<LaikaResult<string>> {
+  async getFileContents(path: string): Promise<ContentiaResult<string>> {
     const encoded = this.encodePath(path);
     let response: Response;
     try {
@@ -181,7 +181,7 @@ export class BitbucketDataSource {
   /** Metadata for a file (size + last commit). `null` on 404. */
   async getFileMeta(
     path: string,
-  ): Promise<LaikaResult<{ size: number, commit?: string, createdAt?: Date, updatedAt?: Date } | null>> {
+  ): Promise<ContentiaResult<{ size: number, commit?: string, createdAt?: Date, updatedAt?: Date } | null>> {
     const encoded = this.encodePath(path);
     let response: Response;
     try {
@@ -213,7 +213,7 @@ export class BitbucketDataSource {
   }
 
   /** List a directory's direct children. Pages through `next` until exhausted. */
-  async listDirectory(path: string): Promise<LaikaResult<BitbucketDirEntry[]>> {
+  async listDirectory(path: string): Promise<ContentiaResult<BitbucketDirEntry[]>> {
     const encoded = this.encodePath(path);
     // Bitbucket only returns a directory listing when the URL has a trailing slash.
     const initialUrl = `${this.repoPath(`/src/${encodeURIComponent(this.branch)}/${encoded}`)}/?pagelen=100`;
@@ -267,7 +267,7 @@ export class BitbucketDataSource {
       commitMessage: string,
       author?: { name: string, email: string },
     },
-  ): Promise<LaikaResult<void>> {
+  ): Promise<ContentiaResult<void>> {
     const form = new FormData();
     form.set('branch', this.branch);
     form.set('message', options.commitMessage);
@@ -308,7 +308,7 @@ export class BitbucketDataSource {
     path: string,
     content: string,
     options: { commitMessage?: string, author?: { name: string, email: string } } = {},
-  ): Promise<LaikaResult<{ path: string }>> {
+  ): Promise<ContentiaResult<{ path: string }>> {
     const result = await this.commit({
       puts: [{ path, content }],
       commitMessage: options.commitMessage ?? `Update ${path}`,
@@ -322,7 +322,7 @@ export class BitbucketDataSource {
   async deleteFile(
     path: string,
     options: { commitMessage?: string, author?: { name: string, email: string } } = {},
-  ): Promise<LaikaResult<{ path: string }>> {
+  ): Promise<ContentiaResult<{ path: string }>> {
     const result = await this.commit({
       deletes: [path],
       commitMessage: options.commitMessage ?? `Delete ${path}`,
