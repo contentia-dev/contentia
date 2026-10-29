@@ -28,15 +28,30 @@ const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'opti
 const WORKSPACE_PROTOCOLS = ['workspace:', 'catalog:', 'link:', 'file:'];
 
 /**
- * Query npm for the latest published version of each package in `workspaceMap`.
- * Falls back to the workspace version for packages not yet on the registry
- * (brand-new packages that have never been published).
+ * The dist-tag releases are published under: the prerelease tag from `.changeset/pre.json`
+ * while changesets is in pre mode (e.g. `alpha`), `latest` otherwise.
+ */
+function releaseTag() {
+  try {
+    const pre = JSON.parse(readFileSync(join(repoRoot, '.changeset', 'pre.json'), 'utf8'));
+    if (pre.mode === 'pre' && pre.tag) return pre.tag;
+  } catch {
+    // Not in pre mode.
+  }
+  return 'latest';
+}
+
+/**
+ * Query npm for the version each package in `workspaceMap` has under the current release
+ * dist-tag (see `releaseTag`). Falls back to the workspace version for packages not yet on
+ * the registry under that tag (brand-new packages that have never been published).
  */
 export function npmPublishedVersions(workspaceMap) {
   const result = { ...workspaceMap };
+  const tag = releaseTag();
   for (const name of Object.keys(workspaceMap)) {
     try {
-      const version = execFileSync('npm', ['view', name, 'version'], {
+      const version = execFileSync('npm', ['view', `${name}@${tag}`, 'version'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       }).trim();

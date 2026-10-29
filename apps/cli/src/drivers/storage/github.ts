@@ -91,7 +91,7 @@ const readOptions = (raw: Record<string, unknown>): GithubOptions => {
 export const githubDriver: StorageDriver = {
   name: 'github',
   packageName: '@contentia/github',
-  version: '2.0.0',
+  version: '0.0.1-alpha.1',
   subpath: 'storage-gh',
   description: 'GitHub repository (commits per write; PAT or GitHub App auth)',
   build(raw, mod) {

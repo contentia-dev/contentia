@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.10",
-    "@contentia/server": "^7.0.0",
+    "@contentia/server": "^0.0.1-alpha.1",
     "@laikacms/decap-cms": "^4.1.0",
-    "@contentia/github": "^3.0.0",
+    "@contentia/github": "^0.0.1-alpha.1",
     "hono": "^4.12.31",
-    "contentia": "^7.0.0",
+    "contentia": "^0.0.1-alpha.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.4"
   },

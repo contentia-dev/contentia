@@ -65,7 +65,7 @@ const readOptions = (raw: Record<string, unknown>): BitbucketOptions => {
 export const bitbucketDriver: StorageDriver = {
   name: 'bitbucket',
   packageName: '@contentia/bitbucket',
-  version: '2.0.0',
+  version: '0.0.1-alpha.1',
   subpath: 'storage-bb',
   description: 'Bitbucket Cloud repository (commits per write, via app password/OAuth2)',
   build(raw, mod) {

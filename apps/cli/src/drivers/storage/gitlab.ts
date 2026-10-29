@@ -51,7 +51,7 @@ const readOptions = (raw: Record<string, unknown>): GitlabOptions => {
 export const gitlabDriver: StorageDriver = {
   name: 'gitlab',
   packageName: '@contentia/gitlab',
-  version: '2.0.0',
+  version: '0.0.1-alpha.1',
   subpath: 'storage-gl',
   description: 'GitLab project (commits per write, via PAT/OAuth/CI job token)',
   build(raw, mod) {

@@ -1,6 +1,6 @@
 {
   "name": "@contentia/cli",
-  "version": "1.0.0",
+  "version": "0.0.1-alpha.1",
   "description": "The Contentia command-line interface (bin `contentia`): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
   "keywords": [
     "headless-cms",
