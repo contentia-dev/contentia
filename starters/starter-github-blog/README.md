@@ -12,11 +12,9 @@ from the same repo that powers your CMS.
 
 ## Quick start
 
-> **Temporarily unavailable for standalone use.** This starter requires `@contentia/github@>=2.0.0`
-> which is not yet published to npm (registry has 1.0.0; the `/storage-gh` subpath this starter
-> imports was added post-1.0). Running `npm install` gets the old version and the server fails at
-> runtime. Use the [Working from the monorepo](#working-from-the-monorepo) steps below until
-> `@contentia/github@2.0.0` is released.
+> **Needs the first Contentia alpha on npm.** This starter installs `@contentia/github@^0.0.1-alpha.1`.
+> Until that version is published, use the [Working from the monorepo](#working-from-the-monorepo)
+> steps below.
 
 Once the package is published:
 
