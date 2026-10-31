@@ -404,5 +404,5 @@ them, so an `'all'` deployment written to from another origin needs `security.ch
 configured accordingly.
 
 For a deployment that needs real authentication rather than a public read,
-[`contentiaApi`](../reference/api/server/api/functions/contentiaApi) from `@contentia/server/api`
-takes `authenticateAccessToken` and `authorize` and mounts the same way.
+[`contentiaApi`](../reference/api/contentia/server/api/functions/contentiaApi) from
+`contentia/server/api` takes `authenticateAccessToken` and `authorize` and mounts the same way.

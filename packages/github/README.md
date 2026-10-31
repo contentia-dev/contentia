@@ -18,9 +18,8 @@ platform write to GitHub on the user's behalf; the user has no GitHub identity t
 Practical signs that you need App mode:
 
 - Contentia Cloud–style multi-tenant operator where editors don't have to have GitHub accounts.
-- A self-hosted gateway that runs its **own** user database (managed via
-  `@contentia/server/oauth2` + `@contentia/server/api` + `@contentia/integrations/github`) on top of
-  GitHub storage.
+- A self-hosted gateway that runs its **own** user database (managed via `contentia/server/oauth2` +
+  `contentia/server/api` + `@contentia/integrations/github`) on top of GitHub storage.
 
 ### Pre-configured Octokit (bring-your-own client)
 
@@ -171,7 +170,7 @@ When `ignoreList` is not supplied the following patterns are excluded:
 **Current state.** The package supports two auth modes: GitHub App (installation token) and
 pre-configured Octokit (bring-your-own). The octokit mode unblocks testing, GitHub Enterprise, and
 custom auth plugins. A first-class OAuth user-token flow (where the user's GitHub identity appears
-on commits) is not yet implemented — it belongs in `@contentia/server/oauth2` for self-hosted
+on commits) is not yet implemented — it belongs in `contentia/server/oauth2` for self-hosted
 gateways.
 
 **Target shape.** When implemented, the constructor will accept an **async auth provider** — a
@@ -180,7 +179,7 @@ pass `new Octokit({ auth: yourToken })` to get non-App auth today.
 
 **Out of scope until the OAuth flow ships:**
 
-- Building the GitHub OAuth flow itself. That belongs in `@contentia/server/oauth2` (and is
+- Building the GitHub OAuth flow itself. That belongs in `contentia/server/oauth2` (and is
   documented there for self-hosted gateways managing their own users).
 - Token storage. Where the token lives between requests (cookie, KV, session, CLI keychain) is a
   consumer concern.

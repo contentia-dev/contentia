@@ -20,7 +20,7 @@ this callback instead of `authenticateAccessToken`:
 > leak through server logs, CDN logs, and browser history.
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
+import { contentiaApi } from 'contentia/server/api';
 
 const api = contentiaApi({
   documents,
@@ -79,11 +79,11 @@ authorize: ctx => ctx.operation === 'read',
 ### Role-based authorization
 
 Because authorization is entirely in your hands, "scopes" and "roles" are just identity fields you
-attach to the [`User`](../../reference/api/server/api/interfaces/User) and check in `authorize`.
-Augment the `User` interface with whatever your policy needs:
+attach to the [`User`](../../reference/api/contentia/server/api/interfaces/User) and check in
+`authorize`. Augment the `User` interface with whatever your policy needs:
 
 ```ts
-declare module '@contentia/server/api' {
+declare module 'contentia/server/api' {
   interface User {
     roles: string[];
   }
@@ -118,10 +118,10 @@ authenticateApiToken: async key => {
 ### Scope-based authorization with `createScopePolicy`
 
 For the common pattern of granting access based on fine-grained scopes (rather than flat roles),
-`@contentia/server/api` ships
-[`createScopePolicy()`](../../reference/api/server/api/functions/createScopePolicy) — a drop-in
-`authorize` factory that maps every CMS request to a required scope and checks the principal's
-granted scopes. The scope vocabulary lives in `contentia/auth`:
+`contentia/server/api` ships
+[`createScopePolicy()`](../../reference/api/contentia/server/api/functions/createScopePolicy) — a
+drop-in `authorize` factory that maps every CMS request to a required scope and checks the
+principal's granted scopes. The scope vocabulary lives in `contentia/auth`:
 
 | Scope           | Grants                                                              |
 | --------------- | ------------------------------------------------------------------- |
@@ -134,7 +134,7 @@ granted scopes. The scope vocabulary lives in `contentia/auth`:
 | `resource:*`    | Implies every action on that resource (e.g. `content:*`)            |
 
 ```ts
-import { contentiaApi, createScopePolicy } from '@contentia/server/api';
+import { contentiaApi, createScopePolicy } from 'contentia/server/api';
 
 const api = contentiaApi({
   documents,
@@ -153,10 +153,10 @@ const api = contentiaApi({
 
 `createScopePolicy` accepts an optional `options` object:
 
-| Option                                                                          | Type                                          | Description                                                                            |
-| ------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [`requiredScopeFor`](../../reference/api/server/api/functions/requiredScopeFor) | `(ctx: AuthorizeContext) => Scope \| null`    | Override the request → required-scope mapping. Return `null` to allow unconditionally. |
-| `scopesOf`                                                                      | `(ctx: AuthorizeContext) => readonly Scope[]` | How to read the principal's granted scopes. Defaults to `ctx.user.scopes ?? []`.       |
+| Option                                                                                    | Type                                          | Description                                                                            |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [`requiredScopeFor`](../../reference/api/contentia/server/api/functions/requiredScopeFor) | `(ctx: AuthorizeContext) => Scope \| null`    | Override the request → required-scope mapping. Return `null` to allow unconditionally. |
+| `scopesOf`                                                                                | `(ctx: AuthorizeContext) => readonly Scope[]` | How to read the principal's granted scopes. Defaults to `ctx.user.scopes ?? []`.       |
 
 `hasScope(granted, required)` from `contentia/auth` resolves wildcards: `admin`/`*` satisfies
 anything, and `resource:*` satisfies any `resource:action` on that resource. Use it directly if you
@@ -206,7 +206,8 @@ bad input — throw or return the error from `authenticateAccessToken` yourself.
 ## SSR auth guard with `authenticateRequest`
 
 `contentiaApi(...)` returns a
-[`ContentiaApi`](../../reference/api/server/api/interfaces/ContentiaApi) object with two methods:
+[`ContentiaApi`](../../reference/api/contentia/server/api/interfaces/ContentiaApi) object with two
+methods:
 
 ```ts
 interface ContentiaApi {
@@ -240,8 +241,8 @@ boundary (Next.js App Router, TanStack Start, Hono middleware, etc.).
 
 Pass any `logger` compatible with the `Console` interface (`error`, `warn`, `info`, `debug`) to
 receive structured diagnostic output from
-[`contentiaApi`](../../reference/api/server/api/functions/contentiaApi). The option is optional — if
-omitted, no output is produced.
+[`contentiaApi`](../../reference/api/contentia/server/api/functions/contentiaApi). The option is
+optional — if omitted, no output is produced.
 
 ```ts
 const api = contentiaApi({
@@ -259,23 +260,23 @@ unified log stream from a single option.
 ## Production auth with `decap-oauth2`
 
 Rather than building an OAuth2 server from scratch, use the bundled
-[`contentiaOauth2`](../../reference/api/server/oauth2/functions/contentiaOauth2) helper. It is a
-self-contained PKCE authorization server with email/password login, optional passkey (WebAuthn), and
-optional TOTP 2FA. You wire it alongside the `contentiaApi(...)` handler in the same Express or Hono
-app.
+[`contentiaOauth2`](../../reference/api/contentia/server/oauth2/functions/contentiaOauth2) helper.
+It is a self-contained PKCE authorization server with email/password login, optional passkey
+(WebAuthn), and optional TOTP 2FA. You wire it alongside the `contentiaApi(...)` handler in the same
+Express or Hono app.
 
 ```bash
-pnpm add @contentia/server
+pnpm add contentia
 ```
 
 **Hono example**
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
-import { contentiaOauth2 } from '@contentia/server/oauth2';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
+import { contentiaOauth2 } from 'contentia/server/oauth2';
 import { R2StorageRepository } from 'contentia/storage-r2';
 import { Hono } from 'hono';
 
@@ -337,7 +338,7 @@ export default app;
 for `contentia`):
 
 ```ts
-import { contentiaOauth2 } from '@contentia/server/oauth2';
+import { contentiaOauth2 } from 'contentia/server/oauth2';
 import express from 'express';
 
 const oauth2 = contentiaOauth2({
@@ -400,12 +401,12 @@ Use this same `decapConfig` when building the admin shell (see
 | TOTP 2FA       | `totp: { … }`                        | TOTP enrollment and per-login verification       |
 | CAPTCHA        | `captcha: { enabled: true, … }`      | Any provider (reCAPTCHA, hCaptcha, Turnstile, …) |
 | Password reset | `passwordReset: { … }`               | Email-based reset link flow                      |
-| i18n           | `translations: nl` (or other locale) | Import from `@contentia/server/oauth2/i18n`      |
+| i18n           | `translations: nl` (or other locale) | Import from `contentia/server/oauth2/i18n`       |
 
 See
-[`packages/server/src/oauth2/README.md`](https://github.com/contentia-dev/contentia/blob/develop/packages/server/src/oauth2/README.md)
-for the full [`OAuthConfig`](../../reference/api/server/oauth2/interfaces/OAuthConfig) option
-reference.
+[`packages/contentia/src/server/oauth2/README.md`](https://github.com/contentia-dev/contentia/blob/develop/packages/contentia/src/server/oauth2/README.md)
+for the full [`OAuthConfig`](../../reference/api/contentia/server/oauth2/interfaces/OAuthConfig)
+option reference.
 
 ---
 

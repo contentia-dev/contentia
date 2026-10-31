@@ -1,7 +1,7 @@
 import { hashesEqual, hashToken, isScope, normalizeScopes, type Scope } from 'contentia/auth';
 import { AuthenticationError } from 'contentia/core';
 
-import type { User } from '@contentia/server/api';
+import type { User } from 'contentia/server/api';
 
 import type { ApiKeyConfig, OidcConfig } from './config.js';
 import type { JwtClaims } from './oidc.js';

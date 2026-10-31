@@ -9,7 +9,7 @@ Resource routes are mounted under `/resources`; `GET /capabilities` sits directl
 > action descriptor plus the originating `Request`. Return `true` to allow, `false` for a 403, or a
 > [`ContentiaError`](../api/contentia/core/errors/classes/ContentiaError) for a custom status. It
 > decides _what a caller may do_; authenticating them is still your job — validate the credential
-> inside the callback, or mount the handler behind `@contentia/server/api`, which checks a Bearer
+> inside the callback, or mount the handler behind `contentia/server/api`, which checks a Bearer
 > token first. For a deliberately open surface, say so with `authorize: allowAll` from
 > `contentia/json-api`.
 

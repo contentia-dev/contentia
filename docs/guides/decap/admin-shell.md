@@ -13,7 +13,7 @@ together with esbuild, then serve the resulting files as static assets.
 ### Install build dependencies
 
 ```bash
-npm install @contentia/server @laikacms/decap-cms @emotion/react @emotion/styled esbuild --save-dev
+npm install contentia @laikacms/decap-cms @emotion/react @emotion/styled esbuild --save-dev
 ```
 
 `@laikacms/decap-cms` is the scoped Decap CMS fork that provides the `@laikacms/decap-cms/lib/util`,
@@ -78,8 +78,8 @@ CMS.init({
 
 > **`base_url` is required.** Without it, Decap cannot locate the Contentia API and the admin shows
 > "Missing required configuration: base_url and app_id are required". Set it to the origin where
-> your [`contentiaApi`](../../reference/api/server/api/functions/contentiaApi) handler runs (e.g.
-> `http://localhost:3000` locally, your public URL in production).
+> your [`contentiaApi`](../../reference/api/contentia/server/api/functions/contentiaApi) handler
+> runs (e.g. `http://localhost:3000` locally, your public URL in production).
 >
 > **`dev_token`** lets the Decap admin authenticate without a full OAuth2 flow during development —
 > any non-empty string works as long as your `authenticateAccessToken` callback accepts it. Remove

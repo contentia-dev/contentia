@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // LCMS-886: generate CycloneDX SBOMs for the published packages (contentia,
-// @contentia/server, @contentia/vite-plugin, @contentia/astro) using pnpm's built-in `pnpm sbom` command (pnpm >=10.16,
+// @contentia/vite-plugin, @contentia/astro) using pnpm's built-in `pnpm sbom` command (pnpm >=10.16,
 // no extra dependency needed). Local/publish-time only — never wired into a
 // GitHub Actions workflow (CI billing is org-wide blocked; see RELEASING.md
 // and AGENTS.md).
@@ -14,7 +14,6 @@ const outDir = join(rootDir, 'sbom');
 
 const packages = [
   'contentia',
-  '@contentia/server',
   '@contentia/vite-plugin',
   '@contentia/astro',
   '@contentia/github',

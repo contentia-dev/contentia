@@ -1,12 +1,12 @@
 # Releasing
 
-All four public packages (`contentia`, `@contentia/server`, `@contentia/vite-plugin`,
-`@contentia/astro`) are version-fixed via changesets and released together with `changeset publish`.
-Publishing MUST go through pnpm (never `npm publish`): pnpm resolves `catalog:` dependency ranges
-into the tarball, npm does not — `prepack` guards against this via
-`scripts/check-no-pnpm-catalog-deps.mjs`. `changeset publish` is safe here: it detects pnpm from the
-root `packageManager` field and runs `pnpm publish` per package. It also skips versions already on
-npm, so re-running it (or racing CI) is harmless.
+The three core packages (`contentia`, `@contentia/vite-plugin`, `@contentia/astro`) are
+version-fixed via changesets and released together with `changeset publish`. Publishing MUST go
+through pnpm (never `npm publish`): pnpm resolves `catalog:` dependency ranges into the tarball, npm
+does not — `prepack` guards against this via `scripts/check-no-pnpm-catalog-deps.mjs`.
+`changeset publish` is safe here: it detects pnpm from the root `packageManager` field and runs
+`pnpm publish` per package. It also skips versions already on npm, so re-running it (or racing CI)
+is harmless.
 
 Releases are published from `main` by `.github/workflows/release.yml`, not from a laptop. Every
 package then carries npm provenance: a signed statement, in a public log, that it was built from
@@ -66,12 +66,11 @@ the `prepack` guard (`scripts/check-no-pnpm-catalog-deps.mjs`) runs automaticall
 ## SBOM (Software Bill of Materials)
 
 `pnpm gen-sbom` generates a CycloneDX SBOM for each published package (`contentia`,
-`@contentia/server`, `@contentia/vite-plugin`, `@contentia/astro`, `@contentia/github`,
-`@contentia/gitlab`, `@contentia/bitbucket`) via pnpm's built-in `pnpm sbom` command — no extra
-dependency needed. Output goes to `sbom/contentia.cdx.json`, `sbom/contentia-server.cdx.json`,
-`sbom/contentia-vite-plugin.cdx.json`, `sbom/contentia-astro.cdx.json`,
-`sbom/contentia-github.cdx.json`, `sbom/contentia-gitlab.cdx.json`, and
-`sbom/contentia-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
+`@contentia/vite-plugin`, `@contentia/astro`, `@contentia/github`, `@contentia/gitlab`,
+`@contentia/bitbucket`) via pnpm's built-in `pnpm sbom` command — no extra dependency needed. Output
+goes to `sbom/contentia.cdx.json`, `sbom/contentia-vite-plugin.cdx.json`,
+`sbom/contentia-astro.cdx.json`, `sbom/contentia-github.cdx.json`, `sbom/contentia-gitlab.cdx.json`,
+and `sbom/contentia-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
 `scripts/generate-sbom.mjs`.
 
 `pnpm release` runs it before `changeset publish`, and the release workflow attaches the result to

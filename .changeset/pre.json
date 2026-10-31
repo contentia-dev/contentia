@@ -10,7 +10,6 @@
     "contentia": "0.0.1-alpha.1",
     "@contentia/github": "0.0.1-alpha.1",
     "@contentia/gitlab": "0.0.1-alpha.1",
-    "@contentia/server": "0.0.1-alpha.1",
     "@contentia/vite-plugin": "0.0.1-alpha.1"
   },
   "changesets": []

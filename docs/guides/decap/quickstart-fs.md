@@ -1,7 +1,7 @@
 # Self-Hosting Quickstart: FileSystem + Decap CMS
 
 This guide walks you through running Contentia on a plain Node.js server using filesystem storage
-(`contentia/storage-fs`) and the Contentia backend for Decap CMS (`@contentia/server`). It is the
+(`contentia/storage-fs`) and the Contentia backend for Decap CMS (`contentia/server/api`). It is the
 simplest possible self-hosted setup — no cloud provider account required.
 
 For a broader overview of the system see [architecture](../../concepts/architecture).
@@ -21,7 +21,7 @@ For a broader overview of the system see [architecture](../../concepts/architect
 
 Install the Contentia packages and a Node.js server runtime. Storage repos, document/asset repos,
 API factories, and serializers are all subpath exports of the single `contentia` package. The Decap
-integration lives in `@contentia/server`:
+integration lives in `contentia/server/api`:
 
 ```bash
 # npm — add hono explicitly: §4a's --legacy-peer-deps prunes auto-installed peers, and
@@ -29,7 +29,7 @@ integration lives in `@contentia/server`:
 # Pin @hono/node-server to the major contentia peer-depends on (currently ^2) — an
 # unpinned install can otherwise pull a newer major than contentia supports and fail
 # with an ERESOLVE peer conflict before anything installs.
-npm install contentia @contentia/server '@hono/node-server@^2' hono
+npm install contentia '@hono/node-server@^2' hono
 
 # pnpm — hono for the same reason: pnpm satisfies @hono/node-server's peer internally, but does
 # not expose it at your project root, so a server.ts would not typecheck without it.
@@ -37,7 +37,7 @@ npm install contentia @contentia/server '@hono/node-server@^2' hono
 # and exits non-zero when it skips any — without these flags this command fails outright with
 # ERR_PNPM_IGNORED_BUILDS (msgpackr-extract, and esbuild once §4a adds it).
 pnpm add --allow-build=esbuild --allow-build=msgpackr-extract \
-  contentia @contentia/server '@hono/node-server@^2' hono
+  contentia '@hono/node-server@^2' hono
 ```
 
 > **Version pin:** `contentia` peer-depends on `@hono/node-server@^2.0.10` (see its `package.json`).
@@ -51,8 +51,7 @@ pnpm add --allow-build=esbuild --allow-build=msgpackr-extract \
 
 | Package             | Purpose                                                                                                                                        |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contentia`         | Core: storage repos, document/asset repos, API factories, serializers (subpaths).                                                              |
-| `@contentia/server` | Decap-compatible API server + Contentia backend for the browser-side Decap CMS admin.                                                          |
+| `contentia`         | Core: storage repos, document/asset repos, API factories and the Decap-compatible API server (`contentia/server/api`), serializers (subpaths). |
 | `@hono/node-server` | Runs a Web-standard `fetch` handler on Node.js.                                                                                                |
 | `hono`              | Peer dependency of `@hono/node-server@2`. §4a's `--legacy-peer-deps` prunes npm's auto-installed copy; also needed to typecheck a `server.ts`. |
 
@@ -66,8 +65,8 @@ pnpm add --allow-build=esbuild --allow-build=msgpackr-extract \
 > the snippet below.
 >
 > **Supported Decap collection formats:** the storage layer above ships serializers for JSON, YAML,
-> markdown-frontmatter, and raw text — but the bundled `@contentia/server` Decap admin backend (§4)
-> currently only sends structured `content` to the documents API for collections with
+> markdown-frontmatter, and raw text — but the bundled `contentia/server/api` Decap admin backend
+> (§4) currently only sends structured `content` to the documents API for collections with
 > **`format: json`**. Decap's default when a collection omits `format:` is markdown-frontmatter,
 > which this backend does not yet support — saving such an entry fails fast with a clear client-side
 > error rather than a raw file write. Always set `format: json` explicitly on every collection in
@@ -81,12 +80,12 @@ Create `server.mjs` (or `server.ts` if you have a TypeScript build step):
 
 ```js
 // server.mjs
-import { contentiaApi } from '@contentia/server/api';
 import { serve } from '@hono/node-server';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { ConventionCatalogProvider } from 'contentia/catalog-convention';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
 import { InProcessLockManager } from 'contentia/locks/in-process';
+import { contentiaApi } from 'contentia/server/api';
 import { FileSystemStorageRepository } from 'contentia/storage-fs';
 import { jsonSerializer } from 'contentia/storage-serializers-json';
 
@@ -169,8 +168,8 @@ serve({ fetch: api.fetch, port: 3000 }, () => {
 > **Production auth:** the `authenticateAccessToken` callback above accepts a hard-coded dev token.
 > For production, replace it with a real validator (JWT verification, database session lookup, etc.)
 > or use the bundled
-> [`contentiaOauth2`](../../reference/api/server/oauth2/functions/contentiaOauth2) helper — see
-> [Decap Integration](./auth).
+> [`contentiaOauth2`](../../reference/api/contentia/server/oauth2/functions/contentiaOauth2) helper
+> — see [Decap Integration](./auth).
 
 > **Other base paths:** if you mount behind a reverse proxy at a different prefix, change
 > `basePath: '/api'` here and update `api_root` in `admin/config.yml` to match.
@@ -211,7 +210,7 @@ endpoint the Decap `contentia` backend pings to confirm the server is reachable.
 
 ### 4a. Install the Decap CMS app
 
-`@contentia/server` was already installed in §1. Install the Decap CMS browser bundle — the
+`contentia` was already installed in §1. Install the Decap CMS browser bundle — the
 `@laikacms/decap-cms` fork (its root export is the classic app bootstrap; it also provides the
 `lib/util`, `lib/auth`, `ui-default`, and `core` subpaths that the Contentia backend imports at
 bundle time) — its required peer dependencies, and esbuild (used to compile the TypeScript entry
@@ -241,8 +240,8 @@ pnpm add -D esbuild
 > `ERR_PNPM_IGNORED_BUILDS` and the install step fails.
 
 > The `contentia` backend ships as `@laikacms/decap-cms/backends/laika` (a subpath of the
-> `@laikacms/decap-cms` package you just installed, not of `@contentia/server`). Import
-> `createLaikaBackend` from there.
+> `@laikacms/decap-cms` package you just installed, not of `contentia`). Import `createLaikaBackend`
+> from there.
 >
 > `@emotion/react` and `@emotion/styled` are required (non-optional) peer dependencies of
 > `@laikacms/decap-cms` — the admin shell is styled with Emotion. Without them the esbuild step will
@@ -342,7 +341,8 @@ collections:
 
 The backend constructs its API URL as `base_url + api_root` → `http://localhost:3000/api`. All
 document, asset, storage, and health endpoints are served under that prefix by the
-[`contentiaApi`](../../reference/api/server/api/functions/contentiaApi) server started in §2.
+[`contentiaApi`](../../reference/api/contentia/server/api/functions/contentiaApi) server started in
+§2.
 
 The `dev_token` value is sent as a Bearer token by the Decap admin; the server's
 `authenticateAccessToken` callback checks it. **Never use a dev token in production** — replace it

@@ -405,6 +405,66 @@
       "types": "./dist/serializers/storage-serializers-yaml/index.d.ts",
       "import": "./dist/serializers/storage-serializers-yaml/index.js",
       "default": "./dist/serializers/storage-serializers-yaml/index.js"
+    },
+    "./server/api": {
+      "types": "./dist/server/api/index.d.ts",
+      "import": "./dist/server/api/index.js",
+      "default": "./dist/server/api/index.js"
+    },
+    "./server/oauth2": {
+      "types": "./dist/server/oauth2/index.d.ts",
+      "import": "./dist/server/oauth2/index.js",
+      "default": "./dist/server/oauth2/index.js"
+    },
+    "./server/oauth2/i18n": {
+      "types": "./dist/server/oauth2/i18n/index.d.ts",
+      "import": "./dist/server/oauth2/i18n/index.js",
+      "default": "./dist/server/oauth2/i18n/index.js"
+    },
+    "./server/oauth2/i18n/en": {
+      "types": "./dist/server/oauth2/i18n/translations/en.d.ts",
+      "import": "./dist/server/oauth2/i18n/translations/en.js",
+      "default": "./dist/server/oauth2/i18n/translations/en.js"
+    },
+    "./server/oauth2/i18n/nl": {
+      "types": "./dist/server/oauth2/i18n/translations/nl.d.ts",
+      "import": "./dist/server/oauth2/i18n/translations/nl.js",
+      "default": "./dist/server/oauth2/i18n/translations/nl.js"
+    },
+    "./server/embedded": {
+      "types": "./dist/server/embedded/index.d.ts",
+      "import": "./dist/server/embedded/index.js",
+      "default": "./dist/server/embedded/index.js"
+    },
+    "./server/ai": {
+      "types": "./dist/server/ai/index.d.ts",
+      "import": "./dist/server/ai/index.js",
+      "default": "./dist/server/ai/index.js"
+    },
+    "./server/ai/providers": {
+      "types": "./dist/server/ai/providers/index.d.ts",
+      "import": "./dist/server/ai/providers/index.js",
+      "default": "./dist/server/ai/providers/index.js"
+    },
+    "./server/ai/tools": {
+      "types": "./dist/server/ai/tools/index.d.ts",
+      "import": "./dist/server/ai/tools/index.js",
+      "default": "./dist/server/ai/tools/index.js"
+    },
+    "./server/ai/i18n/en": {
+      "types": "./dist/server/ai/i18n/en.d.ts",
+      "import": "./dist/server/ai/i18n/en.js",
+      "default": "./dist/server/ai/i18n/en.js"
+    },
+    "./server/ai/i18n/nl": {
+      "types": "./dist/server/ai/i18n/nl.d.ts",
+      "import": "./dist/server/ai/i18n/nl.js",
+      "default": "./dist/server/ai/i18n/nl.js"
+    },
+    "./server/ai/i18n/types": {
+      "types": "./dist/server/ai/i18n/types.d.ts",
+      "import": "./dist/server/ai/i18n/types.js",
+      "default": "./dist/server/ai/i18n/types.js"
     }
   },
   "scripts": {
@@ -427,18 +487,34 @@
     "trash": "catalog:"
   },
   "peerDependencies": {
-    "@cloudflare/workers-types": "*"
+    "@cloudflare/workers-types": "*",
+    "@ai-sdk/anthropic": "^4.0.16",
+    "@ai-sdk/openai": "^4.0.16",
+    "ai": "^7.0.31"
   },
   "peerDependenciesMeta": {
     "@cloudflare/workers-types": {
       "optional": true
+    },
+    "@ai-sdk/anthropic": {
+      "optional": true
+    },
+    "@ai-sdk/openai": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "catalog:ai",
+    "@ai-sdk/openai": "catalog:ai",
     "@cloudflare/workers-types": "catalog:types",
+    "@hono/node-server": "catalog:server",
     "@types/js-yaml": "catalog:types",
     "@types/json-schema": "catalog:types",
     "@types/node": "catalog:types",
+    "ai": "catalog:ai",
     "rimraf": "catalog:tools",
     "tsc-alias": "^1.8.16",
     "typescript": "catalog:tools",

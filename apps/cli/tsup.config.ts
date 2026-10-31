@@ -20,7 +20,7 @@ export default defineConfig([
     // they cannot be inlined into ESM without CJS shim issues. Keep them
     // external (installed as direct deps) so Node loads them natively as CJS.
     external: ['ws', 'undici'],
-    noExternal: ['contentia', '@contentia/server', 'effect', '@effect/platform-node', '@effect/platform-node-shared'],
+    noExternal: ['contentia', 'effect', '@effect/platform-node', '@effect/platform-node-shared'],
   },
   {
     entry: { index: 'src/index.ts' },
@@ -31,6 +31,6 @@ export default defineConfig([
     sourcemap: true,
     clean: false,
     dts: { entry: { index: 'src/index.ts' } },
-    noExternal: ['contentia', '@contentia/server'],
+    noExternal: ['contentia'],
   },
 ]);

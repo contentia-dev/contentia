@@ -7,10 +7,10 @@ the Catalog document/asset repos, and expose them through `contentiaApi(...)`. T
 route.
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
 import { R2StorageRepository } from 'contentia/storage-r2';
 import { Hono } from 'hono';
 // …serializers…
@@ -155,10 +155,10 @@ any other RFC 4918 server. Only a URL (and optionally Basic auth) is needed. Con
 other `StorageRepository` and pass it to `contentiaApi(...)`:
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
 import { jsonSerializer } from 'contentia/storage-serializers-json';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { rawSerializer } from 'contentia/storage-serializers-raw';

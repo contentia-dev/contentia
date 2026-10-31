@@ -16,7 +16,7 @@ cms-agnostic-protocol]] (decap is an adapter, not the owner of the mechanism)
 > `Lock`/`LockToken`/`LockConflictError` (423), the `locks` capability with both `scope` and
 > `transactional` axes, five methods on `DocumentsRepository`, `InProcessLockManager`
 > (`contentia/locks/in-process`), the `/locks/{key}` sub-path on documents-api, the proxy's HTTP
-> forwarding, `@contentia/server/api`'s `/locks` rewritten as a repository adapter, and the four
+> forwarding, `contentia/server/api`'s `/locks` rewritten as a repository adapter, and the four
 > `CmsImplementation` methods in the decap-cms contentia backend.
 >
 > Three documented deviations from the sketch below:
@@ -84,7 +84,7 @@ datasource's native transaction.
 - `ContentiaError` variants exist including **`VersionMismatchError`** (code `version_mismatch`,
   status **409**). There is **no** lock error yet. `ContentiaError` has no generic data slot — a
   subclass adds its own fields.
-- `@contentia/server/api` already holds a **`DocumentsRepository` directly**
+- `contentia/server/api` already holds a **`DocumentsRepository` directly**
   (`documents: DocumentsRepository`), which may itself be the `documents-jsonapi-proxy`. The
   repository interface is the single seam; decap does not care whether it is native or a proxy.
 - Effect's concurrency primitives (`Ref`, STM `TRef`/`TMap`, `Semaphore`) are **in-process only**:

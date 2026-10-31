@@ -145,6 +145,42 @@
       ],
       "contentia/sanitizer": [
         "src/shared/sanitizer/index.ts"
+      ],
+      "contentia/server/api": [
+        "src/server/api/index.ts"
+      ],
+      "contentia/server/oauth2": [
+        "src/server/oauth2/index.ts"
+      ],
+      "contentia/server/oauth2/i18n": [
+        "src/server/oauth2/i18n/index.ts"
+      ],
+      "contentia/server/oauth2/i18n/en": [
+        "src/server/oauth2/i18n/translations/en.ts"
+      ],
+      "contentia/server/oauth2/i18n/nl": [
+        "src/server/oauth2/i18n/translations/nl.ts"
+      ],
+      "contentia/server/embedded": [
+        "src/server/embedded/index.ts"
+      ],
+      "contentia/server/ai": [
+        "src/server/ai/index.ts"
+      ],
+      "contentia/server/ai/providers": [
+        "src/server/ai/providers/index.ts"
+      ],
+      "contentia/server/ai/tools": [
+        "src/server/ai/tools/index.ts"
+      ],
+      "contentia/server/ai/i18n/en": [
+        "src/server/ai/i18n/en.ts"
+      ],
+      "contentia/server/ai/i18n/nl": [
+        "src/server/ai/i18n/nl.ts"
+      ],
+      "contentia/server/ai/i18n/types": [
+        "src/server/ai/i18n/types.ts"
       ]
     }
   },

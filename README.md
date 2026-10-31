@@ -69,10 +69,9 @@ This repository carries the two core packages. The storage/asset adapters (`@con
 and the example apps were moved out into their own repositories in June 2026 — see
 [Imports](./docs/reference/imports.md) for how to install each one.
 
-| Package             | Description                                                                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contentia`         | Core domain, APIs, default implementations, serializers, shared utilities (subpath exports: `contentia/storage-api`, `contentia/storage-fs`, `contentia/storage-r2`, `contentia/core`, …) |
-| `@contentia/server` | Decap CMS integrations: backend, OAuth2, widgets, server adapters.                                                                                                                        |
+| Package     | Description                                                                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contentia` | Core domain, APIs, default implementations, serializers, shared utilities (subpath exports: `contentia/storage-api`, `contentia/storage-fs`, `contentia/server/api`, `contentia/core`, …) |
 
 See [docs/reference/imports.md](./docs/reference/imports.md) for every import path and its install
 command, including the packages that now live in separate repositories.
@@ -94,9 +93,9 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Releasing
 
-The two core packages (`contentia`, `@contentia/server`) are released together at the same version
-(changesets `fixed` group). Internal `workspace:*` references are pinned to the exact version on
-publish. Packages that were moved out of this repo (the adapters, `@contentia/cli`,
+`contentia`, `@contentia/vite-plugin` and `@contentia/astro` are released together at the same
+version (changesets `fixed` group). Internal `workspace:*` references are pinned to the exact
+version on publish. Packages that were moved out of this repo (the adapters, `@contentia/cli`,
 `@contentia/git-gateway`, …) are now released from their own repositories.
 
 ```

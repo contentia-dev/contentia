@@ -6,7 +6,7 @@ import { AuthenticationError } from 'contentia/core';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
 import { InProcessLockManager } from 'contentia/locks/in-process';
 
-import { type ContentiaApi, contentiaApi, createScopePolicy } from '@contentia/server/api';
+import { type ContentiaApi, contentiaApi, createScopePolicy } from 'contentia/server/api';
 
 import { buildStorageRepository } from '../drivers/registry.js';
 import type { ServerConfig } from './config.js';

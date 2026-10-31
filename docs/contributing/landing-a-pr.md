@@ -22,7 +22,7 @@ subpath you changed (`assets-catalog`, `quickstart-fs-decap`, …).
 
 ## Changesets
 
-If your change affects a published package's behavior (`contentia` or `@contentia/server`), add a
+If your change affects a published package's behavior (`contentia` or one of the plugins), add a
 changeset:
 
 ```bash

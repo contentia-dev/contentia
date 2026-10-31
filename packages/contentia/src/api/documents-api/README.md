@@ -25,8 +25,8 @@ const api = buildJsonApi({
 
 `authorize` decides _what a caller may do_; it does not authenticate them for you. Either validate
 the credential inside the callback (as above), or mount the handler behind
-[`@contentia/server/api`](../../../../server/src/api), which authenticates a Bearer token and
-applies its own `authorize` gate before forwarding.
+[`contentia/server/api`](../../../../server/src/api), which authenticates a Bearer token and applies
+its own `authorize` gate before forwarding.
 
 For a surface that is _deliberately_ open — a dev server on loopback, a test harness, or a handler
 already behind an authenticating proxy — say so explicitly with `allowAll`:

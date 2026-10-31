@@ -1,8 +1,8 @@
 # Decap CMS Integration
 
 [Decap CMS](https://decapcms.org/) is a Git-based admin UI for content. Contentia ships a
-Decap-compatible backend (`@contentia/server`) so you can pair that admin with any Contentia storage
-repository — filesystem, R2, S3, WebDAV, and more.
+Decap-compatible backend (`contentia/server/api`) so you can pair that admin with any Contentia
+storage repository — filesystem, R2, S3, WebDAV, and more.
 
 Contentia works with upstream Decap CMS and maintains a standalone
 [`@laikacms/decap-cms` fork](https://github.com/laikacms/decap-cms). The fork follows the same
@@ -41,6 +41,7 @@ else (admin shell, OAuth2, framework bridges) builds on top of that handler.
   editor component.
 - **[Framework setup notes](./frameworks)** — per-framework request bridges (Express, Next.js,
   SvelteKit, Astro, Nuxt, AdonisJS, FoalTS, and more).
-- **[AI assistant](../ai-assistant)** — mount `@contentia/server/ai` for the editor's chat and
-  session endpoints; [`DecapAiConfig`](../../reference/api/server/ai/interfaces/DecapAiConfig)
-  options, session callbacks, and authorization.
+- **[AI assistant](../ai-assistant)** — mount `contentia/server/ai` for the editor's chat and
+  session endpoints;
+  [`DecapAiConfig`](../../reference/api/contentia/server/ai/interfaces/DecapAiConfig) options,
+  session callbacks, and authorization.

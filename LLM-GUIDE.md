@@ -27,13 +27,13 @@ Contentia is **three things stacked**:
 You pick a **storage backend**, wrap it in **repos**, expose them through the **HTTP API**, and
 mount the resulting `(Request) => Promise<Response>` handler in your framework.
 
-The `@contentia/server` package gives you the primitives for each layer:
+`contentia/server` gives you the primitives for each layer:
 
-- **`contentiaApi(...)`** (`@contentia/server/api`) — the Decap-compatible HTTP API over your repos.
+- **`contentiaApi(...)`** (`contentia/server/api`) — the Decap-compatible HTTP API over your repos.
   Returns `{ fetch, authenticateRequest }`; mount `.fetch` on a catch-all route.
 - **`createLaikaBackend()`** (`@laikacms/decap-cms/backends/laika`) — the Decap CMS backend the
   admin UI registers to talk to that API.
-- **`contentiaOauth2(...)`** (`@contentia/server/oauth2`) — an optional PKCE OAuth2 server for
+- **`contentiaOauth2(...)`** (`contentia/server/oauth2`) — an optional PKCE OAuth2 server for
   production login.
 
 For most apps: construct a `StorageRepository`, wrap it in the Catalog document/asset repos, pass
@@ -46,11 +46,11 @@ them to `contentiaApi(...)`, and mount `.fetch` on a catch-all route.
 ### a) Spin up a Node.js backend (Express/Hono/Fastify/Koa/Bun/Deno)
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
 import { FileSystemStorageRepository } from 'contentia/storage-fs';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { resolve } from 'node:path';
@@ -150,10 +150,10 @@ The same `contentiaApi(...)` wiring works on the edge — just swap `FileSystemS
 an edge-compatible repo such as `R2StorageRepository` (`node:fs` is unavailable in V8 isolates).
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
 import { R2StorageRepository } from 'contentia/storage-r2';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { Hono } from 'hono';
@@ -201,7 +201,7 @@ on every request and must return a `User` (throw to reject — `contentiaApi` tu
 a 401).
 
 ```ts
-import { contentiaApi } from '@contentia/server/api';
+import { contentiaApi } from 'contentia/server/api';
 import { jwtVerify, SignJWT } from 'jose';
 
 // 1. Issue a JWT after your login form:
@@ -233,14 +233,14 @@ const contentia = contentiaApi({
 ```
 
 For a full self-contained login server (email/password, passkey, TOTP) use the
-`contentiaOauth2(...)` PKCE server from `@contentia/server/oauth2` — see
+`contentiaOauth2(...)` PKCE server from `contentia/server/oauth2` — see
 [docs/guides/decap/auth.md → "Production auth with decap-oauth2"](./docs/guides/decap/auth.md#production-auth-with-decap-oauth2).
 
 ---
 
 ### f) Add the AI assistant
 
-`@contentia/server/ai` mounts chat and session endpoints that power the Decap CMS editor assistant.
+`contentia/server/ai` mounts chat and session endpoints that power the Decap CMS editor assistant.
 Install the optional peer first:
 
 ```bash
@@ -250,9 +250,9 @@ pnpm add ai @ai-sdk/anthropic   # or any other @ai-sdk/* provider
 Then mount `decapAi` alongside your existing `contentiaApi`:
 
 ```ts
-import { decapAi } from '@contentia/server/ai';
-import { anthropic } from '@contentia/server/ai/providers';
 import { resolveBearer } from 'contentia/auth';
+import { decapAi } from 'contentia/server/ai';
+import { anthropic } from 'contentia/server/ai/providers';
 
 const ai = decapAi({
   model: anthropic('claude-3-5-sonnet-20241022'),
@@ -275,7 +275,7 @@ client-side tools (`getDocumentData` / `updateDocument`) with no `execute` so th
 the browser where the open editor entry lives. Add your own server-side tools via `config.tools`.
 
 See the full options reference in
-[packages/server/src/ai/README.md](./packages/server/src/ai/README.md).
+[packages/contentia/src/server/ai/README.md](./packages/contentia/src/server/ai/README.md).
 
 ---
 
@@ -393,12 +393,11 @@ These are the things that consistently bite first-time integrators:
     }
     ```
 
-12. **Packages need a `dist/` before downstream packages can type-check.** The monorepo has two core
-    packages (`contentia`, `@contentia/server`). If you run
-    `pnpm --filter <package> exec tsc --noEmit` directly and get
+12. **Packages need a `dist/` before downstream packages can type-check.** The core package is
+    `contentia`. If you run `pnpm --filter <package> exec tsc --noEmit` directly and get
     `Cannot find module '@contentia/...'`, build the upstream package first:
     ```
-    pnpm --filter @contentia/server build
+    pnpm --filter contentia build
     ```
     The correct way to typecheck in CI or as a one-shot command is the root-level turbo task, which
     builds upstream dependencies automatically:
@@ -447,7 +446,7 @@ These are the things that consistently bite first-time integrators:
 - **No server code at all** → `contentia serve --config` runs the API from one config file; see
   [docs/guides/server-config.md](./docs/guides/server-config.md)
 - **Astro** → `@contentia/astro` (Content Layer loaders, dev JSON:API, live collections, Zod schema)
-- **AI assistant in the editor** → mount `@contentia/server/ai` (section 2f) and wire the Dulla
+- **AI assistant in the editor** → mount `contentia/server/ai` (section 2f) and wire the Dulla
   transport in `@laikacms/decap-cms-llm-dulla`
 - **Inline wiring code** → sections 2a (Node) and 2c (Workers/R2) above have copy-paste-ready code
 

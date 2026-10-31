@@ -1,6 +1,5 @@
 packages:
   - "packages/contentia"
-  - "packages/server"
   - "packages/github"
   - "packages/gitlab"
   - "packages/bitbucket"
@@ -14,7 +13,7 @@ packages:
 
 catalogs:
 
-  # Vercel AI SDK, used by @contentia/server/ai (optional peers there, so only
+  # Vercel AI SDK, used by contentia/server/ai (optional peers of contentia, so only
   # consumers that mount the AI endpoints install them).
   ai:
     "@ai-sdk/anthropic": "^4.0.16"

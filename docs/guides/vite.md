@@ -93,8 +93,8 @@ export default defineConfig({
   media uploads in dev land locally
 - `/__contentia/session` — a trivial stub-identity responder; local mode does no real auth, so every
   request gets the same fixed identity. It exists because `LaikaBackend.authenticate()`
-  (`@contentia/server`) always pings `${apiUrl}/session` to resolve a display identity, even when
-  the local backend authenticates with a dummy token.
+  (`@laikacms/decap-cms/backends/laika`) always pings `${apiUrl}/session` to resolve a display
+  identity, even when the local backend authenticates with a dummy token.
 
 All three repository-backed sub-APIs serve the same repositories the `contentia:` loader reads: by
 default a filesystem storage repository built from `dir`, with the documents and assets repositories

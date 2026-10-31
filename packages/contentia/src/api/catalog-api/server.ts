@@ -118,7 +118,7 @@ function makeResponders(onError?: ((error: unknown) => void) | undefined, logger
  * {@link CatalogApiOptions.authorize} callback, which runs before every action
  * — including the two OpenAPI routes. This handler performs no *authentication*
  * of its own: `authorize` receives the originating `Request`, so validating a
- * Bearer token (or delegating to `@contentia/server/api`, which does it for you)
+ * Bearer token (or delegating to `contentia/server/api`, which does it for you)
  * is the caller's job.
  */
 export function buildJsonApi(options: CatalogApiOptions): CatalogApi {

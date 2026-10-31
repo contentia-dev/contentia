@@ -5,12 +5,11 @@ Contentia, see the [Guides](../guides/) instead — this section is for changes 
 
 ## Orientation
 
-Contentia is a monorepo carrying **two core packages**, released together:
+Contentia is a monorepo around **one core package**:
 
-| Package             | What it is                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------- |
-| `contentia`         | Core domain, HTTP APIs, storage/document/asset implementations, serializers, shared utilities. |
-| `@contentia/server` | Decap CMS integrations: the Decap-compatible backend, OAuth2, widgets, server adapters.        |
+| Package     | What it is                                                                                     |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `contentia` | Core domain, HTTP APIs and server, storage/document/asset implementations, serializers, utils. |
 
 Alongside them, `packages/github`, `packages/gitlab`, `packages/bitbucket`, and
 `packages/vite-plugin` hold git-host storage adapters and the dev-server plugin. `docs/` is the

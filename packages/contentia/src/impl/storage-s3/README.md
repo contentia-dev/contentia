@@ -5,9 +5,9 @@ MinIO, Backblaze B2, DigitalOcean Spaces, or any other S3-API-shaped service —
 `R2Bucket`, so the existing `R2StorageRepository` can be reused unchanged as a `StorageRepository`
 on top of it.
 
-This module is a pure storage adapter with no `@contentia/server` dependency and no hard dependency
-on `@aws-sdk/client-s3` — the SDK client and command constructors are passed in by the caller, so
-callers who don't use S3 never pull the AWS SDK into their bundle.
+This module is a pure storage adapter with no dependency on `contentia/server` and no hard
+dependency on `@aws-sdk/client-s3` — the SDK client and command constructors are passed in by the
+caller, so callers who don't use S3 never pull the AWS SDK into their bundle.
 
 ## Usage
 
@@ -49,7 +49,7 @@ const repo = new R2StorageRepository(bucket, { json: jsonSerializer }, 'json');
 ```
 
 Pair the resulting `bucket` with the lower-level `contentiaApi` directly, or with
-`createCustomContentia` from `@contentia/server/api`.
+`createCustomContentia` from `contentia/server/api`.
 
 ### `createS3Bucket` options (`CreateS3BucketOptions`)
 

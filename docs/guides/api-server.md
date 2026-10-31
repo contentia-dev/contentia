@@ -3,18 +3,18 @@
 [Getting Started](./getting-started#serve-it-over-http) serves one storage repository over HTTP with
 [`buildJsonApi`](../reference/api/contentia/storage/api/functions/buildJsonApi). When an app needs
 documents, storage, and assets behind **one** endpoint, with authentication built in, use
-[`contentiaApi`](../reference/api/server/api/functions/contentiaApi).
+[`contentiaApi`](../reference/api/contentia/server/api/functions/contentiaApi).
 
 ```bash
-pnpm add contentia @contentia/server
+pnpm add contentia
 ```
 
 ```typescript
-import { contentiaApi } from '@contentia/server/api';
 import { CatalogAssetsRepository } from 'contentia/assets/catalog';
 import { ConventionCatalogProvider } from 'contentia/catalog-convention';
 import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
 import { jsonSerializer } from 'contentia/serializers/json';
+import { contentiaApi } from 'contentia/server/api';
 import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
 const storage = new FileSystemStorageRepository('./content', { json: jsonSerializer }, 'json');
@@ -56,7 +56,7 @@ so it runs on Node.js, Bun, Deno, Cloudflare Workers, or anything else that spea
 | `authorize`               | `(ctx: AuthorizeContext) => boolean \| Promise<boolean>`                                  | yes      | The authorization gate; return `false` to reject with `403`. Fails closed if it throws.                                                                                                                        |
 | `logger`                  | `Pick<Console, 'error'\|'warn'\|'info'\|'debug'>`                                         | no       | Receives structured diagnostic output                                                                                                                                                                          |
 | `locks`                   | `LockManager`                                                                             | no       | Advisory lock backend for the `/locks` sub-API (Decap "being edited by …" banner). Use `InProcessLockManager` from `contentia/locks/in-process` for single-node. When omitted, `/locks` returns `204` (no-op). |
-| `cors`                    | [`CorsOptions`](../reference/api/server/api/interfaces/CorsOptions)                       | no       | Required when the client is served from a different origin than the API                                                                                                                                        |
+| `cors`                    | [`CorsOptions`](../reference/api/contentia/server/api/interfaces/CorsOptions)             | no       | Required when the client is served from a different origin than the API                                                                                                                                        |
 
 ## `authorize`: the authorization gate
 

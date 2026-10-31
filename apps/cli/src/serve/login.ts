@@ -1,13 +1,13 @@
 import { normalizeScopes } from 'contentia/auth';
 import { AuthenticationError } from 'contentia/core';
 
-import type { User } from '@contentia/server/api';
+import type { User } from 'contentia/server/api';
 import {
   type AuthorizationCode,
   contentiaOauth2,
   type OAuthCallbacks,
   type OAuthSession,
-} from '@contentia/server/oauth2';
+} from 'contentia/server/oauth2';
 
 import type { LoginConfig, LoginUserConfig } from './config.js';
 import type { ServerLogger } from './logger.js';

@@ -350,14 +350,15 @@ describe('contentia() plugin — localApi wiring', () => {
 });
 
 describe('@contentia/vite-plugin dependency boundary', () => {
-  it('does not depend on @contentia/server', async () => {
+  it('builds the local API from the repository APIs, not contentia/server', async () => {
     const pkgPath = path.resolve(import.meta.dirname, '../package.json');
-    const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8')) as {
-      dependencies?: Record<string, string>,
-      devDependencies?: Record<string, string>,
-    };
-    expect(pkg.dependencies?.['@contentia/server']).toBeUndefined();
-    expect(pkg.devDependencies?.['@contentia/server']).toBeUndefined();
+    const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf8')) as { dependencies?: Record<string, string> };
     expect(pkg.dependencies?.contentia).toBeDefined();
+    const sources = (await fs.readdir(import.meta.dirname, { recursive: true }))
+      .filter(file => file.endsWith('.ts') && !file.endsWith('.test.ts'));
+    for (const file of sources) {
+      const text = await fs.readFile(path.join(import.meta.dirname, file), 'utf8');
+      expect(text, file).not.toMatch(/from 'contentia\/server/);
+    }
   });
 });

@@ -289,8 +289,8 @@ export default function AdminPage() {
 
 ### AdonisJS v6 — access the raw Node.js request via `ctx.request.request`
 
-AdonisJS v6 is **ESM-native** — it can import `contentia` and `@contentia/server` directly without
-the dynamic `import()` workaround required by CommonJS frameworks like NestJS.
+AdonisJS v6 is **ESM-native** — it can import `contentia` (including `contentia/server/*`) directly
+without the dynamic `import()` workaround required by CommonJS frameworks like NestJS.
 
 AdonisJS wraps `IncomingMessage` in its own `Request` class. The raw Node.js objects are:
 
@@ -441,10 +441,10 @@ level, not per-request:
 
 ```ts
 // src/lib/contentia.ts
-import { contentiaApi } from '@contentia/server/api';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { contentiaApi } from 'contentia/server/api';
 import { FileSystemStorageRepository } from 'contentia/storage-fs';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { resolve } from 'node:path';

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { hashPassword } from 'contentia/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import type { ContentiaApi } from '@contentia/server/api';
+import type { ContentiaApi } from 'contentia/server/api';
 
 import { buildServerApi, describeServerConfig, serverConfigWarnings } from './build.js';
 import { parseServerConfig } from './config.js';

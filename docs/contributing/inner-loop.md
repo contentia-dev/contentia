@@ -18,7 +18,7 @@ rebuilds/retests the packages affected by your change (see `turbo.json`).
 | `pnpm coverage`     | `turbo run test` with v8 coverage reporters.                                   |
 
 Per-package equivalents work too, e.g. `pnpm --filter contentia test` or
-`pnpm --filter @contentia/server typecheck`.
+`pnpm --filter @contentia/vite-plugin typecheck`.
 
 Before pushing, run at minimum:
 
@@ -31,7 +31,7 @@ the hook will pass too.
 
 ## Where code lives
 
-Each core package (`contentia`, `@contentia/server`) is organized by layer under `src/`:
+The core package (`contentia`) is organized by layer under `src/`:
 
 ```
 packages/contentia/src/

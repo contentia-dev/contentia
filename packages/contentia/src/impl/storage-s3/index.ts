@@ -44,8 +44,8 @@
  *   });
  *   const storage = new R2StorageRepository(bucket, serializers, 'md');
  *
- * Note: this file has no `@contentia/server` dependency — it's a
- * pure storage adapter. Pair it with `contentiaApi` from `@contentia/server/api`.
+ * Note: this file has no dependency on `contentia/server` — it's a
+ * pure storage adapter. Pair it with `contentiaApi` from `contentia/server/api`.
  *
  * The peer dep on `@aws-sdk/client-s3` is OPTIONAL — only callers using S3
  * pull it in.
