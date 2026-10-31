@@ -8,56 +8,60 @@ into the tarball, npm does not — `prepack` guards against this via
 root `packageManager` field and runs `pnpm publish` per package. It also skips versions already on
 npm, so re-running it (or racing CI) is harmless.
 
-Publishing runs locally via `pnpm release` (see below) — GH Actions billing is org-wide blocked, so
-the npm publish step is not automated in CI. Pushing a `v*` tag triggers only
-`.github/workflows/create-release.yml`, which creates the matching GitHub release.
+Releases are published from `main` by `.github/workflows/release.yml`, not from a laptop. Every
+package then carries npm provenance: a signed statement, in a public log, that it was built from
+that commit by that workflow. npmjs.com shows it on the package page, and users check it with
+`npm audit signatures`. The workflow authenticates with npm trusted publishing, so there is no npm
+token to leak.
 
-## Alpha releases
+Work lands on `develop`; promoting `develop` to `main` is what releases.
+
+## Releasing
 
 ```sh
-pnpm changeset pre enter alpha   # once, at the start of an alpha cycle
-pnpm changeset                   # as usual, per change
-pnpm changeset version           # bumps to e.g. 1.3.0-alpha.0
+pnpm changeset                  # as usual, per change
+pnpm changeset version          # bumps the versions and writes the changelogs
 git commit -am "chore(release): version packages to 1.3.0-alpha.0"
-pnpm release                     # publishes to npm under the alpha dist-tag
-git tag v1.3.0-alpha.0
-git push origin develop v1.3.0-alpha.0
+git push origin develop
+git push origin develop:main    # promote: the workflow publishes
 ```
 
-While `.changeset/pre.json` exists (pre mode), `changeset publish` automatically publishes under the
-prerelease dist-tag (`alpha`, likewise `beta`/`rc`), so `latest` keeps pointing at the last stable
-release. Consumers install with `npm install contentia@alpha`.
+On `main`, the workflow builds the packages and runs `pnpm release`, which publishes every version
+that isn't on npm yet (a push without a version bump publishes nothing). It then pushes the
+`<package>@<version>` tags and creates the `v<version>` GitHub release, a prerelease for alpha
+versions, with the SBOMs attached. Tests don't run in the workflow: the pre-push hook runs them
+before anything reaches `main`.
 
-End the alpha cycle with `pnpm changeset pre exit` before versioning the stable release.
+While `.changeset/pre.json` exists (pre mode), `changeset publish` publishes under the prerelease
+dist-tag (`alpha`, likewise `beta`/`rc`), so `latest` keeps pointing at the last stable release.
+Consumers install with `npm install contentia@alpha`. Enter pre mode with
+`pnpm changeset pre enter alpha` and end it with `pnpm changeset pre exit` before versioning the
+stable release.
 
-## Stable releases
+`@contentia/github`, `@contentia/gitlab`, `@contentia/bitbucket` and `@contentia/cli` are **not**
+part of the changeset `fixed` group: they version independently. Select only them in
+`pnpm changeset` and release the same way; the GitHub release follows the core version.
 
-Same flow without pre mode: `pnpm changeset version`, commit, run `pnpm release` to publish, then
-tag `vX.Y.Z` and push so the GitHub release is created.
+## One-time setup
+
+1. In the repository settings, create the environment `release` and limit its deployment branches to
+   `main`.
+2. npm only accepts a trusted publisher for a package that already exists, and apart from
+   `contentia` none do yet. For the first release, create a granular access token on npmjs.com (read
+   and write for `contentia` and the `@contentia` scope, a short expiry) and add it to the `release`
+   environment as the secret `NPM_TOKEN`. That release still gets provenance.
+3. After the first release, open each package on npmjs.com (Settings → Trusted publishing) and add
+   GitHub Actions: organization `contentia-dev`, repository `contentia`, workflow `release.yml`,
+   environment `release`. Then delete the `NPM_TOKEN` secret, revoke the token, and set publishing
+   access to require two-factor authentication and disallow tokens.
 
 ## Publishing from your machine
 
-`pnpm release` runs `changeset publish` locally using your local npm credentials — it publishes
-whatever versioned-but-unpublished packages exist, under the correct dist-tag (pre mode aware).
-Afterwards, push the `v*` tag so `.github/workflows/create-release.yml` creates the GitHub release.
-
-## Git platform packages
-
-`@contentia/github`, `@contentia/gitlab`, and `@contentia/bitbucket` are **not** part of the
-changeset `fixed` group — they version independently. To publish one:
-
-```sh
-pnpm changeset                           # select the git platform package(s) only
-pnpm changeset version                   # bumps its version
-git commit -am "chore(release): bump @contentia/github to X.Y.Z"
-pnpm --filter @contentia/github release   # or @contentia/gitlab / @contentia/bitbucket
-git tag @contentia/github@X.Y.Z
-git push origin develop @contentia/github@X.Y.Z
-```
-
-Publishing requires owner npm credentials (same as for the four core packages). The `prepack` guard
-(`scripts/check-no-pnpm-catalog-deps.mjs`) runs automatically, so always use `pnpm publish` or
-`changeset publish` — never `npm publish` directly.
+If the workflow can't run, `pnpm release` from a clean `main` checkout publishes with your own npm
+credentials, under the right dist-tag. Those versions have no provenance, and once trusted
+publishing disallows tokens you'd have to allow them again first. Publishing MUST go through pnpm:
+the `prepack` guard (`scripts/check-no-pnpm-catalog-deps.mjs`) runs automatically, so always use
+`pnpm publish` or `changeset publish`, never `npm publish`.
 
 ## SBOM (Software Bill of Materials)
 
@@ -70,7 +74,6 @@ dependency needed. Output goes to `sbom/contentia.cdx.json`, `sbom/contentia-ser
 `sbom/contentia-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
 `scripts/generate-sbom.mjs`.
 
-This is intentionally a local/publish-time step, not a GitHub Actions workflow step — GH Actions
-billing is org-wide blocked (see `AGENTS.md`), so anything load-bearing runs locally. `pnpm release`
-runs it automatically before `changeset publish`; run it by hand (`pnpm gen-sbom`) any time you want
-a fresh SBOM, e.g. right before cutting a release or for a supply-chain audit.
+`pnpm release` runs it before `changeset publish`, and the release workflow attaches the result to
+the GitHub release. Run it by hand (`pnpm gen-sbom`) any time you want a fresh SBOM, e.g. for a
+supply-chain audit.
