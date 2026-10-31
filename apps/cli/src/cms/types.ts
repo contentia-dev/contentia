@@ -1,40 +1,13 @@
 /**
- * The CMS-adapter seam: everything the CLI needs to know about an admin UI it
- * can scaffold, so that "which CMS" is a value in a registry rather than a
- * hardcoded package name. Decap is the only adapter today (see `./decap.ts`);
- * the `create` wizard therefore skips the CMS question entirely and uses the
- * default, exactly as it skips the starter question while one starter exists.
+ * The CMS-adapter seam: what the CLI needs to know about an admin UI whose
+ * collection config it can turn into types (`contentia local generate`), so
+ * that "which CMS" is a value in a registry rather than a hardcoded package
+ * name. Decap is the only adapter today (see `./decap.ts`).
  *
  * Note the vocabulary clash with `../drivers/types.ts`: a *storage* driver
- * decides where Contentia keeps content, while a *CMS backend* is one of the
- * content sources the admin UI itself can talk to. They are separate axes.
+ * decides where Contentia keeps content, while a CMS adapter describes the
+ * admin UI that edits it. They are separate axes.
  */
-
-/** One pickable item in an adapter catalog: the name plus a one-line blurb for the wizard. */
-export interface CmsExtension {
-  /** Name the user selects, and the name the generated module registers it under. */
-  readonly name: string;
-  /** One-line description shown next to the choice. */
-  readonly description: string;
-}
-
-/** What the user chose to scaffold: which CMS, and which of its extensions. */
-export interface CmsSelection {
-  /** Name of the adapter this selection belongs to — see `cmsAdapters`. */
-  readonly adapter: string;
-  /** Registered backend names (the `backend.name` values a config may use). */
-  readonly backends: readonly string[];
-  /** Widget names as used in collection `fields[].widget`. */
-  readonly widgets: readonly string[];
-  /**
-   * Entry-file codecs (`markdown`, `yaml`, `toml`, `json`). Git-style
-   * backends read raw files and need one per stored format; the contentia
-   * backend serves entries as JSON and needs none.
-   */
-  readonly codecs: readonly string[];
-  /** Extra UI locales to register. `en` is built into the core app. */
-  readonly locales: readonly string[];
-}
 
 /** Where a config file was found, and everything that was checked getting there. */
 export interface CmsConfigDiscovery {
@@ -60,41 +33,14 @@ export interface CmsConfigCodegen {
   >;
 }
 
-/**
- * One admin UI the CLI can scaffold. An adapter owns its own catalogs and its
- * own codegen: nothing outside `./decap.ts` knows what a Decap import looks
- * like. A catalog left empty simply drops its wizard question.
- */
+/** One admin UI the CLI knows how to generate config types for. */
 export interface CmsAdapter {
-  /** Short identifier used in `--cms` and stored in `CmsSelection.adapter`. e.g. 'decap'. */
+  /** Short identifier used in `--cms`. e.g. 'decap'. */
   readonly name: string;
-  /** Display name shown in the wizard. e.g. 'Decap CMS'. */
+  /** Display name. e.g. 'Decap CMS'. */
   readonly title: string;
   /** One-line description shown next to the choice. */
   readonly description: string;
-  /** NPM package the admin UI and all of its extensions ship in. */
-  readonly packageName: string;
-  /** Content sources the admin UI can be pointed at. */
-  readonly backends: readonly CmsExtension[];
-  /** Field editors available to collections. */
-  readonly widgets: readonly CmsExtension[];
-  /** Entry-file formats the admin UI can read and write. */
-  readonly codecs: readonly CmsExtension[];
-  /** Selectable UI translations, as language tags. Excludes the built-in fallback. */
-  readonly locales: readonly string[];
-  /** Selection used by `--yes` and by non-interactive runs. */
-  readonly defaultSelection: CmsSelection;
-  /**
-   * Subpaths of `packageName` that a selection imports at runtime. Drives the
-   * optional-peer install, so it must cover every extension the generated
-   * module pulls in.
-   */
-  extensionSubpaths(selection: CmsSelection): string[];
-  /**
-   * Emit the starter's `src/cms.ts` — the single module that registers
-   * everything the admin uses. Throws on an unknown or unusable selection.
-   */
-  generateModule(selection: CmsSelection): string;
   /** Typed-config codegen, when this CMS keeps its collections in a config file. */
   readonly config?: CmsConfigCodegen;
 }

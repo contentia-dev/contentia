@@ -12,7 +12,8 @@ pnpm add -D @contentia/cli   # or npm i -D / yarn add -D
 Then:
 
 ```sh
-contentia create                      # wizard: starter, directory, title, CMS + its backends/widgets/locales
+contentia serve --config contentia.yaml # the Contentia API server, from one config file
+contentia hash-password               # bcrypt hash for a user in the server config
 contentia local serve                 # serve a storage backend (local files by default) over JSON:API
 contentia local generate              # config.yaml -> typed config.gen.ts (add --watch to keep it fresh)
 contentia local migrate -s ./a -d ./b # copy a storage repository to another backend
@@ -28,63 +29,18 @@ pnpm dlx @contentia/cli local serve
 
 ## Commands
 
-All local-file dev tooling lives under the `local` namespace; the top level is reserved for future
-non-local commands.
+All local-file dev tooling lives under the `local` namespace; the top level holds the API server.
 
 | Command               | What it does                                                                                                                              |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `create`              | Wizard that bootstraps a starter app and generates its `src/cms.ts` from your backend/widget/locale selection                             |
+| `serve`               | Run the Contentia API from one YAML/JSON config: storage backend, OIDC / API keys / test users, CORS (see the Server Config guide)        |
+| `hash-password`       | Print the bcrypt hash of a password for `auth.login.users` (prompts twice, or reads stdin)                                                |
 | `local serve`         | JSON:API storage server for dev workflows: local files (`--root`) or any backend (`--backend`, `--backend-options`); `--json` for editors |
 | `local generate`      | Generate a typed TypeScript module from the CMS config file (`--input/-i`, `--output/-o`, `--watch/-w`, `--cms`)                          |
 | `local migrate`       | Copy every atom from one storage repository to another (fs, webdav, s3, github, gitlab, bitbucket, …); see flags below                    |
 | `local list-backends` | List every registered storage backend and its pinned package version                                                                      |
 
 Run `contentia local <command> --help` for the full flag reference.
-
-### `create` — the wizard
-
-`contentia create` is the supported way to start a Contentia app — always go through it rather than
-copying a starter folder. On a terminal it walks through every choice: the starter template, target
-directory, site title, package manager, and — because every starter boots the **bare, non-contentia
-Decap app** (`@laikacms/decap-cms/laika-app/bare`) with nothing pre-registered — which CMS
-**backends**, **widgets**, and extra admin UI **locales** to install. The selection is written to
-the generated app's `src/cms.ts`; re-run the wizard or edit that file to change it later.
-
-Each prompt can be pre-answered with a flag, which also makes the command scriptable:
-
-```sh
-contentia create --starter starter-hono-blog --name my-blog --directory ./my-blog \
-  --title "My Blog" --package-manager npm \
-  --backends contentia --widgets string,datetime,richtext --locales nl,de
-contentia create --yes   # accept all defaults, no prompts (also the no-TTY behavior)
-contentia create --skip-install  # scaffold the app without running pnpm install
-```
-
-| Flag                 | Description                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `--directory` / `-d` | Target directory (default: `./my-contentia-app`; wizard asks)                               |
-| `--starter`          | Starter template to use (default: first in list; wizard asks when >1 exists)                |
-| `--name`             | `package.json` `name` field (default: directory name)                                       |
-| `--title`            | Site title written to the starter (default: `My Blog`; wizard asks)                         |
-| `--package-manager`  | `pnpm` / `npm` / `yarn` / `bun` (default: `pnpm`; wizard asks)                              |
-| `--skip-install`     | Scaffold the app without installing dependencies                                            |
-| `--cms`              | CMS adapter to use (default: `decap`; wizard skips while only one exists)                   |
-| `--backends`         | Comma-separated backends to register (wizard asks; adapter-specific)                        |
-| `--widgets`          | Comma-separated widgets to register (wizard asks; adapter-specific)                         |
-| `--locales`          | Comma-separated extra admin UI locales (`en` is built in; wizard asks)                      |
-| `--yes` / `-y`       | Accept all defaults and skip wizard prompts (also activated when stdin/stdout is not a TTY) |
-
-### Which CMS
-
-The admin UI is a plug-in choice, selected with `--cms`. Decap is the only one today, so the wizard
-skips the question and uses it — the same way it skips the starter question while one starter is
-enabled. Each CMS owns its own catalogs, so `--backends`, `--widgets`, and `--locales` are always
-read against the selected CMS, and `contentia local generate` reads that CMS's config format.
-
-Adding one means writing a sibling of `src/cms/decap.ts` that implements `CmsAdapter`
-(`src/cms/types.ts`) and listing it in `src/cms/registry.ts`; nothing outside that folder knows what
-a Decap import looks like. Note that a CMS **backend** (a content source the admin UI talks to) is a
-different axis from a **storage backend** (`local migrate`, `local list-backends`).
 
 ### `local serve` — storage server
 

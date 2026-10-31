@@ -1,6 +1,6 @@
 # Framework setup notes
 
-Gaps discovered while building the canonical starter apps (LCMS-023). Each note is a one-time
+Gaps discovered while wiring Contentia into each framework (LCMS-023). Each note is a one-time
 footgun — do it once and forget it.
 
 ### Framework adapter matrix

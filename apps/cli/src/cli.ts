@@ -6,7 +6,6 @@ import { Command } from 'effect/unstable/cli';
 import packageJson from '../package.json' with { type: 'json' };
 import {
   makeApiServerCommand,
-  makeCreateCommand,
   makeGenerateCommand,
   makeHashPasswordCommand,
   makeListBackendsCommand,
@@ -32,7 +31,7 @@ const localCommand = Command.make('local').pipe(
 
 const command = Command.make('contentia').pipe(
   Command.withDescription('The Contentia CLI.'),
-  Command.withSubcommands([makeCreateCommand(), makeApiServerCommand(), makeHashPasswordCommand(), localCommand]),
+  Command.withSubcommands([makeApiServerCommand(), makeHashPasswordCommand(), localCommand]),
 );
 
 const program = Command.run(command, { version: packageJson.version }).pipe(

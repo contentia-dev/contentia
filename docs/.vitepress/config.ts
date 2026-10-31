@@ -193,7 +193,6 @@ export default defineConfig({
           { text: 'Inner Loop', link: '/contributing/inner-loop' },
           { text: 'Landing a PR', link: '/contributing/landing-a-pr' },
           { text: 'House Style', link: '/contributing/house-style' },
-          { text: 'Starter Templates', link: '/contributing/starters' },
         ],
       },
     ],

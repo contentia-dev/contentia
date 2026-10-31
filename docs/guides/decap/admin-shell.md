@@ -26,15 +26,15 @@ shell is styled with Emotion.
 
 `@laikacms/decap-cms` ships two entry points for the admin app:
 
-| Entry point                          | Bundle includes                                       | When to use                                                               |
-| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------- |
-| `@laikacms/decap-cms` (root)         | All built-in widgets, backend, locales pre-registered | Quick setup; you just call `CMS.init()`                                   |
-| `@laikacms/decap-cms/laika-app/bare` | Nothing pre-registered                                | Only register what you use — smaller bundle; used by all curated starters |
+| Entry point                          | Bundle includes                                       | When to use                                 |
+| ------------------------------------ | ----------------------------------------------------- | ------------------------------------------- |
+| `@laikacms/decap-cms` (root)         | All built-in widgets, backend, locales pre-registered | Quick setup; you just call `CMS.init()`     |
+| `@laikacms/decap-cms/laika-app/bare` | Nothing pre-registered                                | Only register what you use — smaller bundle |
 
 The bare entry requires explicit `CMS.registerBackend(...)` and `CMS.registerWidget(...)` calls:
 
 ```typescript
-// admin/index.ts (bare approach — used by all starters)
+// admin/index.ts (bare approach)
 import createLaikaBackend from '@laikacms/decap-cms/backends/laika';
 import { CMS, init } from '@laikacms/decap-cms/laika-app/bare';
 import en from '@laikacms/decap-cms/locales/en';

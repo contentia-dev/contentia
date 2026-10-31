@@ -38,11 +38,6 @@ Use an existing triple under `packages/contentia/src` (`domain/storage`, `impl/s
 3. [Landing a PR](./landing-a-pr) — branch naming, changesets, commit convention, CI checks.
 4. [House style](./house-style) — the conventions a reviewer will hold you to.
 
-Other pages in this section:
-
-- **[Starter templates](./starters)** — status of the `starter-*` reference apps and the core
-  building blocks they demonstrated.
-
 Design decisions (ADRs, incident write-ups) are recorded internally, not on this public site.
 
 The full contribution workflow also lives in

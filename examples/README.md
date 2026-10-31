@@ -1,10 +1,5 @@
 # Contentia examples
 
-> **Runnable starters now live in [`../starters`](../starters).** The curated `starter-*` apps that
-> were briefly staged here have moved to the top-level `starters/` directory, where they ship as
-> download-and-go templates pinned to published Contentia versions (no `workspace:`/`catalog:`
-> protocols). See [`starters/README.md`](../starters/README.md).
-
 This directory retains the `pnpm-workspace.yaml` scaffolding (an isolated `examples/` workspace that
 consumes `contentia` from local source) for any future in-repo example that should build against the
 working tree rather than a published release. It currently contains no apps.

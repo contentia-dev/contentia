@@ -35,7 +35,6 @@
   ],
   "excludes": [
     "examples/**",
-    "starters/**",
     "**/node_modules",
     "**/dist",
     "**/build",

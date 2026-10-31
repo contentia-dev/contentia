@@ -26,8 +26,6 @@ export default tseslint.config(
     ignores: [
       // Standalone examples workspace — not part of this pnpm project
       'examples/**',
-      // Download-and-go starter templates — standalone, deps not installed at repo root
-      'starters/**',
       // Assembled apex site (website + docs) for Cloudflare Pages
       '**/dist/**',
       '**/dist-test/**',
@@ -53,12 +51,9 @@ export default tseslint.config(
       '**/.output/**',
       '**/.vinxi/**',
       '**/.cache/**',
-      'apps/starter-gatsby-blog/public/**',
       // Built static assets (esbuild bundles, etc.)
       '**/public/admin/bundle.js',
       '**/static/admin/bundle.js',
-      // Qwik framework server build output
-      'apps/starter-qwik-blog/server/**',
       // Other framework-generated artifact directories
       '**/.marko-run/**',
       '**/.nitro/**',

@@ -1,7 +1,7 @@
 # CLI
 
-`@contentia/cli` scaffolds new projects and runs local development workflows: a dev storage server,
-typed codegen from your CMS config, and content migrations between backends.
+`@contentia/cli` runs the Contentia API server from a config file, and local development workflows:
+a dev storage server, typed codegen from your CMS config, and content migrations between backends.
 
 The package installs one command, `contentia`. Without installing anything, run it as
 `npx @contentia/cli` or `pnpm dlx @contentia/cli`.
@@ -15,7 +15,7 @@ pnpm add -D @contentia/cli   # or npm i -D / yarn add -D / bun add -d
 Or run without installing:
 
 ```sh
-npx @contentia/cli create
+npx @contentia/cli serve --config contentia.yaml
 pnpm dlx @contentia/cli local serve
 ```
 
@@ -24,90 +24,24 @@ The CLI needs Node.js.
 ## At a glance
 
 ```sh
-contentia create                       # wizard: starter, directory, title, CMS backends/widgets/locales
+contentia serve --config contentia.yaml # the Contentia API server, from one config file
+contentia hash-password                # bcrypt hash for a user in the server config
 contentia local serve                  # serve a content folder over JSON:API on :3030
 contentia local generate --watch       # config.yaml -> typed config.gen.ts, kept fresh on save
 contentia local migrate -s ./a -d ./b  # copy all content from one storage backend to another
 contentia local list-backends          # show the storage backends migrate can use
 ```
 
-| Command               | What it does                                                         |
-| --------------------- | -------------------------------------------------------------------- |
-| `create`              | Bootstrap a new app from a starter and generate its `src/cms.ts`     |
-| `local serve`         | Start a local-file JSON:API storage server for development           |
-| `local generate`      | Generate a typed TypeScript module from the CMS config file          |
-| `local migrate`       | Copy every folder and object from one storage backend to another     |
-| `local list-backends` | List every storage backend `migrate` can use and its package version |
+| Command               | What it does                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `serve`               | Run the Contentia API from a config file (see [Server Config](../guides/server-config)) |
+| `hash-password`       | Print the bcrypt hash of a password for `auth.login.users`                              |
+| `local serve`         | Start a local-file JSON:API storage server for development                              |
+| `local generate`      | Generate a typed TypeScript module from the CMS config file                             |
+| `local migrate`       | Copy every folder and object from one storage backend to another                        |
+| `local list-backends` | List every storage backend `migrate` can use and its package version                    |
 
 Every command accepts `--help` for its full flag reference, e.g. `contentia local migrate --help`.
-
-## `create`
-
-`contentia create` is the supported way to start a Contentia app. On a terminal it walks you through
-each choice:
-
-1. **Starter**: the template to copy (skipped while only one starter is available).
-2. **Directory**: where to create the app (default `./my-contentia-app`). It must be empty or not
-   exist yet.
-3. **Site title**: written into the starter (default `My Blog`).
-4. **Package manager**: `pnpm`, `npm`, `yarn` or `bun` (default `pnpm`).
-5. **CMS**: the admin UI the app ships with (skipped while Decap is the only option).
-6. **Backends**, **widgets** and extra admin UI **locales** to register.
-
-The starter boots a bare Decap admin with nothing pre-registered, so your backend, widget and locale
-choices are written to the generated app's `src/cms.ts`, and the matching packages are added to its
-dependencies. To change them later, edit `src/cms.ts` or run the wizard again in a new directory.
-Dependencies are installed at the end unless you pass `--skip-install`.
-
-### Scripted use
-
-Every question can be answered with a flag. Questions you leave out are still asked, unless you pass
-`--yes` or the terminal is not interactive (CI, piped input); then the default is used.
-
-```sh
-contentia create --directory ./my-blog --title "My Blog" --package-manager npm \
-  --backends contentia,github --widgets string,datetime,richtext,image --locales nl,de
-
-contentia create --yes            # accept every default, no prompts
-contentia create --skip-install   # scaffold only; install dependencies yourself
-```
-
-| Flag                 | Description                                                                            |
-| -------------------- | -------------------------------------------------------------------------------------- |
-| `--directory` / `-d` | Target directory (default: `./my-contentia-app`)                                       |
-| `--starter`          | Starter template (default: `starter-astro-blog`)                                       |
-| `--name`             | `name` field in the new `package.json` (default: the directory name)                   |
-| `--title`            | Site title (default: `My Blog`)                                                        |
-| `--package-manager`  | `pnpm`, `npm`, `yarn` or `bun` (default: `pnpm`)                                       |
-| `--cms`              | CMS to scaffold (default: `decap`)                                                     |
-| `--backends`         | Comma-separated CMS backends to register (default: `contentia`)                        |
-| `--widgets`          | Comma-separated widgets to register (default: `string,datetime,richtext`)              |
-| `--locales`          | Comma-separated extra admin UI locales (default: none; `en` is always included)        |
-| `--skip-install`     | Create the app without installing dependencies                                         |
-| `--yes` / `-y`       | Accept all defaults and skip the prompts (also the behavior when there is no terminal) |
-
-### Decap choices
-
-**Backends** decide where the admin UI reads and writes content: `contentia` (the default, talks to
-a Contentia API server), `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`, `azure`,
-`git-gateway`, `aws-cognito-github-proxy`, `proxy` (a local decap-server, for development) and
-`test-repo` (in memory, for demos).
-
-**Widgets** are the field types you can use in collections: `string`, `text`, `boolean`, `number`,
-`datetime`, `select`, `object`, `list`, `relation`, `code`, `file`, `image`, `map`, `colorstring`,
-`uuid`, `lucide-icon`, `radix-icon`, `aichat` and `richtext`. `richtext` is also registered under
-the name `markdown`, so existing Decap configs that use `widget: markdown` keep working.
-
-**Locales**: `bg`, `ca`, `cs`, `da`, `de`, `es`, `fa`, `fr`, `gr`, `he`, `hr`, `hu`, `it`, `ja`,
-`ko`, `lt`, `mk`, `nb_no`, `nl`, `nn_no`, `pl`, `pt`, `ro`, `ru`, `sk`, `sl`, `sr_Cyrl`, `sv`, `th`,
-`tr`, `ua`, `uk`, `vi`, `zh_Hans`, `zh_Hant`.
-
-A CMS backend (where the admin UI sends content) is a different thing from a storage backend (what
-`local migrate` copies between). See the [Decap guide](../guides/decap/index.md) for how the two fit
-together.
-
-When pnpm skips dependency build scripts during install, `create` prints a warning. Run
-`pnpm approve-builds` in the new app to review and run them.
 
 ## `local serve`
 
@@ -325,12 +259,7 @@ Notes:
 Everything the CLI does is also exported from the package, for use in your own scripts:
 
 ```ts
-import {
-  bootstrapApplication,
-  generateConfig,
-  layerStorageServer,
-  runMigrate,
-} from '@contentia/cli';
+import { generateConfig, layerStorageServer, runMigrate } from '@contentia/cli';
 
 // Run a migration from a script, with your own progress handling
 const result = await runMigrate({
@@ -346,7 +275,6 @@ console.log(`${result.objectsCopied} copied, ${result.errors.length} errors`);
 
 | Export                                     | Use it to                                                     |
 | ------------------------------------------ | ------------------------------------------------------------- |
-| `bootstrapApplication`                     | Scaffold an app, the same as `create`                         |
 | `layerStorageServer`                       | Serve any storage repository the way `local serve` does       |
 | `generateConfig`, `loadConfig`             | Generate or load the typed CMS config                         |
 | `runMigrate`, `loadMigrateConfig`          | Run a migration from a config object or file                  |

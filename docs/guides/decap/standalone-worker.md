@@ -186,6 +186,3 @@ const api = contentiaApi({
 
 export const contentia = api;
 ```
-
-The `starter-webdav-blog` example (a complete WebDAV setup including an embedded local-dev WebDAV
-server) was moved out of this monorepo in June 2026.

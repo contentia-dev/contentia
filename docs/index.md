@@ -55,7 +55,7 @@ provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:
   <tr><td>Drafts and publishing</td><td>Revision history</td></tr>
   <tr><td>Linked assets and image variants</td><td>Conflict detection and locks</td></tr>
   <tr><td>OAuth2, passkeys and 2FA</td><td>Upload sanitization</td></tr>
-  <tr><td>Astro, Vite and Decap integrations</td><td>Starters and CLI bootstrapping</td></tr>
+  <tr><td>Astro, Vite and Decap integrations</td><td>API server from one config file</td></tr>
 </table>
 
 <!--@include: ./.vitepress/adapters/logos.md-->

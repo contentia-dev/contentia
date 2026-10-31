@@ -2,12 +2,7 @@
 
 A condensed entry point for anyone (LLM or human) bootstrapping with Contentia in under five
 minutes. If you're a coding agent dropped into a repo that wants to use Contentia, **read this
-first**, then [`docs/contributing/starters.md`](./docs/contributing/starters.md), then the specific
-docs you need.
-
-Six curated starters live in [`starters/`](./starters/README.md) in this monorepo. Create a new
-project with `npx @contentia/cli create` — see
-[`docs/contributing/starters.md`](./docs/contributing/starters.md).
+first**, then the specific docs you need.
 
 ---
 
@@ -193,10 +188,8 @@ export default app;
 ### d) Use the HTTP API from a SPA (Vue/Solid/Lit/React-SPA)
 
 **Don't.** Use a sidecar Node/Workers backend that exposes `/api/posts` etc. as public endpoints
-(reading the repo directly), and have the SPA `fetch('/api/posts')`. See
-[docs/contributing/starters.md](./docs/contributing/starters.md) for the canonical sidecar pattern
-(five curated starters live in [`starters/`](./starters/README.md); `npx @contentia/cli create` is
-the entry point).
+(reading the repo directly), and have the SPA `fetch('/api/posts')`. Section 2a has the wiring for
+such a backend.
 
 Why: the Contentia HTTP API requires a Bearer token on every endpoint except `/health`. SPAs can't
 safely hold one.
@@ -321,8 +314,6 @@ These are the things that consistently bite first-time integrators:
    front of `/api/decap/*`.**
    - The web-standard adapter streams the raw body to `contentia.fetch`. Body parsers drain it
      first.
-   - The Express/Fastify/Koa starters all have a custom adapter (`*-fetch-adapter.ts`) that handles
-     the conversion correctly.
 
 3. **`contentia/storage-fs` is NOT a separate package on npm.**
    - It's a subpath export of `contentia`. Use
@@ -445,13 +436,7 @@ These are the things that consistently bite first-time integrators:
 
 ---
 
-## 5. Decision tree
-
-> "I need to build X. Which pattern should I use?"
-
-The `starter-*` names below identify the **pattern**. The six curated starters live in
-[`starters/`](./starters/README.md) and are scaffolded via `npx @contentia/cli create`. For the two
-canonical starting points, use the in-repo quickstart guides directly:
+## 5. Where to start
 
 - **Minimal Node example** →
   [docs/guides/decap/quickstart-fs.md](./docs/guides/decap/quickstart-fs.md)
@@ -459,61 +444,16 @@ canonical starting points, use the in-repo quickstart guides directly:
 - **Minimal edge example** →
   [docs/guides/decap/standalone-worker.md](./docs/guides/decap/standalone-worker.md)
   (`R2StorageRepository` + Hono + Cloudflare Workers Assets)
+- **No server code at all** → `contentia serve --config` runs the API from one config file; see
+  [docs/guides/server-config.md](./docs/guides/server-config.md)
+- **Astro** → `@contentia/astro` (Content Layer loaders, dev JSON:API, live collections, Zod schema)
+- **AI assistant in the editor** → mount `@contentia/server/ai` (section 2f) and wire the Dulla
+  transport in `@laikacms/decap-cms-llm-dulla`
 - **Inline wiring code** → sections 2a (Node) and 2c (Workers/R2) above have copy-paste-ready code
-
-```
-┌─ Building a public website? ─────────────────────────────────────┐
-│                                                                  │
-│  React?           → starter-next-blog pattern (App Router SSR)    │
-│  Vue?             → starter-nuxt-blog pattern                     │
-│  Svelte?          → starter-sveltekit-blog pattern                │
-│  Solid?           → starter-solid-start pattern                   │
-│  Qwik?            → starter-qwik-blog pattern                     │
-│  Astro?           → @contentia/astro (Content Layer loaders, dev   │
-│                     JSON:API, live collections, Zod schema) +     │
-│                     starter-astro-blog pattern                    │
-│  Eleventy/static? → starter-eleventy-jamstack pattern             │
-│  TanStack Router? → starter-tanstack-blog pattern                 │
-│  Marko?           → starter-marko-blog pattern                    │
-│  Hypermedia/HTMX? → starter-htmx-hono pattern                     │
-│  Web Components?  → starter-lit-spa pattern                       │
-│  Just want SPA?   → starter-vite-vue-spa or vite-solid-spa pattern│
-└──────────────────────────────────────────────────────────────────┘
-
-┌─ Building a backend API (no public UI)? ─────────────────────────┐
-│                                                                  │
-│  Hono on Node?        → starter-hono-backend pattern              │
-│  Express?             → starter-express-backend pattern           │
-│  Fastify?             → starter-fastify-backend pattern           │
-│  Koa?                 → starter-koa-backend pattern               │
-│  Bun runtime?         → starter-bun-backend pattern               │
-│  Deno runtime?        → starter-deno-backend pattern              │
-│  Effect Platform?     → starter-effect-platform-blog pattern      │
-└──────────────────────────────────────────────────────────────────┘
-
-┌─ Deploying to edge/serverless? ──────────────────────────────────┐
-│                                                                  │
-│  Cloudflare Workers? → quickstart-fs.md§c / standalone-worker.md  │
-│  AWS Lambda?         → starter-lambda-blog pattern               │
-│  Vercel Edge?        → starter-vercel-edge pattern (PoC)         │
-│  Netlify Functions?  → starter-netlify-functions pattern (dev)   │
-└──────────────────────────────────────────────────────────────────┘
-
-┌─ Adding an AI assistant to the editor? ──────────────────────────┐
-│                                                                  │
-│  → mount @contentia/server/ai (section 2f above)                  │
-│    + wire the Dulla transport in @laikacms/decap-cms-llm-dulla   │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-If your target isn't listed: pick the closest pattern and copy the wiring from sections 2a–2f above,
-or from the `quickstart-fs.md` / `standalone-worker.md` guides in `docs/guides/decap/`.
 
 ---
 
 ## 6. What to do when this guide is wrong
 
 This file lives in the repo because Contentia evolves. If you (LLM or human) followed an instruction
-here and it didn't work — **update this file in the same PR**. The doc-improvement loop that
-maintains the starters also maintains this guide. See `docs/contributing/starters.md` for the
-"continuous documentation audit" philosophy.
+here and it didn't work — **update this file in the same PR**.

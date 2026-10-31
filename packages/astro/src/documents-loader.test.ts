@@ -6,7 +6,7 @@
  * - `InMemoryDocumentsRepository`, which advertises version tracking *and* a
  *   change feed — the fully-capable end.
  * - `CatalogDocumentsRepository` over a real filesystem repository, which
- *   advertises neither. This is the zero-config path every starter uses, and
+ *   advertises neither. This is the zero-config path most sites use, and
  *   the reason the digest tier exists.
  *
  * Running the same expectations over both is what makes "degrades cleanly" a

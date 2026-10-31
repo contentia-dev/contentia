@@ -38,7 +38,6 @@ catalogs:
     "effect": "4.0.0-beta.104"
     "es-module-lexer": "^2.3.1"
     "gray-matter": "^4.0.3"
-    "import-meta-resolve": "^4.2.0"
     "js-yaml": "^5.2.1"
     "jsonwebtoken": "^9.0.3"
     "jwt-decode": "^4.0.0"
