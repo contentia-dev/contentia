@@ -62,6 +62,7 @@
     "@types/node": "catalog:types",
     "hono": "catalog:server",
     "contentia": "workspace:*",
+    "@contentia/server": "workspace:*",
     "rimraf": "catalog:tools",
     "tsup": "catalog:tools",
     "typescript": "catalog:tools",

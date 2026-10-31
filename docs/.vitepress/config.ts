@@ -99,6 +99,7 @@ export default defineConfig({
           { text: 'Overview', link: '/guides/' },
           { text: 'Getting Started', link: '/guides/getting-started' },
           { text: 'API Server', link: '/guides/api-server' },
+          { text: 'Server Config', link: '/guides/server-config' },
         ],
       },
       {

@@ -5,7 +5,10 @@ import * as Effect from 'effect/Effect';
 import { identity } from 'effect/Function';
 import * as Layer from 'effect/Layer';
 import * as Logger from 'effect/Logger';
+import * as Redacted from 'effect/Redacted';
 import { Command, Flag, Prompt } from 'effect/unstable/cli';
+
+import { hashPassword } from 'contentia/crypto';
 
 import { bootstrapApplication, type PackageManager, STARTERS } from './bootstrap.js';
 import { cmsAdapters, DEFAULT_CMS_ADAPTER, findCmsAdapter } from './cms/registry.js';
@@ -14,7 +17,9 @@ import { buildStorageRepository, storageDrivers } from './drivers/registry.js';
 import type { BackendSpec, MigrateConfig } from './drivers/types.js';
 import { loadMigrateConfig, runMigrate } from './migrate-runner.js';
 import type { MigrateEvent } from './migrate.js';
-import { layerStorageServer } from './server.js';
+import { buildServerApi, describeServerConfig, serverConfigWarnings } from './serve/build.js';
+import { loadServerConfig } from './serve/config.js';
+import { layerFetchServer, layerStorageServer } from './server.js';
 import { watchFile } from './watch.js';
 
 const createDirectory = Flag.directory('directory').pipe(
@@ -441,6 +446,86 @@ export const makeServeCommand = (name = 'serve', binName = 'contentia local') =>
   );
 
 export const serveCommand = makeServeCommand();
+
+// ---------------------------------------------------------------------------
+// Top-level `serve` — the Contentia API server for deployments (containers,
+// VMs). Everything comes from one config file; unlike `local serve` it never
+// prompts and never installs packages.
+// ---------------------------------------------------------------------------
+
+const apiServerConfig = Flag.string('config').pipe(
+  Flag.withAlias('c'),
+  Flag.withDescription('Server config file, .yaml/.yml/.json (or set CONTENTIA_CONFIG)'),
+  Flag.withFallbackConfig(Config.string('CONTENTIA_CONFIG')),
+);
+
+const apiServerCheck = Flag.boolean('check').pipe(
+  Flag.withDescription('Validate the config and build every repository, then exit without listening'),
+  Flag.withDefault(false),
+);
+
+const toError = (e: unknown): Error => e instanceof Error ? e : new Error(String(e));
+
+export const makeApiServerCommand = (name = 'serve', binName = 'contentia') =>
+  Command.make(
+    name,
+    { config: apiServerConfig, check: apiServerCheck },
+    flags =>
+      Effect.gen(function*() {
+        const config = yield* Effect.tryPromise({ try: () => loadServerConfig(flags.config), catch: toError });
+        const api = yield* Effect.tryPromise({ try: () => buildServerApi(config), catch: toError });
+        const summary = describeServerConfig(config);
+        for (const warning of serverConfigWarnings(config)) yield* Effect.logWarning(`${binName} ${name}: ${warning}`);
+        if (flags.check) {
+          yield* Effect.logInfo(`${binName} ${name}: config OK (${summary})`);
+          return;
+        }
+        yield* Layer.launch(layerFetchServer({
+          fetch: request => api.fetch(request),
+          port: config.listen.port,
+          host: config.listen.host,
+          onListening: url => Effect.logInfo(`${binName} ${name}: ${summary} on ${url}${config.basePath}`),
+        }));
+      }),
+  ).pipe(
+    Command.withDescription(
+      'Run the Contentia API server from a config file: storage backend, auth (OIDC, test logins, API keys) and scopes.',
+    ),
+  );
+
+export const apiServerCommand = makeApiServerCommand();
+
+/** All of stdin, minus the line ending `echo` or a heredoc adds. */
+const readStdin = async (): Promise<string> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString('utf8').replace(/\r?\n$/, '');
+};
+
+/**
+ * `hash-password`: the bcrypt hash for a user's `passwordHash` in
+ * `auth.login.users`. Prompts (twice, hidden) on a terminal; otherwise reads
+ * the password from stdin, so it never appears in shell history or `ps`.
+ */
+export const makeHashPasswordCommand = (name = 'hash-password', binName = 'contentia') =>
+  Command.make(name, {}, () =>
+    Effect.gen(function*() {
+      let password: string;
+      if (process.stdin.isTTY === true) {
+        password = Redacted.value(yield* Prompt.password({ message: 'Password' }));
+        const repeated = Redacted.value(yield* Prompt.password({ message: 'Repeat password' }));
+        if (password !== repeated) return yield* Effect.fail(new Error(`${binName} ${name}: passwords don't match`));
+      } else {
+        password = yield* Effect.promise(readStdin);
+      }
+      if (password === '') return yield* Effect.fail(new Error(`${binName} ${name}: the password is empty`));
+      const hash = yield* Effect.tryPromise({ try: () => hashPassword(password), catch: toError });
+      process.stdout.write(`${hash}\n`);
+    })).pipe(
+      Command.withDescription(
+        'Print the bcrypt hash of a password for auth.login.users in the server config (reads stdin when piped).',
+      ),
+    );
 
 // ---------------------------------------------------------------------------
 // `generate` subcommand — codegen typed TS from the CMS's config file.

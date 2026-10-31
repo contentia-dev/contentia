@@ -83,10 +83,58 @@ export const layerStorageServer = (
   options: StorageServerOptions,
 ): Layer.Layer<never, HttpServerError.ServeError> => {
   const host = options.host ?? '127.0.0.1';
-  const Routes = buildRoutes(options);
-  const App = Layer.mergeAll(Routes, HttpRouter.cors());
-  const { onListening } = options;
-  const Ready = onListening
+  const App = Layer.mergeAll(buildRoutes(options), HttpRouter.cors());
+  // `onListening` replaces the router's own "Listening on" log line.
+  return Layer.mergeAll(
+    HttpRouter.serve(App, { disableListenLog: options.onListening !== undefined }),
+    layerOnListening(host, options.onListening),
+  ).pipe(
+    Layer.provide(NodeHttpServer.layer(createServer, { port: options.port, host })),
+  );
+};
+
+export interface FetchServerOptions {
+  /** A Fetch API handler, e.g. `contentiaApi(...).fetch`. It owns auth and CORS. */
+  fetch: (request: Request) => Promise<Response>;
+  /** Listen port. `0` picks a free port; read it back via `onListening`. */
+  port: number;
+  /** Listen host. Defaults to `127.0.0.1`. */
+  host?: string;
+  /** Called once the socket is bound, with the base URL clients should use. */
+  onListening?: (url: string) => Effect.Effect<void>;
+}
+
+/**
+ * Layer that serves a Fetch API handler on Node until interrupted. Unlike
+ * {@link layerStorageServer} it adds no auth or CORS of its own.
+ */
+export const layerFetchServer = (
+  options: FetchServerOptions,
+): Layer.Layer<never, HttpServerError.ServeError> => {
+  const host = options.host ?? '127.0.0.1';
+  const Routes = HttpRouter.add(
+    '*',
+    '/*',
+    Effect.fn('fetch-server.handle')(function*(request: HttpServerRequest.HttpServerRequest) {
+      const webReq = yield* HttpServerRequest.toWeb(request);
+      const webRes = yield* Effect.promise(() => options.fetch(webReq));
+      return HttpServerResponse.fromWeb(webRes);
+    }),
+  );
+  return Layer.mergeAll(
+    HttpRouter.serve(Routes, { disableListenLog: options.onListening !== undefined }),
+    layerOnListening(host, options.onListening),
+  ).pipe(
+    Layer.provide(NodeHttpServer.layer(createServer, { port: options.port, host })),
+  );
+};
+
+/** Report the bound URL once the socket is listening; a no-op without a callback. */
+const layerOnListening = (
+  host: string,
+  onListening: ((url: string) => Effect.Effect<void>) | undefined,
+): Layer.Layer<never, never, HttpServer.HttpServer> =>
+  onListening
     ? Layer.effectDiscard(Effect.gen(function*() {
       const { address } = yield* HttpServer.HttpServer;
       // `address.hostname` is what the socket reports (e.g. `::1`); the host the
@@ -97,8 +145,3 @@ export const layerStorageServer = (
       yield* onListening(url);
     }))
     : Layer.empty;
-  // `onListening` replaces the router's own "Listening on" log line.
-  return Layer.mergeAll(HttpRouter.serve(App, { disableListenLog: onListening !== undefined }), Ready).pipe(
-    Layer.provide(NodeHttpServer.layer(createServer, { port: options.port, host })),
-  );
-};

@@ -6,6 +6,8 @@ Task-oriented walkthroughs for getting Contentia running and wired into your sta
 
 - **[Getting Started](./getting-started)** — the progressive path: read/write content in the
   browser, stand up a secure-by-default server, or compile content at build time for a static site.
+- **[Server Config](./server-config)** — run the Contentia API from one config file: any storage
+  backend, your own OAuth/OIDC provider, API keys.
 
 ## Integrations
 

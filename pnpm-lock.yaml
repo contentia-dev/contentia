@@ -260,6 +260,9 @@ importers:
         specifier: catalog:default
         version: 8.21.1
     devDependencies:
+      '@contentia/server':
+        specifier: workspace:*
+        version: link:../../packages/server
       '@hono/node-server':
         specifier: ^2.0.2
         version: 2.0.10(hono@4.12.31)

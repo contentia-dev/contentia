@@ -1,5 +1,27 @@
-export { layerStorageServer } from './server.js';
-export type { StorageServerOptions } from './server.js';
+export { layerFetchServer, layerStorageServer } from './server.js';
+export type { FetchServerOptions, StorageServerOptions } from './server.js';
+
+export { buildServerApi, describeServerConfig, serverConfigWarnings } from './serve/build.js';
+export type { BuildServerApiOptions } from './serve/build.js';
+export { loadServerConfig, parseServerConfig } from './serve/config.js';
+export type {
+  ApiKeyConfig,
+  AuthConfig,
+  CatalogConfig,
+  LoginConfig,
+  LoginUserConfig,
+  OidcConfig,
+  ServerConfig,
+  ServerConfigDefaults,
+} from './serve/config.js';
+export { interpolateConfig } from './serve/interpolate.js';
+export type { InterpolateOptions } from './serve/interpolate.js';
+export { createServerLogger } from './serve/logger.js';
+export type { ServerLogger } from './serve/logger.js';
+export { createLoginServer, LOGIN_BASE_PATH } from './serve/login.js';
+export type { LoginServer } from './serve/login.js';
+export { createJwtVerifier, JwtVerificationError, SUPPORTED_ALGORITHMS } from './serve/oidc.js';
+export type { JwtAlgorithm, JwtClaims, JwtVerifierOptions } from './serve/oidc.js';
 
 export { discoverConfig, generateConfig, loadConfig, serialize, writeGenerated } from './cms/decap-config.js';
 export type { SerializeOptions } from './cms/decap-config.js';
@@ -23,11 +45,14 @@ export type { BootstrapOptions, BootstrapResult, PackageManager, StarterName } f
 export { watchFile } from './watch.js';
 
 export {
+  apiServerCommand,
   createCommand,
   generateCommand,
   listBackendsCommand,
+  makeApiServerCommand,
   makeCreateCommand,
   makeGenerateCommand,
+  makeHashPasswordCommand,
   makeListBackendsCommand,
   makeMigrateCommand,
   makeServeCommand,
