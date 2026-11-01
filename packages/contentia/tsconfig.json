@@ -161,8 +161,8 @@
       "contentia/server/oauth2/i18n/nl": [
         "src/server/oauth2/i18n/translations/nl.ts"
       ],
-      "contentia/server/embedded": [
-        "src/server/embedded/index.ts"
+      "contentia/server/decap": [
+        "src/server/decap/index.ts"
       ],
       "contentia/server/ai": [
         "src/server/ai/index.ts"

@@ -461,10 +461,10 @@
       "import": "./dist/server/oauth2/i18n/translations/nl.js",
       "default": "./dist/server/oauth2/i18n/translations/nl.js"
     },
-    "./server/embedded": {
-      "types": "./dist/server/embedded/index.d.ts",
-      "import": "./dist/server/embedded/index.js",
-      "default": "./dist/server/embedded/index.js"
+    "./server/decap": {
+      "types": "./dist/server/decap/index.d.ts",
+      "import": "./dist/server/decap/index.js",
+      "default": "./dist/server/decap/index.js"
     },
     "./server/ai": {
       "types": "./dist/server/ai/index.d.ts",

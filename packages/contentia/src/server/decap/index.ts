@@ -82,14 +82,15 @@ const defaultSerializers = {
  * @example
  * ```ts
  * import { resolve } from 'node:path';
- * import { createEmbeddedContentia } from 'contentia/server/embedded';
+ * import { createEmbeddedContentia } from 'contentia/server/decap';
  *
  * const contentia = createEmbeddedContentia({
  *   contentDir: resolve(process.cwd(), 'content'),
  *   basePath: '/api/decap',
  *   auth: { mode: 'dev' },
  *   decapConfig: {
- *     backend: { name: 'laika', api_root: '/api/decap' },
+ *     // `name` is whatever your Contentia-speaking Decap backend is registered as.
+ *     backend: { name: 'contentia', api_root: '/api/decap' },
  *     media_folder: 'uploads',
  *     public_folder: '/uploads',
  *     collections: [...],

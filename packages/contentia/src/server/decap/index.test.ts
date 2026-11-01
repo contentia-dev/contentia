@@ -26,7 +26,7 @@ function makeRequest(apiPath: string, headers: Record<string, string> = {}): Req
 }
 
 const DEFAULT_DECAP_CONFIG = {
-  backend: { name: 'laika', api_url: '/api/decap' },
+  backend: { name: 'contentia', api_url: '/api/decap' },
   media_folder: 'public/uploads',
   collections: [],
 };
@@ -231,7 +231,7 @@ async function findConfigFile(dir: string): Promise<string | null> {
 
 describe('config seeding', () => {
   it('creates config.yml in contentDir after ensureReady() without any fetch()', async () => {
-    const decapConfig = { backend: { name: 'laika' }, collections: [{ name: 'posts' }] };
+    const decapConfig = { backend: { name: 'contentia' }, collections: [{ name: 'posts' }] };
     const { ensureReady } = makeEmbedded({ decapConfig });
 
     await ensureReady();
@@ -242,7 +242,7 @@ describe('config seeding', () => {
   });
 
   it('creates config.yml in contentDir on the first fetch() when none is present', async () => {
-    const decapConfig = { backend: { name: 'laika' }, collections: [{ name: 'posts' }] };
+    const decapConfig = { backend: { name: 'contentia' }, collections: [{ name: 'posts' }] };
     const { fetch } = makeEmbedded({ decapConfig });
 
     await fetch(makeRequest('/api/decap/health'));
@@ -253,7 +253,7 @@ describe('config seeding', () => {
   });
 
   it('seeded config file content encodes the decapConfig object', async () => {
-    const decapConfig = { backend: { name: 'laika' }, collections: [{ name: 'posts' }] };
+    const decapConfig = { backend: { name: 'contentia' }, collections: [{ name: 'posts' }] };
     const { ensureReady } = makeEmbedded({ decapConfig });
 
     await ensureReady();
@@ -261,7 +261,7 @@ describe('config seeding', () => {
     const seeded = await findConfigFile(tmpDir);
     expect(seeded).not.toBeNull();
     const raw = await fs.readFile(seeded!, 'utf8');
-    expect(raw).toContain('laika');
+    expect(raw).toContain('contentia');
     expect(raw).toContain('posts');
   });
 
