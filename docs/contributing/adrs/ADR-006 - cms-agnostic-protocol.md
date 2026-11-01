@@ -47,9 +47,9 @@ model are wrong, and this ADR is the place to point them: Contentia wraps their 
 replace it. A database is just a storage repository with no folders where the IDs are keys.
 
 **Seam 2: protocol to CMS.** Each CMS gets its own adapter that makes the opinionated choices about
-which fields and conventions it expects. For Decap that adapter is the contentia backend in the
-decap-cms repo (`packages/decap-cms/src/backends/laika/`). Another CMS frontend would get its own
-adapter with its own (probably different) opinions.
+which fields and conventions it expects. For Decap that adapter is a Decap backend in the decap-cms
+fork, outside this repo. Another CMS frontend would get its own adapter with its own (probably
+different) opinions.
 
 ## Consequences
 

@@ -1,31 +1,32 @@
 # Framework setup notes
 
-Gaps discovered while wiring Contentia into each framework (LCMS-023). Each note is a one-time
-footgun — do it once and forget it.
+How to mount a Contentia `fetch` handler ([`contentiaApi`](./api-server), `buildJsonApi`, or the
+OAuth2 server) in each framework, plus the gaps found while wiring it in. Each note is a one-time
+footgun: do it once and forget it.
 
 ### Framework adapter matrix
 
 `contentia.fetch` (and `api.fetch`) expects a **Web API `Request`**. The table below shows what each
 framework gives you at the route handler boundary and whether you need a bridge.
 
-| Framework                         | What you receive                                 | Bridge needed?                                                                                                                          |
-| --------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **Astro**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                                                        |
-| **SvelteKit**                     | Web API `Request`                                | None — pass directly: `contentia.fetch(event.request)`                                                                                  |
-| **Remix**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                                                        |
-| **Next.js (App Router)**          | `NextRequest` (extends Web API `Request`)        | None — pass directly: `contentia.fetch(request)`                                                                                        |
-| **Hono**                          | Hono `HonoRequest` wrapper                       | None — use `c.req.raw`: `contentia.fetch(c.req.raw)`                                                                                    |
-| **TanStack Start**                | Web API `Request`                                | None — pass directly from the server route handler                                                                                      |
-| **Cloudflare Workers**            | Web API `Request`                                | None — Workers environment is spec-compliant                                                                                            |
-| **Nuxt / h3**                     | h3 `H3Event`                                     | `toWebRequest(event)` from `h3`: `contentia.fetch(toWebRequest(event))`                                                                 |
-| **Express / plain `http.Server`** | Node.js `IncomingMessage`                        | Manual bridge — see [Express bridge](#express--plain-httpserver--manual-bridge) below                                                   |
-| **AdonisJS v6**                   | AdonisJS `HttpContext` (wraps `IncomingMessage`) | `ctx.request.request` + `ctx.response.response` — same Express bridge in a controller                                                   |
-| **NestJS (Express adapter)**      | Node.js `IncomingMessage` (via Express)          | Manual bridge in `NestMiddleware.use(req, res)` — same as Express                                                                       |
-| **FoalTS v4**                     | FoalTS `Context` (Express-based)                 | Wrap FoalTS app inside bare Express; use `express.raw()` before mounting FoalTS — see [FoalTS](#foalts-v4--outer-express-wrapper) below |
-| **Fastify**                       | Fastify `FastifyRequest`                         | `request.raw` → same Express bridge inside a Fastify route handler                                                                      |
-| **AWS Lambda (via http bridge)**  | Lambda event object                              | Manual bridge — convert Lambda event → WHATWG `Request` before passing to `contentia.fetch`                                             |
+| Framework                         | What you receive                                 | Bridge needed?                                                                                                |
+| --------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **Astro**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                              |
+| **SvelteKit**                     | Web API `Request`                                | None — pass directly: `contentia.fetch(event.request)`                                                        |
+| **Remix**                         | Web API `Request`                                | None — pass directly: `contentia.fetch(request)`                                                              |
+| **Next.js (App Router)**          | `NextRequest` (extends Web API `Request`)        | None — pass directly: `contentia.fetch(request)`                                                              |
+| **Hono**                          | Hono `HonoRequest` wrapper                       | None — use `c.req.raw`: `contentia.fetch(c.req.raw)`                                                          |
+| **TanStack Start**                | Web API `Request`                                | None — pass directly from the server route handler                                                            |
+| **Cloudflare Workers**            | Web API `Request`                                | None — Workers environment is spec-compliant                                                                  |
+| **Nuxt / h3**                     | h3 `H3Event`                                     | `toWebRequest(event)` from `h3`: `contentia.fetch(toWebRequest(event))`                                       |
+| **Express / plain `http.Server`** | Node.js `IncomingMessage`                        | Manual bridge — see [Express bridge](#express-bridge) below                                                   |
+| **AdonisJS v6**                   | AdonisJS `HttpContext` (wraps `IncomingMessage`) | `ctx.request.request` + `ctx.response.response` — same Express bridge in a controller                         |
+| **NestJS (Express adapter)**      | Node.js `IncomingMessage` (via Express)          | Manual bridge in `NestMiddleware.use(req, res)` — same as Express                                             |
+| **FoalTS v4**                     | FoalTS `Context` (Express-based)                 | Wrap FoalTS app inside bare Express; use `express.raw()` before mounting FoalTS — see [FoalTS](#foalts) below |
+| **Fastify**                       | Fastify `FastifyRequest`                         | `request.raw` → same Express bridge inside a Fastify route handler                                            |
+| **AWS Lambda (via http bridge)**  | Lambda event object                              | Manual bridge — convert Lambda event → WHATWG `Request` before passing to `contentia.fetch`                   |
 
-### Express / plain `http.Server` — manual bridge
+### Express / plain `http.Server` — manual bridge {#express-bridge}
 
 Express and the raw Node.js `http` module use `IncomingMessage` / `ServerResponse`, which predate
 the Web API. You must construct a WHATWG `Request` manually and pipe the response back:
@@ -76,7 +77,7 @@ async function bridgeToContentia(
 Wire it into Express:
 
 ```ts
-app.all('/api/decap/*', (req, res) => bridgeToContentia(req, res, contentia));
+app.all('/api/*', (req, res) => bridgeToContentia(req, res, contentia));
 ```
 
 ### TypeScript 6 — `BodyInit` regression with `Buffer` / `Uint8Array`
@@ -108,7 +109,7 @@ The `.buffer` property of a `Buffer` is the **underlying shared** `ArrayBuffer`;
 VitePress and Docusaurus both run Node.js-based dev servers (Vite's Connect middleware and
 webpack-dev-server respectively). You must register `contentia.fetch` as a middleware rather than a
 route handler, which means you get `IncomingMessage`/`ServerResponse` — not a Web API `Request`. Use
-the same manual bridge as the [Express section](#express--plain-httpserver--manual-bridge).
+the same manual bridge as the [Express section](#express-bridge).
 
 **VitePress** — use a Vite plugin with `configureServer`:
 
@@ -120,9 +121,9 @@ import { contentia } from '../src/contentia.js';
 export default defineConfig({
   vite: {
     plugins: [{
-      name: 'contentia-decap-api',
+      name: 'contentia-api',
       configureServer(server) {
-        server.middlewares.use('/api/decap', async (req, res) => {
+        server.middlewares.use('/api', async (req, res) => {
           // Connect IncomingMessage → Web Request bridge (req.url is path-only)
           const url = `http://${req.headers.host}${req.url}`;
           const chunks: Buffer[] = [];
@@ -150,7 +151,7 @@ export default defineConfig({
 ```
 
 This approach means your VitePress `contentDir` and the Contentia `contentDir` can be the same
-folder — Decap CMS writes markdown files that VitePress renders directly.
+folder: markdown written through the API is the markdown VitePress renders.
 
 **Docusaurus v3** — use `configureWebpack` (not `configureDevServer`):
 
@@ -164,14 +165,14 @@ import type { Plugin } from '@docusaurus/types';
 
 export default function contentiaPlugin(): Plugin {
   return {
-    name: 'contentia-decap-api',
+    name: 'contentia-api',
     configureWebpack(_config, isServer) {
       if (isServer) return;
       return {
         devServer: {
           // webpack-dev-server v5: setupMiddlewares replaces the old before/after hooks
           setupMiddlewares(middlewares: any[], devServer: any) {
-            devServer.app.use('/api/decap', async (req: any, res: any) => {
+            devServer.app.use('/api', async (req: any, res: any) => {
               // IncomingMessage → Web Request bridge (req.url is path-only)
               const url = `http://${req.headers.host}${req.url}`;
               const chunks: Buffer[] = [];
@@ -260,33 +261,6 @@ import { collectStream, runTask } from 'contentia/compat';
 import { collectStream, runTask } from 'contentia/core';
 ```
 
-### Next.js (App Router) — admin page must be a client component
-
-The `/admin` page must be a `'use client'` component that injects the Decap CDN script via
-`useEffect`. There is no server-rendered equivalent: `next/script` with
-`strategy="beforeInteractive"` does not work for third-party CDN scripts in Server Components.
-
-```tsx
-// app/admin/page.tsx
-'use client';
-
-import { useEffect } from 'react';
-
-export default function AdminPage() {
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/decap-cms@^3/dist/decap-cms.js';
-    script.async = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  return <div id="nc-root" />;
-}
-```
-
 ### AdonisJS v6 — access the raw Node.js request via `ctx.request.request`
 
 AdonisJS v6 is **ESM-native** — it can import `contentia` (including `contentia/server/*`) directly
@@ -295,11 +269,11 @@ without the dynamic `import()` workaround required by CommonJS frameworks like N
 AdonisJS wraps `IncomingMessage` in its own `Request` class. The raw Node.js objects are:
 
 ```ts
-// app/controllers/decap_controller.ts
+// app/controllers/contentia_controller.ts
 import type { HttpContext } from '@adonisjs/core/http';
 import { Readable } from 'node:stream';
 
-export default class DecapController {
+export default class ContentiaController {
   async proxy({ request, response }: HttpContext) {
     const req = request.request; // raw IncomingMessage
     const res = response.response; // raw ServerResponse
@@ -340,19 +314,19 @@ Wire the catch-all route in `start/routes.ts`:
 
 ```ts
 import router from '@adonisjs/core/services/router';
-const DecapController = () => import('#controllers/decap_controller');
-router.any('/api/decap/*', [DecapController, 'proxy']);
+const ContentiaController = () => import('#controllers/contentia_controller');
+router.any('/api/*', [ContentiaController, 'proxy']);
 ```
 
-### FoalTS v4 — outer Express wrapper
+### FoalTS v4 — outer Express wrapper {#foalts}
 
 FoalTS v4 is a **decorator-based TypeScript MVC** framework that uses Express internally. Its
 `createApp` function registers the body parser as part of the app bootstrap — you cannot add
 middleware to the resulting app that runs _before_ the body parser.
 
-For the Decap proxy you need the raw binary body (for file uploads etc.). The solution is to wrap
-the FoalTS app inside a **plain Express app**, register `express.raw()` there first, then mount
-FoalTS beneath it:
+To forward requests to Contentia you need the raw binary body (for file uploads etc.). The solution
+is to wrap the FoalTS app inside a **plain Express app**, register `express.raw()` there first, then
+mount FoalTS beneath it:
 
 ```ts
 // src/index.ts
@@ -369,7 +343,7 @@ const outer = express();
 
 // express.raw() runs BEFORE FoalTS body parser because FoalTS is mounted after.
 outer.use(
-  '/api/decap',
+  '/api',
   express.raw({ type: '*/*', limit: '50mb' }),
   async (req, res) => {
     const url = `http://localhost:${PORT}${req.originalUrl}`;
@@ -399,8 +373,8 @@ http.createServer(outer).listen(PORT);
 ```
 
 FoalTS controllers return `HttpResponse` objects and use `@Get`/`@Post`/`@All` decorators. Because
-they sit behind the Decap proxy in the Express chain, the CMS never reaches FoalTS routing and the
-body parser issue is bypassed entirely.
+they sit behind the Contentia route in the Express chain, API requests never reach FoalTS routing
+and the body parser issue is bypassed entirely.
 
 ### SvelteKit — `src/app.html` is required
 
@@ -441,12 +415,12 @@ level, not per-request:
 
 ```ts
 // src/lib/contentia.ts
-import { CatalogAssetsRepository } from 'contentia/assets-catalog';
-import { DecapCatalogProvider } from 'contentia/catalog-decap';
-import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { CatalogAssetsRepository } from 'contentia/assets/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
+import { markdownSerializer } from 'contentia/serializers/markdown';
 import { contentiaApi } from 'contentia/server/api';
-import { FileSystemStorageRepository } from 'contentia/storage-fs';
-import { markdownSerializer } from 'contentia/storage-serializers-markdown';
+import { FileSystemStorageRepository } from 'contentia/storage/fs';
 import { resolve } from 'node:path';
 
 // Module-level singletons — initialized once, reused across all requests
@@ -455,40 +429,14 @@ const storage = new FileSystemStorageRepository(
   { md: markdownSerializer },
   'md',
 );
-const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
+const catalog = new ConventionCatalogProvider({ storage });
 
 export const contentia = contentiaApi({
-  documents: new CatalogDocumentsRepository(storage, settings),
+  documents: new CatalogDocumentsRepository(storage, catalog),
   storage,
-  assets: new CatalogAssetsRepository(storage, settings),
-  basePath: '/api/decap',
+  assets: new CatalogAssetsRepository(storage, catalog),
+  basePath: '/api',
   authenticateAccessToken: yourValidator,
   authorize: () => true,
 });
-```
-
-#### Decap admin via `+page.svelte` + `onMount`
-
-SvelteKit has no `c.html()` equivalent for serving a raw admin shell. The correct pattern uses a
-`+page.svelte` that bootstraps Decap via `onMount`:
-
-```svelte
-<!-- src/routes/admin/+page.svelte -->
-<script lang="ts">
-  import { onMount } from 'svelte';
-
-  onMount(() => {
-    window.CMS_MANUAL_INIT = true;
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js';
-    script.onload = async () => {
-      const { createLaikaBackend } = await import(
-        '@laikacms/decap-cms/backends/laika'
-      );
-      window.CMS.registerBackend('laika', createLaikaBackend());
-      window.CMS.init({ config: { /* your decap config */ } });
-    };
-    document.head.appendChild(script);
-  });
-</script>
 ```

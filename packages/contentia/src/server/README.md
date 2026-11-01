@@ -1,31 +1,9 @@
 # contentia/server
 
 The HTTP surface for [Contentia](https://www.npmjs.com/package/contentia): a single-endpoint
-JSON:API router over the `contentia` repositories, and a self-contained OAuth 2.0 authorization
-server. Both are CMS-agnostic and have no React or admin-UI dependency.
-
-> **Renamed (August 2026):** this package was `@contentia/decap`. Its two server modules carried a
-> `decap-` prefix but were never Decap-specific, so they are now `contentia/server/api` (was
-> `@contentia/decap/decap-api`) and `contentia/server/oauth2` (was `@contentia/decap/decap-oauth2`).
-> The exported symbols renamed with them: `decapApi` -> `contentiaApi`, `DecapApi` ->
-> `ContentiaApi`, `DecapOptions` -> `ContentiaApiOptions`, `decapOauth2` -> `contentiaOauth2`,
-> `DecapOauth2` -> `ContentiaOauth2`. There are no compatibility aliases.
->
-> The third module, the Decap CMS backend (`createLaikaBackend()`), moved out entirely: it ships
-> with the fork as `@laikacms/decap-cms/backends/laika`.
-
-> **Moved (July 2026, DCMS-492):** the client-side pieces that used to live here now ship with the
-> `@laikacms/decap-cms` fork: icon widgets (`@laikacms/decap-cms/widgets/lucide-icon`,
-> `…/widgets/radix-icon`), the AI chat widget (`…/widgets/aichat`), the embedded-entry editor
-> component (`…/editor-component-embedded-entry`), config type utilities (`…/config-types`), and the
-> Dutch locale (`…/locales/nl`, bundled with all other locales). The `@contentia/decap-ai` package
-> is discontinued.
-
-> **Moved back (August 2026):** the AI chat/session server came home as `contentia/server/ai` — it
-> is server code, and the fork now ships only the client half of AI (an `LlmTransport` interface
-> plus chat panel and translate action). The client implementation that speaks to these endpoints is
-> the `Dulla` transport in the fork's `@laikacms/decap-cms-llm-dulla` extension. The Vercel AI SDK
-> is an **optional peer** here, so nothing changes for consumers that do not mount `/ai`.
+JSON:API router over the `contentia` repositories and a self-contained OAuth 2.0 authorization
+server, both CMS-agnostic, plus the endpoints behind an editor's AI assistant. None of them has a
+React or admin-UI dependency.
 
 ```bash
 pnpm add contentia
@@ -33,68 +11,14 @@ pnpm add contentia
 
 ## Exports
 
-| Export                      | Purpose                                                                                 |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| `contentia/server/api`      | Single-endpoint JSON:API router over the `contentia` repositories                       |
-| `contentia/server/oauth2`   | OAuth 2.0 authorization server (PKCE, passkey, TOTP, email)                             |
-| `contentia/server/embedded` | Quick-start all-in-one Node.js backend: filesystem storage + config seeding (see below) |
-| `contentia/server/ai`       | AI chat + session endpoints for the Decap CMS assistant (optional `ai` peer)            |
+| Export                    | Purpose                                                                  |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `contentia/server/api`    | Single-endpoint JSON:API router over the `contentia` repositories        |
+| `contentia/server/oauth2` | OAuth 2.0 authorization server (PKCE, passkey, TOTP, email)              |
+| `contentia/server/ai`     | AI chat + session endpoints for an editor assistant (optional `ai` peer) |
 
-The admin-side counterpart, `createLaikaBackend()`, lives in the fork:
-[`@laikacms/decap-cms/backends/laika`](https://www.npmjs.com/package/@laikacms/decap-cms).
-
-#### `embedded` — quick-start Node.js backend
-
-`createEmbeddedContentia()` wires a complete filesystem-backed Decap CMS backend from one options
-object. It is Node.js-only — for edge runtimes (Cloudflare Workers, Deno Deploy) use `contentiaApi`
-from `contentia/server/api` directly.
-
-```ts
-import { resolve } from 'node:path';
-import { createEmbeddedContentia } from 'contentia/server/embedded';
-
-// Development: any request with Authorization: Bearer dev-local-contentia-token is accepted.
-// Override the token with `devToken` if the default clashes with another service.
-export const contentia = createEmbeddedContentia({
-  contentDir: resolve(process.cwd(), 'content'),
-  basePath: '/api/decap',
-  auth: { mode: 'dev', devToken: 'my-local-token' }, // devToken is optional; defaults to DEFAULT_DEV_TOKEN
-  decapConfig: {
-    backend: { name: 'laika', api_root: '/api/decap' },
-    media_folder: 'public/uploads',
-    public_folder: '/uploads',
-    collections: [...],
-  },
-});
-
-// Await before starting the server so contentia.documents.* is safe on first boot.
-await contentia.ensureReady();
-```
-
-For production, switch to `mode: 'token'` and provide an `authenticate` callback — the callback
-receives the raw Bearer token and must return a `User` or throw to reject:
-
-```ts
-export const contentia = createEmbeddedContentia({
-  contentDir: resolve(process.cwd(), 'content'),
-  basePath: '/api/decap',
-  auth: {
-    mode: 'token',
-    authenticate: async token => {
-      const session = await db.sessions.findByToken(token);
-      if (!session) throw new Error('Unauthorized');
-      return { id: session.userId, email: session.email };
-    },
-  },
-  decapConfig: { ... },
-});
-```
-
-`contentia.fetch` handles all `/api/decap/*` requests. `contentia.documents` / `contentia.storage` /
-`contentia.assets` expose the repositories for SSR route handlers that read/write content directly.
-Call `await contentia.ensureReady()` before your server starts accepting requests — on first boot it
-seeds `config.yml`, and any direct `contentia.documents` access that races that write will see a
-missing config.
+The AI endpoints are documented in the [AI Assistant](https://contentia.dev/guides/ai-assistant)
+guide.
 
 #### `api` options
 
@@ -105,7 +29,7 @@ Key options accepted by `contentiaApi(options)`:
 | `documents`               | `DocumentsRepository`                                    | yes      | Document storage backend                                                                                                                                                         |
 | `storage`                 | `StorageRepository`                                      | yes      | Raw file storage backend                                                                                                                                                         |
 | `assets`                  | `AssetsRepository`                                       | no       | Binary asset storage; enables the `/assets` endpoint when provided                                                                                                               |
-| `basePath`                | `string`                                                 | no       | URL prefix for all endpoints (e.g. `'/api/decap'`)                                                                                                                               |
+| `basePath`                | `string`                                                 | no       | URL prefix for all endpoints (e.g. `'/api'`)                                                                                                                                     |
 | `authenticateAccessToken` | `(token: string) => Promise<User>`                       | yes      | Validates a Bearer access token and returns the principal's **identity**                                                                                                         |
 | `authenticateApiToken`    | `(key: string) => Promise<User>`                         | no       | Validates an API key sent via `X-API-Key` or `Authorization: ApiKey` for M2M access                                                                                              |
 | `authorize`               | `(ctx: AuthorizeContext) => boolean \| Promise<boolean>` | yes      | The authorization gate — decides what the authenticated principal may do. Receives the pre-parsed `ctx` (below). Return `false` to reject with `403`. Fails closed if it throws. |
@@ -180,14 +104,14 @@ own permissions; reach for `ctx.request` only for what the parsed fields don't c
 
 | Method                                                             | Description                                                                                                                                                                                                                    |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `fetch(request: Request): Promise<Response>`                       | Main catch-all handler — route all Decap API traffic here                                                                                                                                                                      |
+| `fetch(request: Request): Promise<Response>`                       | Main catch-all handler — route all API traffic here                                                                                                                                                                            |
 | `authenticateRequest(request: Request): Promise<Response \| User>` | Validates the request's auth (Bearer or API key) and returns a `User` on success, or a `Response` (401/403) on failure. Use in SSR route handlers to protect pages or inject the current user without routing through the API. |
 
 #### Advisory entry locking
 
-When two editors open the same entry, the Decap admin (`@laikacms/decap-cms` ≥ 4.1.0) can show a
-_"being edited by X"_ banner. This is an **advisory** signal only — it never blocks a write; it just
-warns before someone clobbers a concurrent edit.
+When two editors open the same entry, an admin that polls `/locks` (Decap does) can show a _"being
+edited by X"_ banner. This is an **advisory** signal only — it never blocks a write; it just warns
+before someone clobbers a concurrent edit.
 
 The `/locks` endpoint is **auto-enabled** when the `documents` repository implements the lock
 methods (`acquireLock`, `releaseLock`, `getLock`, `refreshLock`). No separate store or option is
@@ -211,12 +135,6 @@ const api = contentiaApi({
 - **Atomic by the repository.** Lock arbitration is delegated to the `DocumentsRepository`, where
   each backend uses its datasource's native conditional write rather than a read-check-write seam.
 
-### Decap CMS backend options
-
-`createLaikaBackend()`, `resolveLaikaBackend()` and their options moved to the fork. See
-`src/backends/laika/README.md` in
-[`@laikacms/decap-cms`](https://www.npmjs.com/package/@laikacms/decap-cms).
-
 ### i18n
 
 Login-page i18n bundles are exposed per-module: `contentia/server/oauth2/i18n`, `…/oauth2/i18n/en`,
@@ -224,8 +142,6 @@ Login-page i18n bundles are exposed per-module: `contentia/server/oauth2/i18n`, 
 
 ## Companion packages
 
-- [`@laikacms/decap-cms`](https://www.npmjs.com/package/@laikacms/decap-cms) — the Decap CMS fork:
-  app shell, widgets (incl. AI chat), contentia backend, config types
 - [`@contentia/aws`](https://www.npmjs.com/package/@contentia/aws) — AWS implementations
 
 ## Documentation

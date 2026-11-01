@@ -12,14 +12,13 @@ JSON:API client (e.g. the Decap admin) can read and write content without a remo
 is unauthenticated by design and only ever live while the dev server is running — a production build
 has no route to it.
 
-See [Local Mode Dev Editing](../guides/decap/local-mode) and [Vite plugin](../guides/vite).
+See [Vite plugin → Local mode](../guides/vite#local-mode).
 
 ## remote mode
 
 The opposite of local mode: the admin communicates with a deployed Contentia API (e.g. a Hono server
 or a Cloudflare Worker). The Vite dev server may or may not be running; the distinguishing factor is
 that content reads and writes go to a remote HTTP endpoint, not to `/__contentia` on localhost.
-`resolveLaikaBackend` selects remote mode whenever `import.meta.env.DEV` is not truthy.
 
 ## protocol
 
@@ -67,10 +66,10 @@ one is plugged in. See [Adapters](../adapters/) for the full list.
 ## CMS integration
 
 The CMS-specific layer built on repositories. It owns every opinionated choice its CMS needs (entry
-shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is the contentia
-backend in the decap-cms repo. CMS features never move from a CMS integration into the protocol;
-swapping one CMS's integration for another's is a migration by design. ADR-006 predates this term
-and calls it an "adapter".
+shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is a Decap backend
+that talks to the Contentia API, and it lives with the CMS, not in Contentia. CMS features never
+move from a CMS integration into the protocol; swapping one CMS's integration for another's is a
+migration by design. ADR-006 predates this term and calls it an "adapter".
 
 ## version
 

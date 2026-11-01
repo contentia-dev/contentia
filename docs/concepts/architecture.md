@@ -28,8 +28,8 @@ Each conceptual layer adds assumptions on top of that foundation:
 5. **Repository settings** — configuration for repository behavior.
 6. **Settings providers** — providers can be chained. When settings live in content, a provider can
    receive a repository and query it to return those settings.
-7. **Contract consumers** — APIs, admin interfaces, the custom Decap CMS fork, and other
-   applications built on the contracts.
+7. **Contract consumers** — APIs, admin interfaces such as a Decap CMS admin, and other applications
+   built on the contracts.
 
 This is a union model: each layer adds assumptions the farther it gets from the core. The built-in
 document contract, for example, assumes a document has a status and language. Applications that do

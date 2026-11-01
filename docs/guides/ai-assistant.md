@@ -1,7 +1,7 @@
 # AI Assistant
 
-`contentia/server/ai` provides the chat and session endpoints behind the Decap CMS editor assistant.
-It authenticates a Bearer token, streams a model response through the Vercel AI SDK, and persists
+`contentia/server/ai` provides the chat and session endpoints behind an editor's AI assistant. It
+authenticates a Bearer token, streams a model response through the Vercel AI SDK, and persists
 conversations through consumer-supplied callbacks.
 
 ```bash
@@ -90,73 +90,18 @@ interface AiSessionCallbacks {
 }
 ```
 
-## Client-side wiring
+## The client
 
-The server endpoints above are only half the picture. The **Decap CMS admin** needs a client-side
-transport that points the chat panel at those endpoints. That transport is
-[`@laikacms/decap-cms-llm-dulla`](https://github.com/laikacms/decap-cms/tree/main/extensions/llm/dulla)
-— it lives in the `laikacms/decap-cms` fork as `extensions/llm/dulla`.
-
-**`@laikacms/decap-cms-llm-dulla` is not published to npm.** Vendor the source into your project or
-reference it as a local workspace dependency from a checkout of the `laikacms/decap-cms` repo:
-
-```sh
-# copy the source once
-cp -R /path/to/contentia-decap-cms/extensions/llm/dulla vendor/decap-cms-llm-dulla
-```
-
-```json
-{
-  "dependencies": {
-    "@laikacms/decap-cms-llm-dulla": "workspace:*"
-  }
-}
-```
-
-### Register the transport
-
-If you own the app entry point, pass the transport as a prop:
-
-```tsx
-import { createDullaTransport } from '@laikacms/decap-cms-llm-dulla';
-
-const llm = createDullaTransport({
-  apiBasePath: '/api/ai',
-  getToken: () => myAuth.getAccessToken(),
-});
-
-<DecapCmsProvider llm={llm}>…</DecapCmsProvider>;
-```
-
-If the CMS is initialised before your app code runs (e.g. a pre-built admin bundle), use the global
-registration path instead:
-
-```ts
-import { registerDulla } from '@laikacms/decap-cms-llm-dulla';
-
-registerDulla({ apiBasePath: '/api/ai' });
-```
-
-`apiBasePath` must match the `basePath` you passed to `decapAi()` on the server (default
-`'/api/ai'`). With a transport registered an **Assistant** panel appears in the editor and the
-locale row gains a translate action for i18n collections.
-
-### Transport options
-
-| Option        | Type                                              | Default   | Purpose                                                  |
-| ------------- | ------------------------------------------------- | --------- | -------------------------------------------------------- |
-| `apiBasePath` | `string`                                          | `/api/ai` | Must match the server's `basePath`                       |
-| `getToken`    | `() => string \| null \| undefined \| Promise<…>` | _(none)_  | Bearer token resolver; omit for cookie/same-origin auth  |
-| `fetch`       | `typeof fetch`                                    | global    | Custom `fetch` for proxies, tests, or custom credentials |
-| `body`        | `Record<string, unknown>`                         | _(none)_  | Extra fields merged into every `/chat` request body      |
-| `onError`     | `(error: Error) => void`                          | _(none)_  | Transport-level errors, alongside the session panel      |
+These endpoints are the server half. The other half is a chat transport in your admin that calls
+them: it sends `{ messages, sessionId?, document }` to `POST /chat` with the user's Bearer token,
+reads the AI SDK's UI message stream back, keeps `X-Session-Id` to continue the conversation, and
+runs the client-side tools below against the open entry. Contentia does not ship that transport.
 
 ## Client-side tools
 
 `getDocumentData` and `updateDocument` are declared with **no `execute`**, so the SDK ships them to
-the browser where the Dulla transport runs them against the open editor draft — see
-[client-side wiring](#client-side-wiring) above. Add your own server-side tools through
-`config.tools` — those should have an `execute`.
+the browser, where the admin's transport runs them against the open editor draft. Add your own
+server-side tools through `config.tools` — those should have an `execute`.
 
 ## Authorization
 

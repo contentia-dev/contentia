@@ -2,9 +2,9 @@
 
 > A modular, runtime-agnostic content API.
 
-One content API over any storage backend. Use it with [Decap CMS](https://decapcms.org/) or your own
-UI, and swap storage backends (filesystem, R2, GitHub, …) without rewriting code. Runs on Node, Bun,
-and Cloudflare Workers.
+One content API over any storage backend. Put your own UI or an existing admin in front of it, and
+swap storage backends (filesystem, R2, GitHub, …) without rewriting code. Runs on Node, Bun, and
+Cloudflare Workers.
 
 ```bash
 pnpm add contentia
@@ -93,8 +93,7 @@ export default {
 
 `contentia/server/api` (the JSON:API router, `contentiaApi`) · `contentia/server/oauth2` (OAuth 2.0
 authorization server) · `contentia/server/ai` (AI chat endpoints; `ai` and `@ai-sdk/*` are optional
-peers) · `contentia/server/embedded` (Node.js quick start). See
-[`src/server/README.md`](./src/server/README.md).
+peers). See [`src/server/README.md`](./src/server/README.md).
 
 ### Testing utilities
 
@@ -117,9 +116,6 @@ peers) · `contentia/server/embedded` (Node.js quick start). See
 
 - [`@contentia/aws`](https://www.npmjs.com/package/@contentia/aws) — AWS service implementations
   (DynamoDB, S3 `StorageRepository`)
-- [`@laikacms/decap-cms`](https://www.npmjs.com/package/@laikacms/decap-cms) — Contentia-aware Decap
-  CMS fork with AI chat widget (`…/widgets/aichat`), icon widgets, embedded-entry editor, and config
-  type utilities (`@contentia/decap-ai` is discontinued; AI features moved here)
 
 ## Documentation
 

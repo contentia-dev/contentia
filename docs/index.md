@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Contentia
   text: One content API, any backend.
-  tagline: Define your content once and serve it as a JSON:API to your editors, sites and agents. The storage behind it is a configuration choice. Self-hosted, MIT licensed.
+  tagline: Define your content once and serve it as a JSON:API to your editors, sites and agents. The storage behind it is a configuration choice. MIT licensed.
   image:
     light: /contentia-mark.svg
     dark: /contentia-mark-dark.svg
@@ -26,7 +26,7 @@ features:
   - title: Swap the backend, keep the code
     details: Filesystem, R2, S3, WebDAV, SQL through Drizzle, GitHub, the browser. Every adapter implements the same repository contracts, so changing storage is configuration.
   - title: Built for editors and agents alike
-    details: One JSON:API with an OpenAPI description, consumed by the Decap admin, your own UI, build-time Vite and Astro integrations, and an MCP server with a single request tool.
+    details: One JSON:API with an OpenAPI description, consumed by your own UI, an admin such as Decap CMS, build-time Vite and Astro integrations, and an MCP server with a single request tool.
 ---
 
 ## Why Contentia
@@ -44,6 +44,12 @@ Contentia is also extremely useful as a homogeneous data access layer in the age
 provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. It only has one
 'request' tool.
 
+### Bring your own admin UI
+
+Contentia is the content API, not a CMS: it has no admin UI of its own. Point your own UI, or an
+existing admin that speaks JSON:API, at the API. Collections can come from a convention, a persisted
+catalog, or a Decap CMS `config.yml`.
+
 ### What Contentia offers
 
 <table>
@@ -55,7 +61,7 @@ provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:
   <tr><td>Drafts and publishing</td><td>Revision history</td></tr>
   <tr><td>Linked assets and image variants</td><td>Conflict detection and locks</td></tr>
   <tr><td>OAuth2, passkeys and 2FA</td><td>Upload sanitization</td></tr>
-  <tr><td>Astro, Vite and Decap integrations</td><td>API server from one config file</td></tr>
+  <tr><td>Astro and Vite integrations</td><td>API server from one config file</td></tr>
 </table>
 
 <!--@include: ./.vitepress/adapters/logos.md-->

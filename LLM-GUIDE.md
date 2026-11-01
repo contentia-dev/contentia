@@ -12,7 +12,7 @@ Contentia is **three things stacked**:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│   HTTP API   (JSON:API)  — what Decap / clients call    │
+│   HTTP API   (JSON:API)  — what your UI / clients call  │
 │   ─ buildJsonApi / contentiaApi — web-standard fetch        │
 ├─────────────────────────────────────────────────────────┤
 │   Domain      — what your server code calls             │
@@ -29,12 +29,13 @@ mount the resulting `(Request) => Promise<Response>` handler in your framework.
 
 `contentia/server` gives you the primitives for each layer:
 
-- **`contentiaApi(...)`** (`contentia/server/api`) — the Decap-compatible HTTP API over your repos.
-  Returns `{ fetch, authenticateRequest }`; mount `.fetch` on a catch-all route.
-- **`createLaikaBackend()`** (`@laikacms/decap-cms/backends/laika`) — the Decap CMS backend the
-  admin UI registers to talk to that API.
+- **`contentiaApi(...)`** (`contentia/server/api`) — the HTTP API over your repos. Returns
+  `{ fetch, authenticateRequest }`; mount `.fetch` on a catch-all route.
 - **`contentiaOauth2(...)`** (`contentia/server/oauth2`) — an optional PKCE OAuth2 server for
   production login.
+
+Contentia has no admin UI. Bring your own, or point an existing admin that speaks JSON:API at
+`contentiaApi`; setting up the admin itself is outside this repo.
 
 For most apps: construct a `StorageRepository`, wrap it in the Catalog document/asset repos, pass
 them to `contentiaApi(...)`, and mount `.fetch` on a catch-all route.
@@ -46,9 +47,8 @@ them to `contentiaApi(...)`, and mount `.fetch` on a catch-all route.
 ### a) Spin up a Node.js backend (Express/Hono/Fastify/Koa/Bun/Deno)
 
 ```ts
-import { serveStatic } from '@hono/node-server/serve-static';
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
-import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
 import { contentiaApi } from 'contentia/server/api';
 import { FileSystemStorageRepository } from 'contentia/storage-fs';
@@ -60,29 +60,28 @@ const storage = new FileSystemStorageRepository(
   { md: markdownSerializer },
   'md',
 );
-const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
-const documents = new CatalogDocumentsRepository(storage, settings);
-const assets = new CatalogAssetsRepository(storage, settings);
+// Collections map to same-name folders; nothing to seed. For a Decap config, see the callout below.
+const catalog = new ConventionCatalogProvider({ storage });
+const documents = new CatalogDocumentsRepository(storage, catalog);
+const assets = new CatalogAssetsRepository(storage, catalog);
 
 const contentia = contentiaApi({
   documents,
   storage,
   assets,
-  basePath: '/api/decap',
+  basePath: '/api',
   authenticateAccessToken: yourValidator, // throw to reject; see task (e) for production auth
   authorize: () => true, // allow every authenticated principal; tighten in production (see task e)
 });
 
-// Serve the Decap CMS admin bundle (built by esbuild — see docs/guides/decap/admin-shell.md → "Serving the Decap admin shell"):
-app.use('/admin/*', serveStatic({ root: './admin' }));
-
-// Mount on every method at /api/decap/*:
-app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
+// Mount on every method at /api/*:
+app.all('/api/*', c => contentia.fetch(c.req.raw));
 ```
 
-> **Before any content operation: seed the Decap config into storage once.** `DecapCatalogProvider`
-> reads the Decap config object from `storage[configKey]` on every request. If the key is missing,
-> every document and asset operation throws
+> **Collections described by a Decap config?** Use
+> `new DecapCatalogProvider({ storage, configKey: 'config' })` (`contentia/catalog-decap`) instead,
+> and seed the config into storage once. It reads the Decap config object from `storage[configKey]`
+> on every request. If the key is missing, every document and asset operation throws
 > `"Decap config object not found at storage key 'config'"`. Run this once (setup script, migration,
 > or first-boot handler):
 >
@@ -110,8 +109,8 @@ app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
 > ```
 >
 > See
-> [docs/guides/decap/standalone-worker.md → "Seeding the server-side Decap config"](./docs/guides/decap/standalone-worker.md#seeding-the-server-side-decap-config)
-> for the full pattern (shared config constant, serializer requirements, server-vs-browser copies).
+> [docs/guides/api-server.md → "Seeding the Decap config"](./docs/guides/api-server.md#seeding-the-decap-config)
+> for the serializer requirements.
 
 ### b) Render content server-side in a framework page (Next/SvelteKit/Astro/Nuxt/Remix/etc.)
 
@@ -151,7 +150,7 @@ an edge-compatible repo such as `R2StorageRepository` (`node:fs` is unavailable 
 
 ```ts
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
-import { DecapCatalogProvider } from 'contentia/catalog-decap';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
 import { contentiaApi } from 'contentia/server/api';
 import { R2StorageRepository } from 'contentia/storage-r2';
@@ -166,21 +165,18 @@ const app = new Hono<{ Bindings: Env }>();
 
 const makeContentia = (env: Env) => {
   const storage = new R2StorageRepository(env.CONTENT, { md: markdownSerializer }, 'md');
-  const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
+  const catalog = new ConventionCatalogProvider({ storage });
   return contentiaApi({
-    documents: new CatalogDocumentsRepository(storage, settings),
+    documents: new CatalogDocumentsRepository(storage, catalog),
     storage,
-    assets: new CatalogAssetsRepository(storage, settings),
-    basePath: '/api/decap',
+    assets: new CatalogAssetsRepository(storage, catalog),
+    basePath: '/api',
     authenticateAccessToken: yourValidator,
     authorize: () => true, // allow every authenticated principal; tighten in production (see task e)
   });
 };
 
-app.all('/api/decap/*', c => makeContentia(c.env).fetch(c.req.raw));
-// Serve the Decap CMS admin bundle: build admin/ with esbuild, then declare
-// `[assets] directory = "./admin"` in wrangler.toml — Workers Assets serve /admin/* automatically.
-// See docs/guides/decap/admin-shell.md → "Serving the Decap admin shell"
+app.all('/api/*', c => makeContentia(c.env).fetch(c.req.raw));
 
 export default app;
 ```
@@ -211,15 +207,14 @@ const token = await new SignJWT({ email: user.email, name: user.name })
   .setExpirationTime('8h')
   .sign(secret);
 
-// 2. Hand that token to the admin shell so Decap sends it as the Bearer token
-//    (inject it into the HTML you serve at /admin behind your login guard).
+// 2. Hand that token to the client, which sends it as `Authorization: Bearer <token>`.
 
 // 3. Validate it on every API request:
 const contentia = contentiaApi({
   documents,
   storage,
   assets,
-  basePath: '/api/decap',
+  basePath: '/api',
   async authenticateAccessToken(token) {
     const { payload } = await jwtVerify(token, secret);
     return {
@@ -234,14 +229,14 @@ const contentia = contentiaApi({
 
 For a full self-contained login server (email/password, passkey, TOTP) use the
 `contentiaOauth2(...)` PKCE server from `contentia/server/oauth2` — see
-[docs/guides/decap/auth.md → "Production auth with decap-oauth2"](./docs/guides/decap/auth.md#production-auth-with-decap-oauth2).
+[docs/guides/auth.md → "Production login with contentiaOauth2"](./docs/guides/auth.md#production-login-with-contentiaoauth2).
 
 ---
 
 ### f) Add the AI assistant
 
-`contentia/server/ai` mounts chat and session endpoints that power the Decap CMS editor assistant.
-Install the optional peer first:
+`contentia/server/ai` mounts chat and session endpoints that power an editor's AI assistant. Install
+the optional peer first:
 
 ```bash
 pnpm add ai @ai-sdk/anthropic   # or any other @ai-sdk/* provider
@@ -255,7 +250,7 @@ import { decapAi } from 'contentia/server/ai';
 import { anthropic } from 'contentia/server/ai/providers';
 
 const ai = decapAi({
-  model: anthropic('claude-3-5-sonnet-20241022'),
+  model: anthropic('claude-sonnet-5-5'),
   basePath: '/api/ai',
   authenticateAccessToken: async token => {
     const ctx = await resolveBearer(token, { verifySessionToken, lookupPatByHash });
@@ -269,12 +264,12 @@ const ai = decapAi({
 app.all('/api/ai/*', c => ai.fetch(c.req.raw));
 ```
 
-The client half is the `Dulla` transport in `@laikacms/decap-cms-llm-dulla` — it implements the
-CMS's `LlmTransport` interface and points the chat panel at this server. The server ships two
-client-side tools (`getDocumentData` / `updateDocument`) with no `execute` so the SDK ships them to
-the browser where the open editor entry lives. Add your own server-side tools via `config.tools`.
+The client half is a chat transport in the admin; Contentia does not ship one. The server declares
+two client-side tools (`getDocumentData` / `updateDocument`) with no `execute`, so the SDK ships
+them to the browser where the open editor entry lives. Add your own server-side tools via
+`config.tools`.
 
-See the full options reference in
+See [docs/guides/ai-assistant.md](./docs/guides/ai-assistant.md) and the options reference in
 [packages/contentia/src/server/ai/README.md](./packages/contentia/src/server/ai/README.md).
 
 ---
@@ -311,7 +306,7 @@ These are the things that consistently bite first-time integrators:
      `collectStream`), NOT through `contentia.fetch(internalRequest)`.
 
 2. **Express/Fastify/Koa: do NOT mount `express.json()` / Fastify body parsers / `koa-bodyparser` in
-   front of `/api/decap/*`.**
+   front of `/api/*`.**
    - The web-standard adapter streams the raw body to `contentia.fetch`. Body parsers drain it
      first.
 
@@ -320,8 +315,6 @@ These are the things that consistently bite first-time integrators:
      `import { FileSystemStorageRepository } from
      'contentia/storage-fs'`. Same for
      `contentia/storage-api`, `contentia/documents-api`, `contentia/storage-serializers-*`, etc.
-   - The Decap backend lives at `@laikacms/decap-cms/backends/laika` — a subpath of
-     `@laikacms/decap-cms`. Import `createLaikaBackend` from there.
 
 4. **`FileSystemStorageRepository` is Node-only.** It needs `node:fs` and a writable local
    filesystem, so it can't run in Workers/edge code. On the edge, construct an edge-compatible
@@ -339,28 +332,17 @@ These are the things that consistently bite first-time integrators:
    import { GitlabStorageRepository } from 'contentia/storage-gitlab';
    ```
 
-6. **Hide the Decap admin shell from your framework's hydration.** SSR frameworks hydrate the whole
-   `<html>`. Decap also expects to own it. Pick one of:
-   - Static file in `public/admin.html` (TanStack, Nuxt, Remix, SolidStart) — cleanest.
-   - Iframe with `srcDoc` (Next App Router).
-   - Inline server-rendered HTML response from a non-page route (SvelteKit `+server.ts`, Marko
-     `+handler.ts`, Astro `is:inline`). Serve a small HTML string that loads Decap from CDN and
-     registers `createLaikaBackend()` — see
-     [docs/guides/decap/admin-shell.md → "Serving the Decap admin shell"](./docs/guides/decap/admin-shell.md#serving-the-decap-admin-shell).
+6. **Admin UI wiring is not in this repo.** Serving an admin, keeping it out of your framework's
+   hydration, and pointing it at the path you mounted `contentiaApi(...)` on are the admin's
+   concern, not Contentia's.
 
 7. **`workspace:*` for internal deps; `catalog:*` for shared external deps.** Use `workspace:*` for
    any `@contentia/*` package reference within the monorepo, and `catalog:*` for shared external
    dependencies defined in the root `pnpm-workspace.yaml` catalog.
 
-8. **`api_root` (not `api_url`) in the Decap backend config.** The Contentia backend constructor
-   reads `config.backend.api_root` (with `api_url` accepted as a deprecated alias). Without it, all
-   Decap admin API calls resolve to the site root and silently 404.
-   - In your Decap config's `backend` key, set `api_root` to the path you mounted
-     `contentiaApi(...)` on (e.g. `'/api/decap'`).
-   - When wiring your own `CMS.init()` (next-blog / astro-blog pattern), use:
-     `backend: { name: 'laika', api_root: '/api/decap' }`
-   - The serializer registry needs all four types: `{ md, yaml, yml, json, raw }`. If you only
-     register `md`, saving YAML or JSON files silently fails.
+8. **Register a serializer for every file type in your content folder.** The serializer registry
+   maps extensions to serializers, e.g. `{ md, yaml, yml, json, raw }`. If you only register `md`,
+   reading or saving YAML and JSON files fails.
 
 9. **Effect Platform 4.x moved HTTP types into `effect/unstable/http/*`.** If you're using
    `@effect/platform-node`, import from `effect/unstable/http/HttpRouter`, not
@@ -417,7 +399,7 @@ These are the things that consistently bite first-time integrators:
     The serializer registry must support structured data — `markdownSerializer`, `yamlSerializer`,
     or `jsonSerializer` all work; `rawSerializer` silently drops the `collections` field. See the
     callout in task (a) above and
-    [docs/guides/decap/standalone-worker.md → "Seeding the server-side Decap config"](./docs/guides/decap/standalone-worker.md#seeding-the-server-side-decap-config).
+    [docs/guides/api-server.md → "Seeding the Decap config"](./docs/guides/api-server.md#seeding-the-decap-config).
 
 14. **`CatalogDocumentsRepository` injects a `language` field into every stored content object.**
     The implementation co-locates the document language with its content in storage so reads can
@@ -437,17 +419,15 @@ These are the things that consistently bite first-time integrators:
 
 ## 5. Where to start
 
-- **Minimal Node example** →
-  [docs/guides/decap/quickstart-fs.md](./docs/guides/decap/quickstart-fs.md)
-  (`FileSystemStorageRepository` + Hono + Decap admin shell, running locally)
+- **Minimal Node example** → [docs/guides/api-server.md](./docs/guides/api-server.md)
+  (`contentiaApi` over `FileSystemStorageRepository`, served with `@hono/node-server`)
 - **Minimal edge example** →
-  [docs/guides/decap/standalone-worker.md](./docs/guides/decap/standalone-worker.md)
-  (`R2StorageRepository` + Hono + Cloudflare Workers Assets)
+  [docs/guides/api-server.md → "Running it"](./docs/guides/api-server.md#running-it)
+  (`R2StorageRepository` on Cloudflare Workers) and task 2c above
 - **No server code at all** → `contentia serve --config` runs the API from one config file; see
   [docs/guides/server-config.md](./docs/guides/server-config.md)
 - **Astro** → `@contentia/astro` (Content Layer loaders, dev JSON:API, live collections, Zod schema)
-- **AI assistant in the editor** → mount `contentia/server/ai` (section 2f) and wire the Dulla
-  transport in `@laikacms/decap-cms-llm-dulla`
+- **AI assistant in the editor** → mount `contentia/server/ai` (section 2f)
 - **Inline wiring code** → sections 2a (Node) and 2c (Workers/R2) above have copy-paste-ready code
 
 ---

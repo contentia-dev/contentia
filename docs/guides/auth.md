@@ -1,8 +1,8 @@
 # Authentication
 
-How callers prove who they are to `contentiaApi(...)`: browser sessions, machine-to-machine API
-keys, SSR guards, structured logging, the bundled OAuth2 server, and the multi-tenant hosted
-gateway.
+How callers prove who they are to [`contentiaApi(...)`](./api-server), and what they may do once
+they have: browser sessions, machine-to-machine API keys, authorization policies, SSR guards,
+structured logging, and the bundled OAuth2 login server.
 
 ## Machine-to-machine auth with `authenticateApiToken`
 
@@ -79,7 +79,7 @@ authorize: ctx => ctx.operation === 'read',
 ### Role-based authorization
 
 Because authorization is entirely in your hands, "scopes" and "roles" are just identity fields you
-attach to the [`User`](../../reference/api/contentia/server/api/interfaces/User) and check in
+attach to the [`User`](../reference/api/contentia/server/api/interfaces/User) and check in
 `authorize`. Augment the `User` interface with whatever your policy needs:
 
 ```ts
@@ -119,7 +119,7 @@ authenticateApiToken: async key => {
 
 For the common pattern of granting access based on fine-grained scopes (rather than flat roles),
 `contentia/server/api` ships
-[`createScopePolicy()`](../../reference/api/contentia/server/api/functions/createScopePolicy) — a
+[`createScopePolicy()`](../reference/api/contentia/server/api/functions/createScopePolicy) — a
 drop-in `authorize` factory that maps every CMS request to a required scope and checks the
 principal's granted scopes. The scope vocabulary lives in `contentia/auth`:
 
@@ -153,10 +153,10 @@ const api = contentiaApi({
 
 `createScopePolicy` accepts an optional `options` object:
 
-| Option                                                                                    | Type                                          | Description                                                                            |
-| ----------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [`requiredScopeFor`](../../reference/api/contentia/server/api/functions/requiredScopeFor) | `(ctx: AuthorizeContext) => Scope \| null`    | Override the request → required-scope mapping. Return `null` to allow unconditionally. |
-| `scopesOf`                                                                                | `(ctx: AuthorizeContext) => readonly Scope[]` | How to read the principal's granted scopes. Defaults to `ctx.user.scopes ?? []`.       |
+| Option                                                                                 | Type                                          | Description                                                                            |
+| -------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [`requiredScopeFor`](../reference/api/contentia/server/api/functions/requiredScopeFor) | `(ctx: AuthorizeContext) => Scope \| null`    | Override the request → required-scope mapping. Return `null` to allow unconditionally. |
+| `scopesOf`                                                                             | `(ctx: AuthorizeContext) => readonly Scope[]` | How to read the principal's granted scopes. Defaults to `ctx.user.scopes ?? []`.       |
 
 `hasScope(granted, required)` from `contentia/auth` resolves wildcards: `admin`/`*` satisfies
 anything, and `resource:*` satisfies any `resource:action` on that resource. Use it directly if you
@@ -174,12 +174,12 @@ authorize: ctx => {
 ### PAT bearer verification with `resolveBearer`
 
 When you issue Personal Access Tokens (PATs) as well as session tokens, use
-[`resolveBearer`](../../reference/api/contentia/auth/functions/resolveBearer) from `contentia/auth`
-as the single seam in `authenticateAccessToken`. It detects a `lk_pat_…` prefix, looks up the PAT
+[`resolveBearer`](../reference/api/contentia/auth/functions/resolveBearer) from `contentia/auth` as
+the single seam in `authenticateAccessToken`. It detects a `lk_pat_…` prefix, looks up the PAT
 record by hash, checks revocation/expiry, and falls back to your session verifier for all other
 bearers — returning a unified
-[`AuthContext`](../../reference/api/contentia/auth/interfaces/AuthContext) with the principal and
-their granted scopes:
+[`AuthContext`](../reference/api/contentia/auth/interfaces/AuthContext) with the principal and their
+granted scopes:
 
 ```ts
 import { resolveBearer } from 'contentia/auth';
@@ -206,7 +206,7 @@ bad input — throw or return the error from `authenticateAccessToken` yourself.
 ## SSR auth guard with `authenticateRequest`
 
 `contentiaApi(...)` returns a
-[`ContentiaApi`](../../reference/api/contentia/server/api/interfaces/ContentiaApi) object with two
+[`ContentiaApi`](../reference/api/contentia/server/api/interfaces/ContentiaApi) object with two
 methods:
 
 ```ts
@@ -223,7 +223,7 @@ duplicating auth logic:
 
 ```ts
 // SvelteKit — src/routes/admin/+page.server.ts
-import { api } from '$lib/decap'; // your contentiaApi(...) instance
+import { api } from '$lib/contentia'; // your contentiaApi(...) instance
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -241,7 +241,7 @@ boundary (Next.js App Router, TanStack Start, Hono middleware, etc.).
 
 Pass any `logger` compatible with the `Console` interface (`error`, `warn`, `info`, `debug`) to
 receive structured diagnostic output from
-[`contentiaApi`](../../reference/api/contentia/server/api/functions/contentiaApi). The option is
+[`contentiaApi`](../reference/api/contentia/server/api/functions/contentiaApi). The option is
 optional — if omitted, no output is produced.
 
 ```ts
@@ -257,11 +257,11 @@ const api = contentiaApi({
 The logger is forwarded to the underlying `storage-api` and `documents-api` handlers so you get a
 unified log stream from a single option.
 
-## Production auth with `decap-oauth2`
+## Production login with `contentiaOauth2`
 
 Rather than building an OAuth2 server from scratch, use the bundled
-[`contentiaOauth2`](../../reference/api/contentia/server/oauth2/functions/contentiaOauth2) helper.
-It is a self-contained PKCE authorization server with email/password login, optional passkey
+[`contentiaOauth2`](../reference/api/contentia/server/oauth2/functions/contentiaOauth2) helper. It
+is a self-contained PKCE authorization server with email/password login, optional passkey
 (WebAuthn), and optional TOTP 2FA. You wire it alongside the `contentiaApi(...)` handler in the same
 Express or Hono app.
 
@@ -272,15 +272,15 @@ pnpm add contentia
 **Hono example**
 
 ```ts
-import { CatalogAssetsRepository } from 'contentia/assets-catalog';
-import { DecapCatalogProvider } from 'contentia/catalog-decap';
-import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
+import { CatalogAssetsRepository } from 'contentia/assets/catalog';
+import { ConventionCatalogProvider } from 'contentia/catalog-convention';
+import { CatalogDocumentsRepository } from 'contentia/documents/catalog';
 import { contentiaApi } from 'contentia/server/api';
 import { contentiaOauth2 } from 'contentia/server/oauth2';
-import { R2StorageRepository } from 'contentia/storage-r2';
+import { R2StorageRepository } from 'contentia/storage/r2';
 import { Hono } from 'hono';
 
-const CLIENT_ID = process.env.DECAP_CLIENT_ID!;
+const CLIENT_ID = process.env.OAUTH_CLIENT_ID!;
 const OAUTH_BASE = '/oauth2';
 
 const oauth2 = contentiaOauth2({
@@ -307,14 +307,14 @@ const oauth2 = contentiaOauth2({
   },
 });
 
-// Build the Decap API handler — its validator checks the OAuth2 session token.
+// Build the API handler — its validator checks the OAuth2 session token.
 const storage = new R2StorageRepository(/* … */);
-const settings = new DecapCatalogProvider({ storage, configKey: 'config' });
+const catalog = new ConventionCatalogProvider({ storage });
 const contentia = contentiaApi({
-  documents: new CatalogDocumentsRepository(storage, settings),
+  documents: new CatalogDocumentsRepository(storage, catalog),
   storage,
-  assets: new CatalogAssetsRepository(storage, settings),
-  basePath: '/api/decap',
+  assets: new CatalogAssetsRepository(storage, catalog),
+  basePath: '/api',
   // Reject by throwing — contentiaApi turns thrown errors into a 401.
   async authenticateAccessToken(token) {
     const session = await db.sessions.findByAccessToken(token);
@@ -329,13 +329,12 @@ const contentia = contentiaApi({
 
 const app = new Hono();
 app.all(`${OAUTH_BASE}/*`, c => oauth2.fetch(c.req.raw));
-app.all('/api/decap/*', c => contentia.fetch(c.req.raw));
+app.all('/api/*', c => contentia.fetch(c.req.raw));
 
 export default app;
 ```
 
-**Express example** (uses the [manual bridge](./frameworks#express--plain-httpserver--manual-bridge)
-for `contentia`):
+**Express example** (uses the [manual bridge](./frameworks#express-bridge) for `contentia`):
 
 ```ts
 import { contentiaOauth2 } from 'contentia/server/oauth2';
@@ -369,29 +368,15 @@ app.all('/oauth2/*', async (req, res) => {
   res.send(Buffer.from(await webResponse.arrayBuffer()));
 });
 // Mount contentia with the same bridge (see Express bridge section)
-app.all('/api/decap/*', (req, res) => bridgeToContentia(req, res, contentia));
+app.all('/api/*', (req, res) => bridgeToContentia(req, res, contentia));
 ```
 
-**Point Decap at the OAuth2 server**
+**Point your client at the OAuth2 server**
 
-In your Decap config, set `backend.base_url` to the origin where the OAuth2 server runs and
-`backend.auth_endpoint` to the authorize path:
-
-```ts
-const decapConfig = {
-  backend: {
-    name: 'laika',
-    api_root: '/api/decap',
-    base_url: 'https://cms.example.com', // origin serving /oauth2/*
-    auth_endpoint: '/oauth2/authorize',
-  },
-  // …collections…
-};
-```
-
-Use this same `decapConfig` when building the admin shell (see
-[Serving the Decap admin shell](./admin-shell) above) so the editor performs the PKCE login against
-`/oauth2/authorize`.
+Any OAuth 2.0 client that does PKCE can sign in: it sends the user to `/oauth2/authorize`, exchanges
+the code at `/oauth2/token` (form-encoded), and then calls the API with the access token as a Bearer
+token. `clientId` and one of `allowedRedirectUris` must match what the client sends. If the client
+runs on another origin than the API, add that origin to the API's `cors` option too.
 
 **Optional extensions**
 
@@ -405,14 +390,5 @@ Use this same `decapConfig` when building the admin shell (see
 
 See
 [`packages/contentia/src/server/oauth2/README.md`](https://github.com/contentia-dev/contentia/blob/develop/packages/contentia/src/server/oauth2/README.md)
-for the full [`OAuthConfig`](../../reference/api/contentia/server/oauth2/interfaces/OAuthConfig)
-option reference.
-
----
-
-## Hosted gateway (multi-tenant)
-
-If multiple sites share one editing experience, host a gateway Worker separately and point each
-site's Decap admin at it. Auth is per-tenant via GitHub OAuth (or other). Storage is the tenant's
-own GitHub repo. The `contentia-gateway` app and the `@contentia/git-gateway` package were moved out
-of this monorepo in June 2026; they now live in their own repositories.
+for the full [`OAuthConfig`](../reference/api/contentia/server/oauth2/interfaces/OAuthConfig) option
+reference.

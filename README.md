@@ -17,8 +17,8 @@
 
 ---
 
-One content API over any storage backend. Use it with [Decap CMS](https://decapcms.org/) or your own
-UI, and swap storage backends without rewriting code.
+One content API over any storage backend. Put your own UI or an existing admin in front of it, and
+swap storage backends without rewriting code.
 
 ## Quick Start
 
@@ -83,8 +83,8 @@ command, including the packages that now live in separate repositories.
 - [Getting Started](./docs/guides/getting-started.md)
 - [Architecture](./docs/concepts/architecture.md)
 - [API Reference](./docs/reference/json-api/index.md)
-- [Decap Integration](./docs/guides/decap/index.md)
-- [Deployment](./docs/guides/deployment.md)
+- [API Server](./docs/guides/api-server.md) and [Authentication](./docs/guides/auth.md)
+- [Deployment](./docs/guides/api-server.md#deploying-a-filesystem-backed-server)
 - [Imports](./docs/reference/imports.md)
 
 ## Contributing

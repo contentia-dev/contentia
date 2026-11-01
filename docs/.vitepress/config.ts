@@ -99,6 +99,8 @@ export default defineConfig({
           { text: 'Overview', link: '/guides/' },
           { text: 'Getting Started', link: '/guides/getting-started' },
           { text: 'API Server', link: '/guides/api-server' },
+          { text: 'Authentication', link: '/guides/auth' },
+          { text: 'Framework Setup', link: '/guides/frameworks' },
           { text: 'Server Config', link: '/guides/server-config' },
         ],
       },
@@ -116,23 +118,7 @@ export default defineConfig({
         items: [
           { text: 'Astro', link: '/guides/astro' },
           { text: 'Vite', link: '/guides/vite' },
-          {
-            text: 'Decap CMS',
-            collapsed: true,
-            items: [
-              { text: 'Overview', link: '/guides/decap/' },
-              { text: 'The decap-cms Fork', link: '/guides/decap/fork' },
-              { text: 'Quickstart: FileSystem + Decap', link: '/guides/decap/quickstart-fs' },
-              { text: 'Local Mode Dev Editing', link: '/guides/decap/local-mode' },
-              { text: 'Standalone Worker', link: '/guides/decap/standalone-worker' },
-              { text: 'Serving the Admin Shell', link: '/guides/decap/admin-shell' },
-              { text: 'Authentication', link: '/guides/decap/auth' },
-              { text: 'Widgets & Editor Components', link: '/guides/decap/widgets-and-editors' },
-              { text: 'AI Assistant', link: '/guides/ai-assistant' },
-              { text: 'Git Gateway', link: '/guides/decap/git-gateway' },
-              { text: 'Framework Setup Notes', link: '/guides/decap/frameworks' },
-            ],
-          },
+          { text: 'AI Assistant', link: '/guides/ai-assistant' },
           { text: 'VS Code Extension', link: '/guides/vscode' },
         ],
       },
@@ -203,8 +189,8 @@ export default defineConfig({
       text: 'Edit this page on GitHub',
     },
     footer: {
-      message: 'Released under the MIT License.',
-      copyright: 'Copyright © Contentia contributors',
+      message:
+        'Released under the <a href="https://github.com/contentia-dev/contentia/blob/develop/LICENSE">MIT License</a> · © 2026 Sem Postma',
     },
   },
 });

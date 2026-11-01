@@ -46,9 +46,9 @@ Every command accepts `--help` for its full flag reference, e.g. `contentia loca
 ## `local serve`
 
 Serves content as a JSON:API storage API, the same API a production
-[API server](../guides/api-server.md) exposes. Point the Decap `contentia` backend, a frontend, or
-any JSON:API client at it while you develop. By default it serves a folder of content files;
-`--backend` serves any storage backend `migrate` can use instead.
+[API server](../guides/api-server.md) exposes. Point an admin UI, a frontend, or any JSON:API client
+at it while you develop. By default it serves a folder of content files; `--backend` serves any
+storage backend `migrate` can use instead.
 
 ```sh
 contentia local serve                                   # serve the current directory on 127.0.0.1:3030

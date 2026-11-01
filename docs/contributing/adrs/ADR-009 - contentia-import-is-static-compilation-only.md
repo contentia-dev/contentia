@@ -70,8 +70,8 @@ provide — with typed errors, tracing, and interruptibility — and the caller 
 developer experience: seeing content update live during `vite
 dev`. Local mode (LCMS-449 Slice 1,
 GitHub #847) already solves this by mounting a real JSON:API under `/__contentia` on the dev server,
-using `resolveLaikaBackend` to switch automatically between the local and remote backends. No fetch
-shim is needed for that use case either.
+and the admin points at it in dev and at the deployed API otherwise. No fetch shim is needed for
+that use case either.
 
 ## Consequences
 
@@ -79,7 +79,6 @@ shim is needed for that use case either.
   introduces an async-fetch variant of the `contentia:` import protocol.
 - **SSR consumers use repositories directly.** Documentation and examples show the `runTask` /
   `collectStream` (compat) or `Effect.gen` patterns, not a `contentia:` import in SSR context.
-- **Local mode is the dev-experience answer.** `localApi: true` in the Vite plugin (plus
-  `resolveLaikaBackend` in the admin entry) covers the dev-editing use case that a shim might
-  otherwise be asked to solve. See [Local Mode Dev Editing](../../guides/decap/local-mode) and
-  [Vite](../../guides/vite).
+- **Local mode is the dev-experience answer.** `localApi: true` in the Vite plugin (plus an admin
+  that targets it in dev) covers the dev-editing use case that a shim might otherwise be asked to
+  solve. See [Vite → Local mode](../../guides/vite#local-mode).

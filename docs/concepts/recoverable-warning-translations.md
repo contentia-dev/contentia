@@ -98,7 +98,7 @@ return Result.fail(
 title from the error class's static `TITLE` (most recoverable warnings don't; omit it unless the UI
 needs it).
 
-## Consuming side (Decap UI)
+## Consuming side (a UI)
 
 A consumer with the `translation.message` key can resolve display text via the existing catalog,
 e.g.:
@@ -112,9 +112,9 @@ function localize(key: string, catalog: Translation = defaultMessages): string {
 }
 ```
 
-Until the Decap UI's partial-success affordance lands (tracked separately in `ROADMAP.md`), backends
-should still pass a good plain-English `message` to the `Error` constructor — `translation.message`
-is additive, not a replacement for the English fallback string.
+Backends should still pass a good plain-English `message` to the `Error` constructor:
+`translation.message` is additive, not a replacement for the English fallback string, and not every
+consumer localizes.
 
 ## Reference implementation
 
