@@ -16,8 +16,7 @@
     "format:check": "dprint check",
     "version": "changeset version",
     "smoke:cli": "pnpm build && node scripts/smoke-cli-tarball.mjs",
-    "gen-sbom": "node scripts/generate-sbom.mjs",
-    "release": "pnpm gen-sbom && changeset publish",
+    "release": "changeset publish",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -143,9 +143,6 @@ Thumbs.db
 tmp/
 temp/
 
-# Generated SBOMs (pnpm gen-sbom) — regenerate per release, don't commit
-/sbom/
-
 # Local pnpm store used by release tooling
 /.pnpm-store/
 

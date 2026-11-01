@@ -26,11 +26,17 @@ git push origin develop
 git push origin develop:main    # promote: the workflow publishes
 ```
 
-On `main`, the workflow builds the packages and runs `pnpm release`, which publishes every version
-that isn't on npm yet (a push without a version bump publishes nothing). It then pushes the
-`<package>@<version>` tags and creates the `v<version>` GitHub release, a prerelease for alpha
-versions, with the SBOMs attached. Tests don't run in the workflow: the pre-push hook runs them
-before anything reaches `main`.
+On `main`, the workflow first runs the checks: format, lint, typecheck, tests and the CLI tarball
+smoke test (the same ones the husky hooks run), and a gitleaks scan of everything reachable from
+`main`. It publishes only if they all pass. It then builds the packages and runs `pnpm release`,
+which publishes every version that isn't on npm yet (a push without a version bump publishes
+nothing). Last, it pushes the `<package>@<version>` tags and creates the `v<version>` GitHub
+release, a prerelease for alpha versions.
+
+The checks run only on `main`, to keep Actions minutes down; `develop` relies on the hooks. To run
+them on another branch, start the workflow by hand on it (Actions → Release → Run workflow): it runs
+the checks and skips the publish. If gitleaks flags something that isn't a secret, add its
+fingerprint (printed with the finding) to `.gitleaksignore`.
 
 While `.changeset/pre.json` exists (pre mode), `changeset publish` publishes under the prerelease
 dist-tag (`alpha`, likewise `beta`/`rc`), so `latest` keeps pointing at the last stable release.
@@ -64,12 +70,11 @@ the `prepack` guard (`scripts/check-no-pnpm-catalog-deps.mjs`) runs automaticall
 
 ## SBOM (Software Bill of Materials)
 
-`pnpm gen-sbom` generates a CycloneDX SBOM for each published package (`contentia`,
-`@contentia/vite-plugin`, `@contentia/astro`) via pnpm's built-in `pnpm sbom` command — no extra
-dependency needed. Output goes to `sbom/contentia.cdx.json`, `sbom/contentia-vite-plugin.cdx.json`
-and `sbom/contentia-astro.cdx.json` (all gitignored — regenerate, don't commit). The script is
-`scripts/generate-sbom.mjs`.
+The npm packages ship without an SBOM. Each consumer's tools (Dependabot, Trivy, OSV-Scanner,
+`npm sbom`) build one from their own lockfile, which covers Contentia and the dependency versions
+they actually installed. An SBOM from our lockfile would only list the versions we tested with. If
+an audit asks for one anyway, pnpm generates it:
 
-`pnpm release` runs it before `changeset publish`, and the release workflow attaches the result to
-the GitHub release. Run it by hand (`pnpm gen-sbom`) any time you want a fresh SBOM, e.g. for a
-supply-chain audit.
+```sh
+pnpm --filter contentia sbom --sbom-format cyclonedx --prod > contentia.cdx.json
+```

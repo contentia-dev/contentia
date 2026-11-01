@@ -1,0 +1,57 @@
+# gitleaks false positives in the history, as exact fingerprints (commit:file:rule:line),
+# so the same files are still scanned for anything new. Add a fingerprint here only
+# after checking that the match is not a real secret; rotate it if it is.
+
+# Truncated stub PEMs in the GitHub App private-key normalisation tests.
+10dd6cd7583b2aeb420c6737a84b042671ad1c82:packages/github/src/storage-gh/testing/index.ts:private-key:194
+301e093541c3fd13330417f27d52043f96d91079:packages/integrations/github/src/storage-gh/testing/index.ts:private-key:205
+a1986e9962a468b4beaeac37044b04494bea3525:packages/github/src/storage-gh/github-storage-repository.test.ts:private-key:34
+dc88736772c9b5dc01e0e422fa571e191036a500:packages/github/src/storage-gh/github-storage-repository.test.ts:private-key:11
+f8b8b63addc0eceb7ccc0b682b8ab0ab7c3d0a71:packages/github/src/storage-gh/github-datasource.test.ts:private-key:42
+f8b8b63addc0eceb7ccc0b682b8ab0ab7c3d0a71:packages/github/src/storage-gh/github-datasource.test.ts:private-key:49
+f8b8b63addc0eceb7ccc0b682b8ab0ab7c3d0a71:packages/github/src/storage-gh/github-datasource.test.ts:private-key:56
+f8b8b63addc0eceb7ccc0b682b8ab0ab7c3d0a71:packages/github/src/storage-gh/github-datasource.test.ts:private-key:63
+
+# Test JWTs (jwt.io sample token, sub 1234567890) in the auth tests.
+34581f90d54a6e7e87981122d387fb5b6fc192e4:packages/shared/auth/test/auth.test.ts:jwt:108
+34581f90d54a6e7e87981122d387fb5b6fc192e4:packages/shared/auth/test/auth.test.ts:jwt:115
+
+# RFC 6238 TOTP test vector (base32 of "12345678901234567890").
+fa7b999d8649402cb3defdf680a53f287551ad62:packages/decap/decap-oauth2/src/totp/totp.test.ts:generic-api-key:7
+
+# Passkey test variable names matched as API keys.
+9c826c43ad1096a87f0ad6fa51812bea5a23d7f1:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:838
+9c826c43ad1096a87f0ad6fa51812bea5a23d7f1:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:842
+9c826c43ad1096a87f0ad6fa51812bea5a23d7f1:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:864
+9c826c43ad1096a87f0ad6fa51812bea5a23d7f1:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:885
+9c826c43ad1096a87f0ad6fa51812bea5a23d7f1:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:909
+e27a1d83e5076c7a38760d89b1ceed35a7321106:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:1101
+e27a1d83e5076c7a38760d89b1ceed35a7321106:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:912
+e27a1d83e5076c7a38760d89b1ceed35a7321106:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:940
+e27a1d83e5076c7a38760d89b1ceed35a7321106:packages/decap/src/decap-oauth2/passkey/passkey.test.ts:generic-api-key:982
+
+# Storage keys like parent/child in repository tests.
+166e517187ea9d6ca5b48d605144d34efb1bfcf3:packages/integrations/surrealdb/src/storage-surrealdb/surrealdb-storage-repository.test.ts:generic-api-key:447
+1c8e5939f510bf343fc893ecc865865bd8a34b44:packages/integrations/couchdb/src/storage-couchdb/couchdb-storage-repository.test.ts:generic-api-key:410
+2113828b5982de923868933c54af8f3d9a070e85:packages/integrations/etcd/src/storage-etcd/etcd-storage-repository.test.ts:generic-api-key:405
+2113828b5982de923868933c54af8f3d9a070e85:packages/integrations/ldap/src/storage-ldap/ldap-storage-repository.test.ts:generic-api-key:469
+2da6c8586e8f341461bd127b0a888905ff14e967:packages/laikacms/src/impl/storage-webdav/infrastructure/repositories/webdav-storage-repository.test.ts:generic-api-key:373
+493324c2f229325c8fdbf1ee45d34735e3b027d2:packages/integrations/gel/src/storage-gel/gel-storage-repository.test.ts:generic-api-key:481
+7bd35a5e077bcc85197b8fb270cad724af4a0d44:packages/integrations/neo4j/src/storage-neo4j/neo4j-storage-repository.test.ts:generic-api-key:496
+
+# Base64 sync tokens ({"seq":42}, {"epoch":1700}) in the JSON:API reference examples.
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/assets.md:generic-api-key:639
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/assets.md:generic-api-key:653
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/assets.md:generic-api-key:707
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/documents.md:generic-api-key:1013
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/documents.md:generic-api-key:1027
+7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/documents.md:generic-api-key:1081
+
+# The sk-live-abc123 placeholder in the Decap auth docs.
+d7f8b2cd5e157186a62afd505d333cdaaf93332f:docs/guides/decap/auth.md:generic-api-key:15
+f90b76551a14eb558225521e3543fb16963e65aa:docs/decap-integration.md:generic-api-key:194
+
+# Demo tenant tokens in the removed multi-tenant starter.
+af10319abc601d4f3180796024bfda2981d5b36b:apps/starter-multi-tenant/README.md:curl-auth-header:26
+af10319abc601d4f3180796024bfda2981d5b36b:apps/starter-multi-tenant/README.md:curl-auth-header:30
+af10319abc601d4f3180796024bfda2981d5b36b:apps/starter-multi-tenant/content/tenants/acme/posts/hello-world.md:curl-auth-header:7

@@ -47,8 +47,6 @@ Deliberate cautions to avoid over-positioning Contentia before adoption earns it
 - [x] OAuth2 with PKCE
 - [x] File sanitization
 - [x] Editorial workflow
-- [x] SBOM — `pnpm gen-sbom` (see RELEASING.md), local/publish-time only, no GitHub Actions
-      dependency
 - [x] Effect-based repository contracts + recoverable-warning pipeline — `ContentiaTask` /
       `ContentiaStream` (Effect Channel-backed) carry data, recoverable warnings, progress events,
       and a terminal value/done. Every storage / documents / assets repository interface returns
