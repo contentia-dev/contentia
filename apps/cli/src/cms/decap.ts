@@ -13,7 +13,7 @@ import type { CmsAdapter } from './types.js';
 export const decapAdapter: CmsAdapter = {
   name: 'decap',
   title: 'Decap CMS',
-  description: 'The Contentia fork of Decap CMS',
+  description: 'A Decap CMS config.yml',
   config: {
     discover: discoverConfig,
     defaultOutput: input => path.join(path.dirname(input), 'config.gen.ts'),

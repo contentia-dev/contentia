@@ -176,8 +176,8 @@ export interface DecapAiConfig {
    * Use the standard Vercel AI SDK tool() function to create tools.
    *
    * Client-side tools (getDocumentData, updateDocument) are executed by the
-   * CMS client (see the Dulla transport in laikacms/decap-cms), which is why
-   * they carry no `execute`. Server-side tools should have one.
+   * CMS client, which is why they carry no `execute`. Server-side tools should
+   * have one.
    *
    * @example
    * ```typescript

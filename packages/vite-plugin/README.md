@@ -85,9 +85,8 @@ export default defineConfig({
 - `/__contentia/assets` — the assets repository's JSON:API (`assets-api`'s `buildAssetsApi`), so
   Decap media uploads in dev land locally
 - `/__contentia/session` — a trivial stub-identity responder; local mode does no real auth, so every
-  request gets the same fixed identity. It exists because `LaikaBackend.authenticate()`
-  (`@laikacms/decap-cms/backends/laika`) always pings `${apiUrl}/session` to resolve a display
-  identity, even when the local backend authenticates with a dummy token.
+  request gets the same fixed identity. It mirrors the API server's `/session` endpoint, so a client
+  that resolves the signed-in user from `/session` works against the local API unchanged.
 
 All three repository-backed sub-APIs serve the same repositories the `contentia:` loader reads: by
 default a filesystem storage repository built from `dir`, with the documents and assets repositories

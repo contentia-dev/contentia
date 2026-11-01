@@ -27,7 +27,7 @@ export type { GranularScope, Scope, ScopePolicyOptions } from './scopes.js';
 // PAT / bearer-resolution seam (implementation in contentia/auth). Re-exported
 // so a api consumer can wire scoped bearers (OAuth session + PAT) into
 // authenticateAccessToken from one import, and get user.scopes for the policy
-// above. See decap-cms docs/contributing/learnings/dcb-002-authorization-model.
+// above.
 export {
   hasRequiredScope,
   InsufficientScopeError,
@@ -630,8 +630,8 @@ export const contentiaApi = (options: ContentiaApiOptions): ContentiaApi => {
         });
         // Owner identity is the authenticated principal's, derived here — never
         // trusted from the request body — so a caller can't release/override
-        // another user's lock. `email` matches the client's lock-owner id
-        // (the Decap fork's `user.login`), so "locked-by-me" detection works.
+        // another user's lock. `email` is also in the `/session` response, so a
+        // client that keys lock ownership on it gets "locked-by-me" right.
         return await respond(
           await locksApi.fetch(request, { id: user.email, name: user.name ?? user.email }),
         );

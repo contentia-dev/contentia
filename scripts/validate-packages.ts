@@ -173,18 +173,8 @@ async function fetchSchemaKeyOrder(): Promise<string[]> {
 }
 
 // Valid subdirectories in packages/
-const VALID_SUBDIRS = ['domain', 'impl', 'api', 'serializers', 'shared', 'decap', 'tools'] as const;
+const VALID_SUBDIRS = ['domain', 'impl', 'api', 'serializers', 'shared', 'tools'] as const;
 type ValidSubdir = typeof VALID_SUBDIRS[number];
-
-const DECAP_PATTERNS = {
-  widget: /^decap-cms-widget-[a-z][a-z0-9-]*$/,
-  locale: /^decap-cms-locale-[a-z]{2}(-[A-Z]{2})?$/,
-  editorComponent: /^decap-cms-editor-component-[a-z][a-z0-9-]*$/,
-  backend: /^decap-cms-backend-[a-z][a-z0-9-]*$/,
-  server: /^decap-server-[a-z][a-z0-9-]*$/,
-  oauth2: /^decap-oauth2$/,
-  api: /^decap-api$/,
-};
 
 // Patterns for determining which subdirectory a package should be in
 const SUBDIR_PATTERNS: Record<ValidSubdir, RegExp[]> = {
@@ -219,11 +209,6 @@ const SUBDIR_PATTERNS: Record<ValidSubdir, RegExp[]> = {
     /^json-api$/,
     /^file-sanitizer$/,
     /^token-crypto$/,
-  ],
-
-  // Decap packages (all decap-* packages)
-  decap: [
-    /^decap-/,
   ],
 
   // Development tools
@@ -289,63 +274,6 @@ function validateScope(pkg: PackageJson, pkgPath: string): ValidationError[] {
       path: pkgPath,
       rule: 'scope-required',
       message: `Package name must be scoped with "${ROOT_CONFIG.scope}/". Found: "${pkg.name}"`,
-      severity: 'error',
-    });
-  }
-
-  return errors;
-}
-
-function validateDecapPackageNaming(
-  pkg: PackageJson,
-  pkgPath: string,
-  folderPath: string,
-): ValidationError[] {
-  const errors: ValidationError[] = [];
-  const name = pkg.name.replace(`${ROOT_CONFIG.scope}/`, '');
-
-  // Check if this is in packages/decap/ directory
-  const isInDecapFolder = folderPath.startsWith('packages/decap/');
-
-  // Skip non-decap packages
-  if (!name.startsWith('decap-')) {
-    return errors;
-  }
-
-  if (isInDecapFolder) {
-    // Packages in packages/decap/ should follow any valid decap pattern
-    const validPatterns = Object.values(DECAP_PATTERNS);
-    const matchesPattern = validPatterns.some(pattern => pattern.test(name));
-
-    if (!matchesPattern) {
-      errors.push({
-        package: pkg.name,
-        path: pkgPath,
-        rule: 'decap-folder-naming',
-        message:
-          `Package in packages/decap/ should follow a valid decap pattern (decap-server-<name>, decap-cms-widget-<name>, decap-cms-locale-<locale>, decap-cms-editor-component-<name>, decap-cms-backend-<name>, decap-oauth2, or decap-api). Found: "${name}"`,
-        severity: 'error',
-      });
-    }
-
-    // Check folder name matches package name
-    const folderName = folderPath.split('/').pop();
-    if (folderName && folderName !== name) {
-      errors.push({
-        package: pkg.name,
-        path: pkgPath,
-        rule: 'decap-folder-name-mismatch',
-        message: `Folder name "${folderName}" doesn't match package name "${name}"`,
-        severity: 'warning',
-      });
-    }
-  } else {
-    // Decap packages should be in packages/decap/
-    errors.push({
-      package: pkg.name,
-      path: pkgPath,
-      rule: 'decap-wrong-directory',
-      message: `Decap package "${name}" should be in packages/decap/, not "${folderPath}"`,
       severity: 'error',
     });
   }
@@ -701,7 +629,6 @@ function validatePackage(data: PackageData): ValidationResult {
     ...validateAuthor(pkg, pkgPath),
     ...validatePackageStructure(pkg, pkgPath),
     ...validateDirectoryPlacement(pkg, pkgPath, relativePath),
-    ...validateDecapPackageNaming(pkg, pkgPath, relativePath),
     ...validateKeyOrder(pkg, pkgPath, keys),
   ];
 

@@ -4,7 +4,7 @@
  * shipped defaults, but the vocabulary is open, a consumer may grant its own
  * namespaced scopes (e.g. `shipping:read`). This is the single source of the
  * scope primitives; adapters (`contentia/server/api`) layer their own vocabulary +
- * policy on top, and `decap-cms` keeps a types-only copy for its admin UI.
+ * policy on top.
  *
  * Wildcards:
  * - `admin` (and the equivalent `*`) grant every scope.

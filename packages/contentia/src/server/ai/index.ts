@@ -3,9 +3,8 @@
  *
  * The chat/session HTTP surface behind Decap CMS's assistant: a
  * `fetch(Request) => Response` handler with `POST {base}/chat` plus session
- * list/detail endpoints. It pairs with the `Dulla` transport shipped by
- * laikacms/decap-cms, which implements the CMS's `LlmTransport` interface
- * against these endpoints and executes the document tools client-side.
+ * list/detail endpoints. It pairs with a chat transport in the admin, which
+ * calls these endpoints and executes the document tools client-side.
  *
  * The Vercel AI SDK is an optional peer: install `ai` (and a provider such as
  * `@ai-sdk/anthropic`) to use this module. Re-export `tool`, model factories

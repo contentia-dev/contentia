@@ -8,13 +8,13 @@ the conversation through consumer-supplied callbacks.
 
 This module is the server half of a two-part arrangement:
 
-| Half       | Where it lives                                                      | Job                                                          |
-| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Server** | here (`contentia/server/ai`)                                        | auth, model call, session persistence                        |
-| **Client** | `@laikacms/decap-cms-llm-dulla` (the `Dulla` transport in the fork) | implements the CMS's `LlmTransport`, executes document tools |
+| Half       | Where it lives               | Job                                                       |
+| ---------- | ---------------------------- | --------------------------------------------------------- |
+| **Server** | here (`contentia/server/ai`) | auth, model call, session persistence                     |
+| **Client** | the admin's chat transport   | calls these endpoints, executes the client-side doc tools |
 
-The CMS itself ships no transport and no AI dependency: it defines an `LlmTransport` interface, a
-chat panel, and a translate action. `Dulla` is the implementation that points them at this server.
+The client is not part of Contentia: it is whatever chat transport your admin uses, pointed at these
+endpoints.
 
 ## Optional dependency
 

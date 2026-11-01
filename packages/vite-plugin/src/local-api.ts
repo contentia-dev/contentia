@@ -3,20 +3,18 @@
  *
  * While `vite dev` is running, {@link mountLocalApi} exposes the plugin's own
  * `storage`/`documents`/`assets` repositories through the same JSON:API contract the
- * Decap contentia-backend already speaks, so a JSON:API client (the Decap admin,
- * or any other) can read and write content locally instead of a remote
- * backend. Unauthenticated by design — see the module-level warning below —
+ * API server speaks, so a JSON:API client (an admin UI, or any other) can read
+ * and write content locally instead of a remote backend. Unauthenticated by design — see the module-level warning below —
  * and reachable only through the dev server, because {@link mountLocalApi} is
  * only ever called from `configureServer`; nothing in the `build` phase or
  * `configurePreviewServer` calls it, so a production build has no route to
  * it by construction.
  *
  * `${basePath}/session` is a trivial, unauthenticated stub-identity responder,
- * not a repository-backed sub-API: `LaikaBackend.authenticate()`
- * (`@laikacms/decap-cms/backends/laika`) always pings it to resolve a display identity, even
- * when `resolveLaikaBackend`'s local backend authenticates with a dummy
- * token, so it must exist for the local backend to complete login (LCMS-449
- * slice 2, issue #848).
+ * not a repository-backed sub-API. It mirrors the API server's `/session`
+ * endpoint: a client that resolves the signed-in user from `/session` pings it
+ * even when it authenticated with a dummy token, so it must exist for such a
+ * client to complete login (LCMS-449 slice 2, issue #848).
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -126,13 +124,12 @@ async function writeFetchResponse(response: Response, res: ServerResponse): Prom
 const LOCAL_SESSION_USER = { name: 'Local Dev', email: 'local-dev@contentia.local' };
 
 /**
- * A trivial `${basePath}/session` responder. `resolveLaikaBackend`'s local
- * backend (`@laikacms/decap-cms/backends/laika`) authenticates with a dummy token and never
- * performs the PKCE OAuth dance, but `LaikaBackend.authenticate()` always
- * pings `${apiUrl}/session` to resolve the display identity regardless of how
- * the token was obtained — local mode has no real session to report, so this
- * always succeeds with the same stub identity. Matches the JSON:API shape
- * `decap-api`'s own `/session` endpoint returns.
+ * A trivial `${basePath}/session` responder. A client in local mode
+ * authenticates with a dummy token and never performs the PKCE OAuth dance,
+ * but may still ping `${apiUrl}/session` to resolve the display identity —
+ * local mode has no real session to report, so this always succeeds with the
+ * same stub identity. Matches the JSON:API shape the API server's own
+ * `/session` endpoint (`contentia/server/api`) returns.
  */
 async function sessionHandler(_request: Request): Promise<Response> {
   return new Response(

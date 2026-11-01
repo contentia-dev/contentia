@@ -879,14 +879,14 @@ describe('sub-API routing — GET /assets/capabilities (LCMS-305)', () => {
 });
 
 describe('sub-API routing — basePath propagation (LCMS-305)', () => {
-  it('routes /api/decap/documents/* when basePath is /api/decap', async () => {
+  it('routes /api/cms/documents/* when basePath is /api/cms', async () => {
     const documentsRepo = {
       getCapabilities: () => ContentiaTask.succeed(makeDocumentsCaps()),
     } as unknown as DocumentsRepository;
 
-    const api = contentiaApi(makeOptions({ documents: documentsRepo, basePath: '/api/decap' }));
+    const api = contentiaApi(makeOptions({ documents: documentsRepo, basePath: '/api/cms' }));
     const res = await api.fetch(
-      new Request(`${BASE_URL}/api/decap/documents/capabilities`, {
+      new Request(`${BASE_URL}/api/cms/documents/capabilities`, {
         headers: { Authorization: 'Bearer good-token' },
       }),
     );
@@ -901,7 +901,7 @@ describe('sub-API routing — basePath propagation (LCMS-305)', () => {
       getCapabilities: () => ContentiaTask.succeed(makeDocumentsCaps()),
     } as unknown as DocumentsRepository;
 
-    const api = contentiaApi(makeOptions({ documents: documentsRepo, basePath: '/api/decap' }));
+    const api = contentiaApi(makeOptions({ documents: documentsRepo, basePath: '/api/cms' }));
     const res = await api.fetch(
       new Request(`${BASE_URL}/documents/capabilities`, {
         headers: { Authorization: 'Bearer good-token' },

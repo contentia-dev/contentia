@@ -612,7 +612,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
       description: 'JSON:API-style HTTP interface over a Contentia assets repository: list, fetch, '
         + 'upload, update and delete assets and folders, plus capability introspection. '
         + 'Success responses use the application/vnd.api+json media type. '
-        + '⚠️ The handler ships no authentication — wrap it (e.g. with contentia/decap-api or a custom '
+        + '⚠️ The handler ships no authentication — wrap it (e.g. with contentia/server/api or a custom '
         + 'middleware that validates a Bearer token) before exposing it to an untrusted network, '
         + 'otherwise anyone who can reach it can list, upload, modify, and delete asset binaries.',
       license: { name: 'MIT', identifier: 'MIT' },

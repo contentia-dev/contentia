@@ -72,10 +72,12 @@ a delegation chain.
 
 ### Routing warnings into observability
 
-The Decap backend's `onWarning` hook is the recommended attach point for routing recoverable
-warnings into a host app's observability stack. The callback receives the typed `ContentiaError`
-directly, so its `.code` / `.message` / `.cause` / `.translation` fields are all available for
-tagging.
+Where a host app drains a task at its boundary, the `onProgress` option of `runTask` /
+`collectStream` (`contentia/compat`) is the attach point for routing recoverable warnings into its
+observability stack. Each warning arrives as `{ _tag: 'RecoverableError', error }` with the typed
+`ContentiaError`, so its `.code` / `.message` / `.cause` / `.translation` fields are all available
+for tagging. Over HTTP, the JSON:API servers serialize the same warnings into `meta.warnings`, so a
+client can surface or forward them.
 
 When tagging warnings into Sentry / OpenTelemetry / Datadog / etc., prefer the following conventions
 so distributed traces stay correlatable across the pipeline:
@@ -92,8 +94,12 @@ recording them at `level: 'warning'` (Sentry) / severity `WARN` (OTel) keeps ale
 failures, not user-visible partial successes. Example:
 
 ```ts
-const LaikaBackend = createLaikaBackend({
-  onWarning: e => {
+import { runTask } from 'contentia/compat';
+
+const doc = await runTask(documents.getDocument(key), {
+  onProgress: meta => {
+    if (meta._tag !== 'RecoverableError') return;
+    const e = meta.error;
     Sentry.addBreadcrumb({
       category: 'contentia.warning',
       level: 'warning',

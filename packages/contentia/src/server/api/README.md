@@ -4,10 +4,9 @@
 [![npm](https://img.shields.io/npm/dm/contentia)](https://www.npmjs.com/package/contentia)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/contentia)](https://bundlephobia.com/result?p=contentia)
 
-Decap-compatible HTTP API. A single `fetch(request)` router that composes the `storage`,
-`documents`, `assets`, and `locks` JSON:API sub-APIs behind one authentication + authorization
-boundary, so a Decap CMS admin UI (via `@laikacms/decap-cms/backends/laika`) has one endpoint to
-talk to.
+The Contentia HTTP API. A single `fetch(request)` router that composes the `storage`, `documents`,
+`assets`, and `locks` JSON:API sub-APIs behind one authentication + authorization boundary, so an
+admin UI or app has one endpoint to talk to.
 
 ## Usage
 

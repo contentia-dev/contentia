@@ -662,7 +662,7 @@ function validateOperationShape(operation: AtomicOperation, index: number): Cont
  * Build a JSON:API handler for the documents repository.
  *
  * ⚠️ This handler ships **no authentication**. Wrap it (e.g. with
- * `contentia/decap-api` or a custom middleware that validates a Bearer token)
+ * `contentia/server/api` or a custom middleware that validates a Bearer token)
  * before exposing it to an untrusted network — otherwise anyone who can reach
  * `fetch` can read, create, modify, publish, unpublish, and delete documents
  * and revisions.

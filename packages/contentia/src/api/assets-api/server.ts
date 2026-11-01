@@ -436,7 +436,7 @@ function validateOperationShape(operation: AssetOperation, index: number): Conte
  * Build a JSON:API handler for the assets repository.
  *
  * ⚠️ This handler ships **no authentication**. Wrap it (e.g. with
- * `contentia/decap-api` or a custom middleware that validates a Bearer token)
+ * `contentia/server/api` or a custom middleware that validates a Bearer token)
  * before exposing it to an untrusted network — otherwise anyone who can reach
  * `fetch` can list, upload, modify, and delete asset binaries.
  */

@@ -24,15 +24,14 @@ Deliberate cautions to avoid over-positioning Contentia before adoption earns it
 
 ## Planned
 
-- [ ] More Decap CMS widgets
 - [ ] Real-time collaboration
 - [ ] GraphQL API option _(under consideration — see
       [ADR-002](docs/contributing/decisions/ADR-002-graphql-api-option.md))_
 - [ ] Capability sharing - bubble capabilities up through the chain of repositories; propagate
       capabilities via documents-api, storage-api, and assets-api to be read via proxy packages.
-      _Note: Not currently necessary since Decap doesn't support paging, so everything is downloaded
-      locally and capabilities like search can be done client-side. However, this is vital for
-      supporting bigger datasets in the future._
+      _Note: Not currently necessary since today's admin clients (Decap among them) don't page, so
+      everything is downloaded locally and capabilities like search can be done client-side.
+      However, this is vital for supporting bigger datasets in the future._
 - [ ] White paper for the open Contentia interface — defer the "Spec" / "Standard" / "Protocol" name
       until a second, independent implementer exists (see Positioning caveats)
 - [ ] Contentia creates a homogeneous, backend-agnostic RAG architecture
@@ -43,7 +42,6 @@ Deliberate cautions to avoid over-positioning Contentia before adoption earns it
 
 - [x] Core architecture
 - [x] Cloudflare R2 support
-- [x] Decap CMS backend
 - [x] OAuth2 with PKCE
 - [x] File sanitization
 - [x] Editorial workflow
@@ -59,9 +57,7 @@ Deliberate cautions to avoid over-positioning Contentia before adoption earns it
       JSON:API servers serialize warnings into `meta.warnings` on collection, single-resource, void
       (delete), and per-op atomic results; JSON:API proxy backends read `meta.warnings` from
       upstream responses and re-emit them locally, including `documents-jsonapi-proxy`'s
-      atomic-batch `/operations` path (LCMS-994, #1068). The Decap CMS backend exposes an
-      `onWarning` hook so host apps can route warnings into their own observability (Sentry, toasts,
-      metrics) — defaults to a `console.warn` line so devtools show them.
+      atomic-batch `/operations` path (LCMS-994, #1068).
 - [x] i18n for recoverable warning messages across every storage/document backend — see
       `docs/concepts/recoverable-warning-translations.md` ("Rollout status": Done, no backends
       outstanding).
