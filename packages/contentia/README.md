@@ -115,8 +115,6 @@ peers) · `contentia/server/embedded` (Node.js quick start). See
 
 ## Companion packages
 
-- [`@contentia/github`](https://www.npmjs.com/package/@contentia/github) — GitHub-backed storage
-  repository
 - [`@contentia/aws`](https://www.npmjs.com/package/@contentia/aws) — AWS service implementations
   (DynamoDB, S3 `StorageRepository`)
 - [`@laikacms/decap-cms`](https://www.npmjs.com/package/@laikacms/decap-cms) — Contentia-aware Decap

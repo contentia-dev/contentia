@@ -224,10 +224,8 @@ Login-page i18n bundles are exposed per-module: `contentia/server/oauth2/i18n`, 
 
 ## Companion packages
 
-- [`contentia`](https://www.npmjs.com/package/contentia) — core domain, APIs, serializers
 - [`@laikacms/decap-cms`](https://www.npmjs.com/package/@laikacms/decap-cms) — the Decap CMS fork:
   app shell, widgets (incl. AI chat), contentia backend, config types
-- [`@contentia/github`](https://www.npmjs.com/package/@contentia/github) — GitHub storage
 - [`@contentia/aws`](https://www.npmjs.com/package/@contentia/aws) — AWS implementations
 
 ## Documentation

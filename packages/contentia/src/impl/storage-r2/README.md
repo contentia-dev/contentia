@@ -74,7 +74,7 @@ export default {
   with no data, plus a `recoverableError` (`NotFoundError`) callers can inspect. This matches
   `storage-fs`'s `listAtoms` (though not its `listAtomSummaries`, which is deliberately silent — see
   LCMS-809 in that package's README), `storage-web`, `storage-web-fs`, WebDAV, GitLab, and Bitbucket
-  on both methods, but differs from `@contentia/github`, `storage-drizzle`, and
+  on both methods, but differs from `contentia/storage-github`, `storage-drizzle`, and
   `storage-github-cdn`, which silently return `total: 0` either way. `storage-s3` (any S3-compatible
   client wrapped via `createS3Bucket`) inherits this exact behavior, since it plugs into the same
   `R2StorageRepository`. See LCMS-1004.

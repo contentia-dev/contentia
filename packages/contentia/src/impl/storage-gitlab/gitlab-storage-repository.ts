@@ -36,13 +36,16 @@ import {
 } from 'contentia/storage';
 import * as minimatch from 'minimatch';
 
-import { BitbucketDataSource, type BitbucketDataSourceOptions } from './bitbucket-datasource.js';
+import { GitlabDataSource, type GitlabDataSourceOptions } from './gitlab-datasource.js';
 
-export interface BitbucketStorageRepositoryOptions extends BitbucketDataSourceOptions {
+export interface GitlabStorageRepositoryOptions extends GitlabDataSourceOptions {
   readonly serializerRegistry: StorageSerializerRegistry;
   readonly defaultFileExtension: string;
+  /** Glob patterns to omit from directory listings. */
   readonly ignoreList?: readonly string[];
+  /** Optional `author_name`/`author_email` attached to every commit. */
   readonly commitAuthor?: { readonly name: string, readonly email: string };
+  /** Strategy for picking the on-server extension when creating an object. */
   readonly determineExtension?: DetermineExtension;
 }
 
@@ -59,19 +62,20 @@ const liftResult = <A>(promise: Promise<ContentiaResult<A>>): Effect.Effect<A, C
   Effect.flatMap(Effect.promise(() => promise), Effect.fromResult);
 
 /**
- * A {@link StorageRepository} backed by a Bitbucket Cloud repository.
- * Closes the git-platform triumvirate alongside `@contentia/github` and
- * `@contentia/gitlab`.
+ * A {@link StorageRepository} backed by a GitLab project, talking the REST v4
+ * API. Stores each object as a file in the project's repository on a fixed
+ * branch; reads and writes are commits attributed to the authenticated user
+ * (or to {@link GitlabStorageRepositoryOptions.commitAuthor} when supplied).
  *
- * The Bitbucket-shaped quirk: all writes go through one endpoint. Creates,
- * updates, and deletes are folded into multipart `POST /src` payloads,
- * which means a future "transactional commit" (multiple files in one
- * commit) is a thin layer above `dataSource.commit({...})`. The current
- * repository surface stays one-file-at-a-time for API parity with the
- * other git platforms.
+ * Parallels `contentia/storage-github`'s `GithubStorageRepository`. The
+ * difference is auth: GitLab PATs/OAuth tokens are long-lived so there is no
+ * App installation flow — bring a token, point at a project, and write.
+ *
+ * Runtime-agnostic: only depends on `fetch`. Works on Node, Bun, Deno,
+ * Cloudflare Workers, and the browser.
  */
-export class BitbucketStorageRepository extends StorageRepository {
-  private readonly dataSource: BitbucketDataSource;
+export class GitlabStorageRepository extends StorageRepository {
+  private readonly dataSource: GitlabDataSource;
   private readonly serializerRegistry: StorageSerializerRegistry;
   private readonly defaultFileExtension: string;
   private readonly availableExtensions: readonly string[];
@@ -79,7 +83,7 @@ export class BitbucketStorageRepository extends StorageRepository {
   private readonly commitAuthor?: { readonly name: string, readonly email: string };
   private readonly determineExtension: DetermineExtension;
 
-  constructor(options: BitbucketStorageRepositoryOptions) {
+  constructor(options: GitlabStorageRepositoryOptions) {
     super();
     const {
       serializerRegistry,
@@ -97,13 +101,16 @@ export class BitbucketStorageRepository extends StorageRepository {
     this.availableExtensions = Object.keys(serializerRegistry);
     this.commitAuthor = commitAuthor;
     this.determineExtension = determineExtension;
-    this.dataSource = new BitbucketDataSource(dataSourceOptions);
+    this.dataSource = new GitlabDataSource(dataSourceOptions);
     this.excludeFilter = ignoreList
-      .map(p => minimatch.makeRe(p, { dot: true, partial: true }))
+      .map(pattern => minimatch.makeRe(pattern, { dot: true, partial: true }))
       .filter((re): re is minimatch.MMRegExp => re !== false);
   }
 
-  private resolveExtension(key: string, metadata: StorageObject['metadata'] | undefined): string {
+  private resolveExtension(
+    key: string,
+    metadata: StorageObject['metadata'] | undefined,
+  ): string {
     const requested = this.determineExtension(key, {
       metadata,
       defaultExtension: this.defaultFileExtension,
@@ -119,24 +126,17 @@ export class BitbucketStorageRepository extends StorageRepository {
     return path;
   }
 
-  /** Try each registered extension and return the first that exists on the branch. */
+  /** Probe each registered extension to find the on-server file for an extension-free key. */
   private async resolvePathWithExtension(
     key: string,
-  ): Promise<ContentiaResult<{ path: string, extension: string } | null>> {
+  ): Promise<{ path: string, extension: string } | null> {
     const base = this.stripExtension(key);
-    const probes = await Promise.all(
-      this.availableExtensions.map(async ext => {
-        const meta = await this.dataSource.getFileMeta(`${base}.${ext}`);
-        return { ext, meta };
-      }),
-    );
-    for (const probe of probes) {
-      if (Result.isFailure(probe.meta)) return Result.fail(probe.meta.failure);
-      if (probe.meta.success) {
-        return Result.succeed({ path: `${base}.${probe.ext}`, extension: probe.ext });
-      }
+    for (const ext of this.availableExtensions) {
+      const candidate = `${base}.${ext}`;
+      const meta = await this.dataSource.getFileMeta(candidate);
+      if (Result.isSuccess(meta)) return { path: candidate, extension: ext };
     }
-    return Result.succeed(null);
+    return null;
   }
 
   private async serialize(extension: string, content: StorageObjectContent): Promise<string> {
@@ -166,25 +166,25 @@ export class BitbucketStorageRepository extends StorageRepository {
   getObject(key: string): ContentiaTask.ContentiaTask<StorageObject> {
     return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
-        const resolved = yield* liftResult(this.resolvePathWithExtension(key));
+        const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(key));
         if (!resolved) {
           return yield* Effect.fail(new NotFoundError(`No object found at key "${key}"`));
         }
-        const [meta, raw] = yield* Effect.all(
+        const [contents, meta] = yield* Effect.all(
           [
-            liftResult(this.dataSource.getFileMeta(resolved.path)),
             liftResult(this.dataSource.getFileContents(resolved.path)),
+            liftResult(this.dataSource.getFileMeta(resolved.path)),
           ],
           { concurrency: 2 },
         );
-        const content = yield* Effect.promise(() => this.deserialize(resolved.extension, raw));
+        const content = yield* Effect.promise(() => this.deserialize(resolved.extension, contents.content));
         return {
           type: 'object',
           key: this.stripExtension(resolved.path),
-          createdAt: meta?.createdAt?.toISOString(),
-          updatedAt: meta?.updatedAt?.toISOString(),
+          createdAt: meta.createdAt.toISOString(),
+          updatedAt: meta.updatedAt.toISOString(),
           content,
-          metadata: { extension: resolved.extension, revisionId: meta?.commit },
+          metadata: { extension: resolved.extension, revisionId: meta.lastCommitId },
         } satisfies StorageObject;
       })
     );
@@ -196,7 +196,7 @@ export class BitbucketStorageRepository extends StorageRepository {
         if (!create.content) {
           return yield* Effect.fail(new InvalidData('Object content is required for creation'));
         }
-        const existing = yield* liftResult(this.resolvePathWithExtension(create.key));
+        const existing = yield* Effect.promise(() => this.resolvePathWithExtension(create.key));
         if (existing) {
           return yield* Effect.fail(
             new EntryAlreadyExistsError(
@@ -221,7 +221,7 @@ export class BitbucketStorageRepository extends StorageRepository {
   updateObject(update: StorageObjectUpdate): ContentiaTask.ContentiaTask<StorageObject> {
     return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
-        const resolved = yield* liftResult(this.resolvePathWithExtension(update.key));
+        const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(update.key));
         if (!resolved) {
           return yield* Effect.fail(new NotFoundError(`No object found at key "${update.key}"`));
         }
@@ -229,6 +229,7 @@ export class BitbucketStorageRepository extends StorageRepository {
           const serialized = yield* Effect.promise(() => this.serialize(resolved.extension, update.content!));
           yield* liftResult(
             this.dataSource.createOrUpdate(resolved.path, serialized, {
+              expectedLastCommitId: update.metadata?.revisionId,
               commitMessage: `Update ${resolved.path}`,
               author: this.commitAuthor,
             }),
@@ -242,8 +243,14 @@ export class BitbucketStorageRepository extends StorageRepository {
   createOrUpdateObject(create: StorageObjectCreate): ContentiaTask.ContentiaTask<StorageObject> {
     return ContentiaTask.make<StorageObject>(() =>
       Effect.gen({ self: this }, function*() {
-        const existing = yield* liftResult(this.resolvePathWithExtension(create.key));
-        const ext = existing?.extension ?? this.resolveExtension(create.key, create.metadata);
+        // When metadata pins an extension, honour it — don't let a stale file
+        // at a different extension capture the write.
+        const requested = create.metadata?.extension;
+        const metadataExt = requested && this.serializerRegistry[requested] ? requested : undefined;
+        const existing = metadataExt
+          ? null
+          : yield* Effect.promise(() => this.resolvePathWithExtension(create.key));
+        const ext = metadataExt ?? existing?.extension ?? this.resolveExtension(create.key, create.metadata);
         const path = existing?.path ?? `${this.stripExtension(create.key)}.${ext}`;
         const serialized = create.content
           ? yield* Effect.promise(() => this.serialize(ext, create.content!))
@@ -262,7 +269,8 @@ export class BitbucketStorageRepository extends StorageRepository {
   getFolder(key: string): ContentiaTask.ContentiaTask<Folder> {
     return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
-        // Probing the listing is the cheapest way to confirm the directory exists.
+        // Probing the listing is the cheapest way to confirm the directory
+        // exists — GitLab has no first-class "stat directory" call.
         yield* liftResult(this.dataSource.listDirectory(key));
         const now = new Date(0).toISOString();
         return { type: 'folder', key, createdAt: now, updatedAt: now } satisfies Folder;
@@ -273,7 +281,8 @@ export class BitbucketStorageRepository extends StorageRepository {
   createFolder(folderCreate: FolderCreate): ContentiaTask.ContentiaTask<Folder> {
     return ContentiaTask.make<Folder>(() =>
       Effect.gen({ self: this }, function*() {
-        // Git tracks files, not folders — `.keep` is the convention this suite uses.
+        // Git tracks files, not directories — write a `.keep` so the folder
+        // exists at all. Mirrors the github/storage-fs convention.
         const keepPath = pathCombine(folderCreate.key, '.keep');
         yield* liftResult(
           this.dataSource.createOrUpdate(keepPath, '', {
@@ -289,13 +298,25 @@ export class BitbucketStorageRepository extends StorageRepository {
   getAtom(key: string): ContentiaTask.ContentiaTask<Atom> {
     return ContentiaTask.make<Atom>(() =>
       Effect.gen({ self: this }, function*() {
-        // Bitbucket doesn't expose a cheap "is it a file or a directory" probe
-        // other than fetching meta on the file vs listing the dir. Try the file
-        // surface first; fall through to folder only on NotFoundError — all other
-        // errors (429, 403, 5xx) must propagate unchanged.
-        const probe = yield* Effect.result(ContentiaTask.runValue(this.getObject(key)));
-        if (Result.isSuccess(probe)) return probe.success as Atom;
-        if (!(probe.failure instanceof NotFoundError)) return yield* Effect.fail(probe.failure);
+        const typed = yield* Effect.result(
+          Effect.tryPromise({
+            try: () => this.dataSource.pathType(key),
+            catch: e =>
+              e instanceof NotFoundError
+                ? e
+                : e instanceof Error
+                ? new BadRequestError(e.message)
+                : new BadRequestError(String(e)),
+          }),
+        );
+        // pathType NotFound → fall back to a getObject probe (the path may
+        // be a key without its on-server extension).
+        if (typed._tag === 'Failure') {
+          return yield* ContentiaTask.runValue(this.getObject(key));
+        }
+        if (typed.success === 'file') {
+          return yield* ContentiaTask.runValue(this.getObject(key));
+        }
         return yield* ContentiaTask.runValue(this.getFolder(key));
       })
     );
@@ -358,13 +379,11 @@ export class BitbucketStorageRepository extends StorageRepository {
     });
   }
 
-  private listFolderLevel(
-    folderKey: string,
-  ): Effect.Effect<AtomSummary[], ContentiaError> {
+  private listFolderLevel(folderKey: string): Effect.Effect<AtomSummary[], ContentiaError> {
     return Effect.gen({ self: this }, function*() {
       const listing = yield* liftResult(this.dataSource.listDirectory(folderKey));
       const filtered = listing.filter(entry => this.excludeFilter.every(re => !re.test(entry.path)));
-      return filtered.map(entry => {
+      const summaries: AtomSummary[] = filtered.map(entry => {
         let key = entry.path;
         if (entry.type === 'file') {
           for (const ext of this.availableExtensions) {
@@ -374,8 +393,9 @@ export class BitbucketStorageRepository extends StorageRepository {
             }
           }
         }
-        return { type: entry.type === 'file' ? 'object-summary' : 'folder-summary', key } satisfies AtomSummary;
+        return { type: entry.type === 'file' ? 'object-summary' : 'folder-summary', key };
       });
+      return summaries;
     });
   }
 
@@ -385,23 +405,20 @@ export class BitbucketStorageRepository extends StorageRepository {
         let removed = 0;
         let skipped = 0;
         for (const key of keys) {
-          const resolved = yield* Effect.result(liftResult(this.resolvePathWithExtension(key)));
-          if (Result.isFailure(resolved)) {
-            yield* emit.recoverableError(resolved.failure);
-            skipped += 1;
-            continue;
-          }
-          if (!resolved.success) {
+          const resolved = yield* Effect.promise(() => this.resolvePathWithExtension(key));
+          if (!resolved) {
             yield* emit.recoverableError(new NotFoundError(`No object found at key "${key}"`));
             skipped += 1;
             continue;
           }
-          const deleted = yield* Effect.result(liftResult(
-            this.dataSource.deleteFile(resolved.success.path, {
-              commitMessage: `Delete ${resolved.success.path}`,
-              author: this.commitAuthor,
-            }),
-          ));
+          const deleted = yield* Effect.result(
+            liftResult(
+              this.dataSource.deleteFile(resolved.path, {
+                commitMessage: `Delete ${resolved.path}`,
+                author: this.commitAuthor,
+              }),
+            ),
+          );
           if (Result.isFailure(deleted)) {
             yield* emit.recoverableError(deleted.failure);
             skipped += 1;
@@ -418,16 +435,15 @@ export class BitbucketStorageRepository extends StorageRepository {
   getCapabilities(): ContentiaTask.ContentiaTask<Capabilities> {
     return ContentiaTask.succeed<Capabilities>({
       changes: unsupportedChanges,
-      compatibilityDate: CompatibilityDate.make('2026-05-20'),
+      compatibilityDate: CompatibilityDate.make('2026-05-19'),
       fileExtensions: {
         supported: true,
-        description:
-          'Stores each object as a file in the Bitbucket repository using any registered serializer extension.',
+        description: 'Stores each object as a file in the GitLab project using any registered serializer extension.',
         supportedExtensions: this.serializerRegistry,
       },
       pagination: {
         supported: true,
-        description: 'In-memory slicing over the Bitbucket tree listing; cursor pagination is not exposed.',
+        description: 'In-memory slicing over the GitLab tree listing; cursor pagination is not supported.',
         styles: { offset: true, page: true, cursor: false },
       },
     });

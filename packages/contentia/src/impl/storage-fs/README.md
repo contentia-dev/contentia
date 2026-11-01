@@ -67,8 +67,8 @@ const post = await runTask(repo.getObject('posts/hello-world'));
   folder isn't a warning-worthy condition — every fresh install would otherwise log a spurious
   "recoverable warning" on first admin visit. `listAtoms`'s warning matches GitLab, Bitbucket,
   WebDAV, `storage-r2`/`storage-s3`, `storage-web`, and `storage-web-fs`; the silent
-  `listAtomSummaries` matches `@contentia/github`, `storage-drizzle`, and `storage-github-cdn`
-  (which are silent on both methods). See LCMS-1004.
+  `listAtomSummaries` matches `contentia/storage-github`, `storage-drizzle`, and
+  `storage-github-cdn` (which are silent on both methods). See LCMS-1004.
 
 ## Testing
 

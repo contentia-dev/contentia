@@ -16,7 +16,7 @@ import * as Result from 'effect/Result';
  * - **Directory listings** come from jsDelivr's metadata API (`data.jsdelivr.com`),
  *   which returns the repo's full file tree as JSON.
  *
- * The trade-off versus {@link "@contentia/github".GithubDataSource} is metadata:
+ * The trade-off versus {@link "contentia/storage-github".GithubDataSource} is metadata:
  * a CDN carries no git history, so **commit timestamps are always epoch(0)**.
  * See {@link GithubCdnDataSourceOptions.fetchMeta} for the sha/revision behavior.
  *

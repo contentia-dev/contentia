@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
-import type { StorageRepository } from 'contentia/storage';
+import { Octokit } from '@octokit/rest';
+import { GithubStorageRepository } from 'contentia/storage-github';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -90,43 +91,29 @@ const readOptions = (raw: Record<string, unknown>): GithubOptions => {
 
 export const githubDriver: StorageDriver = {
   name: 'github',
-  packageName: '@contentia/github',
-  version: '0.0.1-alpha.1',
-  subpath: 'storage-gh',
+  packageName: 'contentia',
+  version: '*',
+  subpath: 'storage-github',
   description: 'GitHub repository (commits per write; PAT or GitHub App auth)',
-  build(raw, mod) {
+  build(raw) {
     const options = readOptions(raw);
-    const Ctor = mod.GithubStorageRepository as new(
-      o: Record<string, unknown>,
-    ) => StorageRepository;
-
-    if (options.mode === 'token') {
-      // Build a pre-configured Octokit from the PAT and hand it to the repo
-      // constructor as `octokit` — the underlying GithubDataSource accepts
-      // either an Octokit instance OR raw App credentials.
-      const OctokitCtor = mod.Octokit as new(o: Record<string, unknown>) => unknown;
-      const octokit = new OctokitCtor({ auth: options.token });
-      return new Ctor({
-        octokit,
-        owner: options.owner,
-        repo: options.repo,
-        branch: options.branch,
-        defaultFileExtension: options.defaultFileExtension,
-        commitAuthor: options.commitAuthor,
-        serializerRegistry: defaultSerializerRegistry,
-      });
-    }
-
-    return new Ctor({
-      appId: options.appId,
-      privateKey: options.privateKey,
-      installationId: options.installationId,
+    const common = {
       owner: options.owner,
       repo: options.repo,
       branch: options.branch,
       defaultFileExtension: options.defaultFileExtension,
       commitAuthor: options.commitAuthor,
       serializerRegistry: defaultSerializerRegistry,
-    });
+    };
+    // A token gets a pre-configured Octokit; App credentials let the
+    // repository mint and refresh installation tokens itself.
+    return options.mode === 'token'
+      ? new GithubStorageRepository({ ...common, octokit: new Octokit({ auth: options.token }) })
+      : new GithubStorageRepository({
+        ...common,
+        appId: options.appId,
+        privateKey: options.privateKey,
+        installationId: options.installationId,
+      });
   },
 };

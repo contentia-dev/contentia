@@ -11,9 +11,8 @@ Contentia is a monorepo around **one core package**:
 | ----------- | ---------------------------------------------------------------------------------------------- |
 | `contentia` | Core domain, HTTP APIs and server, storage/document/asset implementations, serializers, utils. |
 
-Alongside them, `packages/github`, `packages/gitlab`, `packages/bitbucket`, and
-`packages/vite-plugin` hold git-host storage adapters and the dev-server plugin. `docs/` is the
-whole contentia.dev site, a VitePress app in the same pnpm workspace.
+Alongside it, `packages/vite-plugin` and `packages/astro` hold the build plugins, and `apps/cli` the
+CLI. `docs/` is the whole contentia.dev site, a VitePress app in the same pnpm workspace.
 
 Each core package follows the same layered, DDD-lite structure (see
 [Architecture](../concepts/architecture)):

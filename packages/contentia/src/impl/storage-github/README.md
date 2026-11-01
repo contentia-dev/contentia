@@ -1,8 +1,16 @@
-# @contentia/github
+# contentia/storage-github
 
 GitHub-backed `StorageRepository` for Contentia. Stores content as commits in a GitHub repository;
 pairs with the FS adapter for local dev so the same flow works against a real git repo with no FS
 required.
+
+```bash
+pnpm add contentia @octokit/rest @octokit/auth-app
+```
+
+`@octokit/rest` and `@octokit/auth-app` are optional peers of `contentia`, loaded the first time
+this backend needs a client, so only projects that use GitHub install them. Import `Octokit` from
+`@octokit/rest` when you build your own client.
 
 ## Auth modes
 
@@ -37,7 +45,7 @@ API calls — no token minting, no TTL management. This is the right choice when
 ## Usage — App mode
 
 ```ts
-import { GithubStorageRepository } from '@contentia/github/storage-gh';
+import { GithubStorageRepository } from 'contentia/storage-github';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 import { yamlSerializer } from 'contentia/storage-serializers-yaml';
 
@@ -63,8 +71,8 @@ Then pass `storage` to `contentiaApi({ storage, ... })`.
 ## Usage — Octokit mode
 
 ```ts
-import { GithubStorageRepository } from '@contentia/github/storage-gh';
 import { Octokit } from '@octokit/rest';
+import { GithubStorageRepository } from 'contentia/storage-github';
 
 // Any fully-configured Octokit instance works — PAT, OAuth, GHE, custom plugins.
 const octokit = new Octokit({ auth: env.GITHUB_TOKEN });
@@ -90,17 +98,18 @@ const storage = new GithubStorageRepository({
 
 ## Behaviour notes
 
-- **Extension hiding.** Keys are extension-free at the boundary, exactly like `@contentia/gitlab`
-  and `contentia/storage-fs`. The on-disk file extension is chosen from the registered serializers
-  and looked up on read.
+- **Extension hiding.** Keys are extension-free at the boundary, exactly like
+  `contentia/storage-gitlab` and `contentia/storage-fs`. The on-disk file extension is chosen from
+  the registered serializers and looked up on read.
 - **Empty directories.** Git tracks files, not directories. `createFolder` writes a `.keep` file
   (filtered out of listings via the `ignoreList`).
 - **Listings on missing folders.** GitHub's API cannot distinguish an empty directory from a missing
   one — both return HTTP 404. The GitHub backend maps 404 → `Result.succeed([])`, so listing a
   missing folder returns `total: 0` with zero summaries and **no** `recoverableError`. `getFolder`
   on a missing folder similarly succeeds, returning a synthetic `Folder` with `createdAt/updatedAt`
-  set to `new Date(0)`. This differs from `@contentia/gitlab` and `@contentia/bitbucket`, which
-  surface missing-folder 404s as `recoverableError` (`NotFoundError`).
+  set to `new Date(0)`. This differs from `contentia/storage-gitlab` and
+  `contentia/storage-bitbucket`, which surface missing-folder 404s as `recoverableError`
+  (`NotFoundError`).
 - **Upsert.** `createOrUpdateObject` maps to GitHub's `createOrUpdateFileContents` endpoint. Pass
   `update.metadata.revisionId` (the file's blob `sha`) for optimistic-concurrency updates.
 - **Rate limits.** Deep listings (Trees API) and write operations count against your installation's
@@ -142,13 +151,13 @@ Auth options are a **discriminated union** — supply either `octokit` **or** th
 
 ### Optional
 
-| Option               | Type                              | Default                     | Description                                                                                                                                                                                                                                                                                    |
-| -------------------- | --------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ignoreList`         | `string[]`                        | See below                   | Glob patterns for files that are excluded from directory listings. Overrides the built-in list entirely when supplied.                                                                                                                                                                         |
-| `commitAuthor`       | `{ name: string, email: string }` | _(none)_                    | Name and email stamped as **both** the `author` and `committer` fields on every GitHub API write call (`createOrUpdateFileContents` and `deleteFile`). Both fields are set explicitly; neither is left for GitHub to default. Omit to let GitHub fall back to the App installation's identity. |
-| `determineExtension` | `DetermineExtension`              | `defaultDetermineExtension` | Custom resolver that picks the file extension for a new object given its key and metadata. Replaces the built-in logic when provided.                                                                                                                                                          |
-| `tokenTtlSeconds`    | `number`                          | `3000` (50 min)             | App mode only. How many seconds before the cached installation token is considered stale and a fresh one is minted. GitHub installation tokens last ~1 hour; the default refreshes well before expiry.                                                                                         |
-| `userAgent`          | `string`                          | `'@contentia/github'`       | `User-Agent` header sent on every Octokit request.                                                                                                                                                                                                                                             |
+| Option               | Type                              | Default                      | Description                                                                                                                                                                                                                                                                                    |
+| -------------------- | --------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ignoreList`         | `string[]`                        | See below                    | Glob patterns for files that are excluded from directory listings. Overrides the built-in list entirely when supplied.                                                                                                                                                                         |
+| `commitAuthor`       | `{ name: string, email: string }` | _(none)_                     | Name and email stamped as **both** the `author` and `committer` fields on every GitHub API write call (`createOrUpdateFileContents` and `deleteFile`). Both fields are set explicitly; neither is left for GitHub to default. Omit to let GitHub fall back to the App installation's identity. |
+| `determineExtension` | `DetermineExtension`              | `defaultDetermineExtension`  | Custom resolver that picks the file extension for a new object given its key and metadata. Replaces the built-in logic when provided.                                                                                                                                                          |
+| `tokenTtlSeconds`    | `number`                          | `3000` (50 min)              | App mode only. How many seconds before the cached installation token is considered stale and a fresh one is minted. GitHub installation tokens last ~1 hour; the default refreshes well before expiry.                                                                                         |
+| `userAgent`          | `string`                          | `'contentia/storage-github'` | `User-Agent` header sent on every Octokit request.                                                                                                                                                                                                                                             |
 
 #### Default `ignoreList`
 

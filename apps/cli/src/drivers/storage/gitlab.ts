@@ -1,4 +1,4 @@
-import type { StorageRepository } from 'contentia/storage';
+import { GitlabStorageRepository } from 'contentia/storage-gitlab';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -50,15 +50,12 @@ const readOptions = (raw: Record<string, unknown>): GitlabOptions => {
 
 export const gitlabDriver: StorageDriver = {
   name: 'gitlab',
-  packageName: '@contentia/gitlab',
-  version: '0.0.1-alpha.1',
-  subpath: 'storage-gl',
+  packageName: 'contentia',
+  version: '*',
+  subpath: 'storage-gitlab',
   description: 'GitLab project (commits per write, via PAT/OAuth/CI job token)',
-  build(raw, mod) {
+  build(raw) {
     const options = readOptions(raw);
-    const Ctor = mod.GitlabStorageRepository as new(
-      o: GitlabOptions & { serializerRegistry: typeof defaultSerializerRegistry },
-    ) => StorageRepository;
-    return new Ctor({ ...options, serializerRegistry: defaultSerializerRegistry });
+    return new GitlabStorageRepository({ ...options, serializerRegistry: defaultSerializerRegistry });
   },
 };

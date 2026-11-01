@@ -56,10 +56,11 @@
   },
   "devDependencies": {
     "@hono/node-server": "^2.0.2",
+    "@octokit/rest": "catalog:octokit",
     "@types/js-yaml": "catalog:types",
     "@types/node": "catalog:types",
-    "hono": "catalog:server",
     "contentia": "workspace:*",
+    "hono": "catalog:server",
     "rimraf": "catalog:tools",
     "tsup": "catalog:tools",
     "typescript": "catalog:tools",

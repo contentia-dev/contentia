@@ -96,9 +96,8 @@ value.
 `storage.backend` accepts any backend listed by `contentia local list-backends`, with that backend's
 options (see the [adapter pages](../adapters/)). Switching backends is a config change.
 
-The server never installs packages at startup. The git hosts need their package installed next to
-the CLI (`npm install @contentia/github`, `@contentia/gitlab` or `@contentia/bitbucket`), and S3
-needs `@aws-sdk/client-s3`.
+The server never installs packages at startup. Every backend is built in except S3, which needs
+`@aws-sdk/client-s3` installed next to the CLI.
 
 ## Authentication
 

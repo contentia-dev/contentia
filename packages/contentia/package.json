@@ -176,6 +176,21 @@
       "import": "./dist/impl/storage-github-cdn/index.js",
       "default": "./dist/impl/storage-github-cdn/index.js"
     },
+    "./storage/github": {
+      "types": "./dist/impl/storage-github/index.d.ts",
+      "import": "./dist/impl/storage-github/index.js",
+      "default": "./dist/impl/storage-github/index.js"
+    },
+    "./storage/gitlab": {
+      "types": "./dist/impl/storage-gitlab/index.d.ts",
+      "import": "./dist/impl/storage-gitlab/index.js",
+      "default": "./dist/impl/storage-gitlab/index.js"
+    },
+    "./storage/bitbucket": {
+      "types": "./dist/impl/storage-bitbucket/index.d.ts",
+      "import": "./dist/impl/storage-bitbucket/index.js",
+      "default": "./dist/impl/storage-bitbucket/index.js"
+    },
     "./storage/jsonapi-proxy": {
       "types": "./dist/impl/storage-jsonapi-proxy/index.d.ts",
       "import": "./dist/impl/storage-jsonapi-proxy/index.js",
@@ -356,6 +371,21 @@
       "import": "./dist/impl/storage-github-cdn/index.js",
       "default": "./dist/impl/storage-github-cdn/index.js"
     },
+    "./storage-github": {
+      "types": "./dist/impl/storage-github/index.d.ts",
+      "import": "./dist/impl/storage-github/index.js",
+      "default": "./dist/impl/storage-github/index.js"
+    },
+    "./storage-gitlab": {
+      "types": "./dist/impl/storage-gitlab/index.d.ts",
+      "import": "./dist/impl/storage-gitlab/index.js",
+      "default": "./dist/impl/storage-gitlab/index.js"
+    },
+    "./storage-bitbucket": {
+      "types": "./dist/impl/storage-bitbucket/index.d.ts",
+      "import": "./dist/impl/storage-bitbucket/index.js",
+      "default": "./dist/impl/storage-bitbucket/index.js"
+    },
     "./storage-jsonapi-proxy": {
       "types": "./dist/impl/storage-jsonapi-proxy/index.d.ts",
       "import": "./dist/impl/storage-jsonapi-proxy/index.js",
@@ -490,7 +520,9 @@
     "@cloudflare/workers-types": "*",
     "@ai-sdk/anthropic": "^4.0.16",
     "@ai-sdk/openai": "^4.0.16",
-    "ai": "^7.0.31"
+    "ai": "^7.0.31",
+    "@octokit/auth-app": "^7.1.4",
+    "@octokit/rest": "^22.0.1"
   },
   "peerDependenciesMeta": {
     "@cloudflare/workers-types": {
@@ -504,6 +536,12 @@
     },
     "ai": {
       "optional": true
+    },
+    "@octokit/auth-app": {
+      "optional": true
+    },
+    "@octokit/rest": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -511,6 +549,8 @@
     "@ai-sdk/openai": "catalog:ai",
     "@cloudflare/workers-types": "catalog:types",
     "@hono/node-server": "catalog:server",
+    "@octokit/auth-app": "catalog:octokit",
+    "@octokit/rest": "catalog:octokit",
     "@types/js-yaml": "catalog:types",
     "@types/json-schema": "catalog:types",
     "@types/node": "catalog:types",

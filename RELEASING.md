@@ -38,9 +38,8 @@ Consumers install with `npm install contentia@alpha`. Enter pre mode with
 `pnpm changeset pre enter alpha` and end it with `pnpm changeset pre exit` before versioning the
 stable release.
 
-`@contentia/github`, `@contentia/gitlab`, `@contentia/bitbucket` and `@contentia/cli` are **not**
-part of the changeset `fixed` group: they version independently. Select only them in
-`pnpm changeset` and release the same way; the GitHub release follows the core version.
+`@contentia/cli` is **not** part of the changeset `fixed` group: it versions independently. Select
+only it in `pnpm changeset` and release the same way; the GitHub release follows the core version.
 
 ## One-time setup
 
@@ -66,11 +65,9 @@ the `prepack` guard (`scripts/check-no-pnpm-catalog-deps.mjs`) runs automaticall
 ## SBOM (Software Bill of Materials)
 
 `pnpm gen-sbom` generates a CycloneDX SBOM for each published package (`contentia`,
-`@contentia/vite-plugin`, `@contentia/astro`, `@contentia/github`, `@contentia/gitlab`,
-`@contentia/bitbucket`) via pnpm's built-in `pnpm sbom` command — no extra dependency needed. Output
-goes to `sbom/contentia.cdx.json`, `sbom/contentia-vite-plugin.cdx.json`,
-`sbom/contentia-astro.cdx.json`, `sbom/contentia-github.cdx.json`, `sbom/contentia-gitlab.cdx.json`,
-and `sbom/contentia-bitbucket.cdx.json` (all gitignored — regenerate, don't commit). The script is
+`@contentia/vite-plugin`, `@contentia/astro`) via pnpm's built-in `pnpm sbom` command — no extra
+dependency needed. Output goes to `sbom/contentia.cdx.json`, `sbom/contentia-vite-plugin.cdx.json`
+and `sbom/contentia-astro.cdx.json` (all gitignored — regenerate, don't commit). The script is
 `scripts/generate-sbom.mjs`.
 
 `pnpm release` runs it before `changeset publish`, and the release workflow attaches the result to

@@ -33,43 +33,45 @@ describe('GithubDataSource.normalizePrivateKey', () => {
     createAppAuthMock.mockReturnValue(async () => ({ token: 'installation-token' }));
   });
 
-  const buildAndGetNormalizedKey = (privateKey: string): string => {
-    new GithubDataSource({ ...APP_AUTH_OPTIONS, privateKey });
+  const buildAndGetNormalizedKey = async (privateKey: string): Promise<string> => {
+    const ds = new GithubDataSource({ ...APP_AUTH_OPTIONS, privateKey });
+    // createAppAuth runs on the first request, when the optional Octokit peers load.
+    await (ds as unknown as { getOctokit(): Promise<unknown> }).getOctokit();
     const passedOptions = createAppAuthMock.mock.calls.at(-1)?.[0] as { privateKey: string };
     return passedOptions.privateKey;
   };
 
-  it('strips literal \\n sequences into real newlines', () => {
+  it('strips literal \\n sequences into real newlines', async () => {
     const raw = '-----BEGIN RSA PRIVATE KEY-----\\nMIIEow\\n-----END RSA PRIVATE KEY-----';
-    expect(buildAndGetNormalizedKey(raw)).toBe(
+    expect(await buildAndGetNormalizedKey(raw)).toBe(
       '-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----',
     );
   });
 
-  it('strips surrounding double quotes', () => {
+  it('strips surrounding double quotes', async () => {
     const raw = '"-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----"';
-    expect(buildAndGetNormalizedKey(raw)).toBe(
+    expect(await buildAndGetNormalizedKey(raw)).toBe(
       '-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----',
     );
   });
 
-  it('strips both literal \\n and surrounding quotes together', () => {
+  it('strips both literal \\n and surrounding quotes together', async () => {
     const raw = '"-----BEGIN RSA PRIVATE KEY-----\\nMIIEow\\n-----END RSA PRIVATE KEY-----"';
-    expect(buildAndGetNormalizedKey(raw)).toBe(
+    expect(await buildAndGetNormalizedKey(raw)).toBe(
       '-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----',
     );
   });
 
-  it('leaves an already-normalized key untouched', () => {
+  it('leaves an already-normalized key untouched', async () => {
     const raw = '-----BEGIN RSA PRIVATE KEY-----\nMIIEow\n-----END RSA PRIVATE KEY-----';
-    expect(buildAndGetNormalizedKey(raw)).toBe(raw);
+    expect(await buildAndGetNormalizedKey(raw)).toBe(raw);
   });
 
-  it('does not touch quotes or newlines in the middle of the key', () => {
+  it('does not touch quotes or newlines in the middle of the key', async () => {
     const raw = '-----BEGIN"KEY-----\nmiddle\\nchunk\n-----END"KEY-----';
     // Only real newlines from \n-escapes are converted and only *leading/trailing* quotes
     // are stripped — embedded quotes are preserved.
-    expect(buildAndGetNormalizedKey(raw)).toBe('-----BEGIN"KEY-----\nmiddle\nchunk\n-----END"KEY-----');
+    expect(await buildAndGetNormalizedKey(raw)).toBe('-----BEGIN"KEY-----\nmiddle\nchunk\n-----END"KEY-----');
   });
 });
 

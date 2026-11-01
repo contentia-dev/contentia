@@ -284,15 +284,15 @@ See the full options reference in
 `contentiaApi(...)` is runtime-agnostic — the only thing that changes between Node and the edge is
 which `StorageRepository` you construct:
 
-| Storage repo                  | Subpath                           | Runtime                                          |
-| ----------------------------- | --------------------------------- | ------------------------------------------------ |
-| `FileSystemStorageRepository` | `contentia/storage-fs`            | Node, Bun, Deno (needs `node:fs`)                |
-| `R2StorageRepository`         | `contentia/storage-r2`            | V8 isolates (Workers, Vercel Edge)               |
-| `DrizzleStorageRepository`    | `contentia/storage-drizzle`       | Any SQL DB via Drizzle ORM                       |
-| `WebDavStorageRepository`     | `contentia/storage-webdav`        | Any RFC 4918 WebDAV server                       |
-| `GithubStorageRepository`     | `@contentia/github/storage-gh`    | Runtime-agnostic (`fetch`-only); GitHub repos    |
-| `GitlabStorageRepository`     | `@contentia/gitlab/storage-gl`    | Runtime-agnostic (`fetch`-only); GitLab repos    |
-| `BitbucketStorageRepository`  | `@contentia/bitbucket/storage-bb` | Runtime-agnostic (`fetch`-only); Bitbucket repos |
+| Storage repo                  | Subpath                       | Runtime                                          |
+| ----------------------------- | ----------------------------- | ------------------------------------------------ |
+| `FileSystemStorageRepository` | `contentia/storage-fs`        | Node, Bun, Deno (needs `node:fs`)                |
+| `R2StorageRepository`         | `contentia/storage-r2`        | V8 isolates (Workers, Vercel Edge)               |
+| `DrizzleStorageRepository`    | `contentia/storage-drizzle`   | Any SQL DB via Drizzle ORM                       |
+| `WebDavStorageRepository`     | `contentia/storage-webdav`    | Any RFC 4918 WebDAV server                       |
+| `GithubStorageRepository`     | `contentia/storage-github`    | Runtime-agnostic (`fetch`-only); GitHub repos    |
+| `GitlabStorageRepository`     | `contentia/storage-gitlab`    | Runtime-agnostic (`fetch`-only); GitLab repos    |
+| `BitbucketStorageRepository`  | `contentia/storage-bitbucket` | Runtime-agnostic (`fetch`-only); Bitbucket repos |
 
 Wrap the repo in `CatalogDocumentsRepository` / `CatalogAssetsRepository`, pass them to
 `contentiaApi(...)`, and mount `.fetch` from your framework's catch-all route. `contentiaApi(...)`
@@ -334,9 +334,9 @@ These are the things that consistently bite first-time integrators:
    Bun S3 don't have first-party adapters yet — for those platforms write a small
    `StorageRepository` adapter or use one of the git-backed repos:
    ```ts
-   import { BitbucketStorageRepository } from '@contentia/bitbucket/storage-bb';
-   import { GithubStorageRepository } from '@contentia/github/storage-gh';
-   import { GitlabStorageRepository } from '@contentia/gitlab/storage-gl';
+   import { BitbucketStorageRepository } from 'contentia/storage-bitbucket';
+   import { GithubStorageRepository } from 'contentia/storage-github';
+   import { GitlabStorageRepository } from 'contentia/storage-gitlab';
    ```
 
 6. **Hide the Decap admin shell from your framework's hydration.** SSR frameworks hydrate the whole

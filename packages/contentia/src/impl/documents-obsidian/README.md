@@ -124,5 +124,5 @@ therefore unsupported:
 
 No built-in `DocumentsRepository` with revision history exists yet. If you need file-level history,
 pair a `DocumentsRepository` that delegates to a storage backend with change tracking — for example
-`GithubStorageRepository` from `@contentia/github` (a `StorageRepository`) preserves each write as a
-GitHub commit, giving you a per-file audit trail at the storage layer.
+`GithubStorageRepository` from `contentia/storage-github` (a `StorageRepository`) preserves each
+write as a GitHub commit, giving you a per-file audit trail at the storage layer.

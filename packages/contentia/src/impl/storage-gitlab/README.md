@@ -1,10 +1,10 @@
-# `@contentia/gitlab`
+# `contentia/storage-gitlab`
 
 GitLab-backed `StorageRepository` for Contentia. Stores content as commits in a GitLab project via
 the REST v4 API; authenticates with a Personal Access Token, an OAuth bearer token, or a CI job
-token. The runtime parallel of [`@contentia/github`](../github), with one major simplification:
-GitLab tokens are long-lived, so there is no App-installation flow — bring a token, point at a
-project, and write.
+token. The runtime parallel of [`contentia/storage-github`](../storage-github), with one major
+simplification: GitLab tokens are long-lived, so there is no App-installation flow — bring a token,
+point at a project, and write.
 
 Runtime-agnostic: only depends on `fetch`. Works on Node, Bun, Deno, Cloudflare Workers, and the
 browser.
@@ -22,7 +22,7 @@ bearer tokens (`oauthToken`) over PATs.
 ## Usage
 
 ```ts
-import { GitlabStorageRepository } from '@contentia/gitlab/storage-gl';
+import { GitlabStorageRepository } from 'contentia/storage-gitlab';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 
 const repo = new GitlabStorageRepository({
@@ -106,18 +106,19 @@ new GitlabStorageRepository({
 
 ## Behaviour notes
 
-- **Extension hiding.** Keys are extension-free at the boundary, exactly like `@contentia/github`
-  and `contentia/storage-fs`. The on-server file extension is chosen from the registered serializers
-  and looked up on read.
+- **Extension hiding.** Keys are extension-free at the boundary, exactly like
+  `contentia/storage-github` and `contentia/storage-fs`. The on-server file extension is chosen from
+  the registered serializers and looked up on read.
 - **Upsert via POST → PUT.** `createOrUpdate` first tries `POST /repository/files/...` (create); on
   the "already exists" path (HTTP 400 with the matching message) it transparently retries with `PUT`
   (update). The `revisionId` returned in `metadata` is the file's `last_commit_id`, which you can
   pass back via `update.metadata.revisionId` for optimistic-concurrency updates.
 - **Empty directories.** Git tracks files, not directories. `createFolder` writes a `.keep` file
-  (filtered out of listings via the same ignore list as `storage-fs` and `@contentia/github`).
+  (filtered out of listings via the same ignore list as `storage-fs` and
+  `contentia/storage-github`).
 - **Listings on missing folders** are reported as `recoverableErrors` (a `NotFoundError`). Note that
-  `@contentia/github` behaves differently: GitHub's API cannot distinguish an empty directory from a
-  missing one (both return 404), so the GitHub backend maps 404 → empty results instead of a
+  `contentia/storage-github` behaves differently: GitHub's API cannot distinguish an empty directory
+  from a missing one (both return 404), so the GitHub backend maps 404 → empty results instead of a
   `NotFoundError`. Bitbucket matches GitLab — missing folders surface as a `recoverableError`.
 - **Pagination.** Cursor pagination is not supported. The directory listing pages through
   `X-Next-Page` until exhausted, then offset/page styles are applied in memory.
@@ -126,7 +127,7 @@ new GitlabStorageRepository({
   implementation — e.g. a mocked `fetch` in tests, or an instrumented/proxied one on a runtime
   without a global `fetch`.
 - **`userAgent`.** Sent as the `User-Agent` header on every request. Defaults to
-  `@contentia/gitlab`. Override it to identify your app in GitLab's request logs, e.g.
+  `contentia/storage-gitlab`. Override it to identify your app in GitLab's request logs, e.g.
   `userAgent: 'my-cms/1.4.0'`.
 
 ## What this does not do

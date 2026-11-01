@@ -1,4 +1,4 @@
-import type { StorageRepository } from 'contentia/storage';
+import { BitbucketStorageRepository } from 'contentia/storage-bitbucket';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -64,15 +64,12 @@ const readOptions = (raw: Record<string, unknown>): BitbucketOptions => {
 
 export const bitbucketDriver: StorageDriver = {
   name: 'bitbucket',
-  packageName: '@contentia/bitbucket',
-  version: '0.0.1-alpha.1',
-  subpath: 'storage-bb',
+  packageName: 'contentia',
+  version: '*',
+  subpath: 'storage-bitbucket',
   description: 'Bitbucket Cloud repository (commits per write, via app password/OAuth2)',
-  build(raw, mod) {
+  build(raw) {
     const options = readOptions(raw);
-    const Ctor = mod.BitbucketStorageRepository as new(
-      o: BitbucketOptions & { serializerRegistry: typeof defaultSerializerRegistry },
-    ) => StorageRepository;
-    return new Ctor({ ...options, serializerRegistry: defaultSerializerRegistry });
+    return new BitbucketStorageRepository({ ...options, serializerRegistry: defaultSerializerRegistry });
   },
 };

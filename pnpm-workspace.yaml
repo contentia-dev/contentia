@@ -1,8 +1,5 @@
 packages:
   - "packages/contentia"
-  - "packages/github"
-  - "packages/gitlab"
-  - "packages/bitbucket"
   - "packages/vite-plugin"
   - "packages/astro"
   - "docs"

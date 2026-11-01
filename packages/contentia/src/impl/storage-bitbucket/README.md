@@ -1,17 +1,17 @@
-# `@contentia/bitbucket`
+# `contentia/storage-bitbucket`
 
 A Bitbucket-backed `StorageRepository` for Contentia via the
 [Cloud REST v2 API](https://developer.atlassian.com/cloud/bitbucket/rest/intro/). Completes the
-git-platform triumvirate alongside [`@contentia/github`](../github) and
-[`@contentia/gitlab`](../gitlab).
+git-platform triumvirate alongside [`contentia/storage-github`](../storage-github) and
+[`contentia/storage-gitlab`](../storage-gitlab).
 
 Runtime-agnostic — only depends on `fetch`. Works on Node, Bun, Deno, Cloudflare Workers, and the
 browser.
 
-## `@contentia/bitbucket/storage-bb`
+## `contentia/storage-bitbucket`
 
 ```ts
-import { BitbucketStorageRepository } from '@contentia/bitbucket/storage-bb';
+import { BitbucketStorageRepository } from 'contentia/storage-bitbucket';
 import { markdownSerializer } from 'contentia/storage-serializers-markdown';
 
 const repo = new BitbucketStorageRepository({

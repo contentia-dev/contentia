@@ -64,10 +64,10 @@ export default {
 
 ## Packages
 
-This repository carries the two core packages. The storage/asset adapters (`@contentia/aws`,
-`@contentia/github`, …), `@contentia/cli`, `@contentia/git-gateway`, the `portable-text-*` mappers,
-and the example apps were moved out into their own repositories in June 2026 — see
-[Imports](./docs/reference/imports.md) for how to install each one.
+This repository carries the two core packages. Some storage/asset adapters (`@contentia/aws`, …),
+`@contentia/cli`, `@contentia/git-gateway`, the `portable-text-*` mappers, and the example apps were
+moved out into their own repositories in June 2026 — see [Imports](./docs/reference/imports.md) for
+how to install each one.
 
 | Package     | Description                                                                                                                                                                               |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

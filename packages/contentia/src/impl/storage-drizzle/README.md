@@ -111,9 +111,9 @@ Valid `pagination` shapes for `listAtoms` / `listAtomSummaries`:
   children) — the refusal is surfaced as a stream `recoverableError`, not a fatal error.
 - **Listings on missing folders.** SQL cannot distinguish an empty folder from a missing one — both
   produce zero matching rows. `listAtoms`/`listAtomSummaries` return `total: 0` with no data and
-  **no** `recoverableError` for a missing folder key. This matches `@contentia/github` behaviour but
-  differs from GitLab, WebDAV, `web`, and `web-fs`, which surface a `NotFoundError` recoverableError
-  so callers can detect stale or misspelled folder keys.
+  **no** `recoverableError` for a missing folder key. This matches `contentia/storage-github`
+  behaviour but differs from GitLab, WebDAV, `web`, and `web-fs`, which surface a `NotFoundError`
+  recoverableError so callers can detect stale or misspelled folder keys.
 - **Content serialization.** `StorageObjectContent` is stored as a JSON string in the `content`
   column; invalid JSON on read surfaces as an `InvalidData` recoverableError.
 

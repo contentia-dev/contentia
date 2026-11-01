@@ -15,20 +15,20 @@
 
 - key: github
   name: GitHub
-  icon: packages/github/icon.svg
-  iconDark: packages/github/icon-dark.svg
-  storage: packages/github
+  icon: packages/contentia/src/impl/storage-github/icon.svg
+  iconDark: packages/contentia/src/impl/storage-github/icon-dark.svg
+  storage: packages/contentia/src/impl/storage-github
 
 - key: gitlab
   name: GitLab
-  icon: packages/gitlab/icon.svg
-  storage: packages/gitlab
+  icon: packages/contentia/src/impl/storage-gitlab/icon.svg
+  storage: packages/contentia/src/impl/storage-gitlab
 
 - key: bitbucket
   name: Bitbucket
-  icon: packages/bitbucket/icon.svg
-  iconDark: packages/bitbucket/icon-dark.svg
-  storage: packages/bitbucket
+  icon: packages/contentia/src/impl/storage-bitbucket/icon.svg
+  iconDark: packages/contentia/src/impl/storage-bitbucket/icon-dark.svg
+  storage: packages/contentia/src/impl/storage-bitbucket
 
 - key: github-cdn
   name: GitHub CDN

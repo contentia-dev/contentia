@@ -16,9 +16,6 @@ const packages = [
   'contentia',
   '@contentia/vite-plugin',
   '@contentia/astro',
-  '@contentia/github',
-  '@contentia/gitlab',
-  '@contentia/bitbucket',
 ];
 
 mkdirSync(outDir, { recursive: true });

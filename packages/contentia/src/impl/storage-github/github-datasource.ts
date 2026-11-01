@@ -1,5 +1,5 @@
-import { createAppAuth } from '@octokit/auth-app';
-import { Octokit } from '@octokit/rest';
+import type { createAppAuth } from '@octokit/auth-app';
+import type { Octokit } from '@octokit/rest';
 import {
   ConflictError,
   DirInsteadOfFile,
@@ -47,7 +47,7 @@ interface GithubDirEntry {
 }
 
 const DEFAULT_TOKEN_TTL_SECONDS = 50 * 60;
-const DEFAULT_USER_AGENT = '@contentia/github';
+const DEFAULT_USER_AGENT = 'contentia/storage-github';
 
 /**
  * Convert a base64 string to UTF-8 text. Works in both Node and Workers
@@ -92,7 +92,8 @@ export class GithubDataSource {
   private readonly tokenTtlMs: number;
 
   private readonly externalOctokit?: Octokit;
-  private readonly auth?: ReturnType<typeof createAppAuth>;
+  private readonly appCredentials?: { appId: string | number, privateKey: string, installationId: string | number };
+  private auth?: ReturnType<typeof createAppAuth>;
 
   private cachedOctokit?: Octokit;
   private cachedTokenExpiry = 0;
@@ -107,11 +108,11 @@ export class GithubDataSource {
     if (opts.octokit) {
       this.externalOctokit = opts.octokit;
     } else {
-      this.auth = createAppAuth({
+      this.appCredentials = {
         appId: opts.appId,
         privateKey: this.normalizePrivateKey(opts.privateKey),
         installationId: opts.installationId,
-      });
+      };
     }
   }
 
@@ -128,7 +129,15 @@ export class GithubDataSource {
     if (this.externalOctokit) return this.externalOctokit;
     if (this.cachedOctokit && Date.now() < this.cachedTokenExpiry) return this.cachedOctokit;
 
-    const result = await this.auth!({ type: 'installation' });
+    // `@octokit/rest` and `@octokit/auth-app` are optional peers of `contentia`,
+    // loaded the first time App credentials need a client, so importing this
+    // module never requires them.
+    const [{ createAppAuth }, { Octokit }] = await Promise.all([
+      import('@octokit/auth-app'),
+      import('@octokit/rest'),
+    ]);
+    this.auth ??= createAppAuth(this.appCredentials!);
+    const result = await this.auth({ type: 'installation' });
     const token = (result as { token: string }).token;
     this.cachedOctokit = new Octokit({ auth: token, userAgent: this.userAgent });
     this.cachedTokenExpiry = Date.now() + this.tokenTtlMs;

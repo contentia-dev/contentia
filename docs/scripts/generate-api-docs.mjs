@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * Prebuild step: generates the TypeScript API reference for every published package under
- * `packages/` (`contentia`, `@contentia/github`, ...) from source with TypeDoc
+ * `packages/` (`contentia`, `@contentia/astro`, ...) from source with TypeDoc
  * (typedoc-plugin-markdown + typedoc-vitepress-theme).
  *
  * Entry points are derived from each package's `package.json` `exports`, so every public
  * subpath gets a page and nothing private does. Each module is named after its import
- * specifier (`contentia/storage/fs`, `@contentia/github/storage-gh`, ...) rather than its
+ * specifier (`contentia/storage/fs`, `@contentia/astro/loader`, ...) rather than its
  * source path.
  *
  * All packages go through one TypeDoc run on a tsconfig that extends the core package's, so

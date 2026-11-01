@@ -106,10 +106,10 @@ doesn't stick.
 - **Listings on missing folders.** `GithubCdnDataSource.listDirectory` returns an empty array (not
   an error) when the path isn't found in the cached tree — a missing folder is indistinguishable
   from an existing-but-empty one. `listAtoms`/`listAtomSummaries` return `total: 0` with no data and
-  **no** `recoverableError` either way. This matches `@contentia/github` and `storage-drizzle`, but
-  differs from `storage-fs`, `storage-r2`/`storage-s3`, `storage-web`, `storage-web-fs`, WebDAV,
-  GitLab, and Bitbucket, which surface a `NotFoundError` recoverableError so callers can detect
-  stale or misspelled folder keys. See LCMS-1004.
+  **no** `recoverableError` either way. This matches `contentia/storage-github` and
+  `storage-drizzle`, but differs from `storage-fs`, `storage-r2`/`storage-s3`, `storage-web`,
+  `storage-web-fs`, WebDAV, GitLab, and Bitbucket, which surface a `NotFoundError` recoverableError
+  so callers can detect stale or misspelled folder keys. See LCMS-1004.
 
 ## What this does not do
 

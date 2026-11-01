@@ -54,7 +54,7 @@ export interface GitlabDirEntry {
 }
 
 const DEFAULT_API_URL = 'https://gitlab.com/api/v4';
-const DEFAULT_USER_AGENT = '@contentia/gitlab';
+const DEFAULT_USER_AGENT = 'contentia/storage-gitlab';
 
 /** UTF-8-safe base64 encode without `Buffer`. */
 const textToBase64 = (text: string): string => {
