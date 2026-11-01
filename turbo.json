@@ -41,6 +41,9 @@
     "test": {
       "dependsOn": ["build"]
     },
+    "@contentia/docs#test": {
+      "dependsOn": ["^build"]
+    },
     "lint": {
       "dependsOn": ["^build"]
     }

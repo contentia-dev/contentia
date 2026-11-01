@@ -15,7 +15,7 @@
     "format": "dprint fmt",
     "format:check": "dprint check",
     "version": "changeset version",
-    "smoke:cli": "pnpm build && node scripts/smoke-cli-tarball.mjs",
+    "smoke:cli": "turbo run build --filter=@contentia/cli && node scripts/smoke-cli-tarball.mjs",
     "release": "changeset publish",
     "prepare": "husky"
   },
