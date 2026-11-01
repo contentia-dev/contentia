@@ -71,9 +71,6 @@ import { buildCspWithLogo } from './templates/html.js';
 /**
  * Default label shown in the user's authenticator app, and baked into every
  * `otpauth://` URI minted without an explicit `totp.issuer`.
- *
- * BREAKING (v4): was `'Decap CMS'`. Set `totp.issuer: 'Decap CMS'` to keep
- * enrollments created before the rename matching.
  */
 export const DEFAULT_TOTP_ISSUER = 'Contentia';
 
@@ -1469,12 +1466,9 @@ async function handleTotpSetupPage(
     return oauthError('access_denied', 'User not found', undefined, 401);
   }
 
-  // Generate TOTP secret and QR code using setupOAuthTOTP.
-  // BREAKING (v4): this default changed from 'Decap CMS' to 'Contentia'. The
-  // issuer is the label shown in the user's authenticator app and is baked into
-  // every already-enrolled otpauth:// URI, so a deployment that relied on the
-  // old default must now set `totp.issuer: 'Decap CMS'` explicitly to keep
-  // existing enrollments matching.
+  // Generate TOTP secret and QR code using setupOAuthTOTP. The issuer is the
+  // label shown in the user's authenticator app and is baked into every
+  // enrolled otpauth:// URI, so changing it later breaks existing enrollments.
   const issuer = config.totp.issuer || DEFAULT_TOTP_ISSUER;
   const setupData = await setupOAuthTOTP(pendingSession.userId, user.email, {
     enabled: true,

@@ -65,13 +65,13 @@ describe('html tagged template', () => {
 });
 
 describe('processCustomLogo', () => {
-  it('returns default decap logo when customLogo is undefined', () => {
+  it('returns the default Contentia logo when customLogo is undefined', () => {
     const result = processCustomLogo(undefined);
     expect(result.html.length).toBeGreaterThan(0);
     expect(result.imgSrc).toHaveLength(0);
   });
 
-  it('returns default decap logo when customLogo is empty string', () => {
+  it('returns the default Contentia logo when customLogo is empty string', () => {
     const result = processCustomLogo('');
     expect(result.html.length).toBeGreaterThan(0);
     expect(result.imgSrc).toHaveLength(0);

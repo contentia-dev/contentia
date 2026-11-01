@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/dm/contentia)](https://www.npmjs.com/package/contentia)
 [![Bundle Size](https://img.shields.io/bundlephobia/minzip/contentia)](https://bundlephobia.com/result?p=contentia)
 
-OAuth2 authentication server for Decap CMS with PKCE support.
+OAuth 2.0 authorization server with PKCE support, for any admin UI or app that signs users in.
 
 ## Features
 
@@ -26,7 +26,7 @@ import { contentiaOauth2 } from 'contentia/server/oauth2';
 
 const oauth2 = contentiaOauth2({
   basePath: '/oauth2',
-  clientId: process.env.DECAP_CLIENT_ID!,
+  clientId: process.env.OAUTH_CLIENT_ID!,
   // Required: only these URIs may receive an authorization code (RFC 6749 §3.1.2.2).
   // Omitting this field is a TypeScript error — it is intentionally required.
   allowedRedirectUris: ['https://cms.example.com/admin/'],
@@ -120,10 +120,8 @@ const oauth2 = contentiaOauth2({
     required: false,
     /**
      * Issuer name shown in authenticator apps. Defaults to `DEFAULT_TOTP_ISSUER`
-     * ('Contentia'). BREAKING in v4: this default was 'Decap CMS'. It is baked
-     * into every already-minted `otpauth://` URI, so an existing deployment that
-     * never set this must now pass `issuer: 'Decap CMS'` to keep enrolled users
-     * matching.
+     * ('Contentia'). It is baked into every minted `otpauth://` URI, so changing
+     * it later breaks matching for already-enrolled users.
      */
     issuer: 'My CMS',
     /** Time-step tolerance for clock drift (default: 1) */
@@ -302,7 +300,7 @@ These top-level `OAuthConfig` fields are independent of any optional feature.
 | `tokenEndpoint`          | `string`                              | `<basePath>/token`       | Override the token endpoint path.                                                                                                                                                                                                          |
 | `ignoreUnsafeReasons`    | `UnsafeReason[]`                      | —                        | Safety-gate codes to suppress. Each entry acknowledges a known risk; every suppressed reason is warned about through `logger` on startup. See `UNSAFE_REASONS` for the registry.                                                           |
 | `threatModel`            | `'standard' \| 'post-quantum'`        | `'standard'`             | `'standard'` defends against a classical attacker. `'post-quantum'` also enables guards against a cryptographically relevant quantum computer (Shor-breakable primitives are gated).                                                       |
-| `customLogo`             | `string`                              | —                        | HTML string replacing the default Decap CMS logo on the login page (e.g. `'<img src="/logo.png" alt="My CMS">'`).                                                                                                                          |
+| `customLogo`             | `string`                              | —                        | HTML string replacing the default Contentia logo on the login page (e.g. `'<img src="/logo.png" alt="My CMS">'`).                                                                                                                          |
 | `customStyles`           | `string`                              | —                        | CSS string appended after the built-in styles. Use to adjust colors, fonts, or layout without forking the template.                                                                                                                        |
 | `loginRedirectUrl`       | `string`                              | OAuth authorize endpoint | URL users are sent to after a successful password reset (e.g. your CMS admin page). Defaults to `<basePath>/authorize` when omitted.                                                                                                       |
 | `logger`                 | `{ debug, info, warn, error, fatal }` | —                        | Structured logger for internal diagnostics. Any object that implements `debug/info/warn/error/fatal(...args: unknown[]): void` works — `console`, `pino`, `winston`, etc.                                                                  |
@@ -314,7 +312,7 @@ import { contentiaOauth2 } from 'contentia/server/oauth2';
 
 const oauth2 = contentiaOauth2({
   basePath: '/oauth2',
-  clientId: process.env.DECAP_CLIENT_ID!,
+  clientId: process.env.OAUTH_CLIENT_ID!,
   allowedRedirectUris: ['https://cms.example.com/admin/'],
   callbacks: {/* ... */},
 
