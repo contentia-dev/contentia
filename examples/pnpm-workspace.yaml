@@ -33,7 +33,7 @@ catalogs:
     "hono": "^4.12.31"
 
   tools:
-    "rimraf": "^6.1.3"
+    "rimraf": "^6.1.4"
     "typescript": "^6.0.3"
     "vitest": "^4.1.10"
 
