@@ -124,7 +124,7 @@ export default defineConfig({
         items: [
           { text: 'Astro', link: '/guides/astro' },
           { text: 'Vite', link: '/guides/vite' },
-          { text: 'AI Assistant', link: '/guides/ai-assistant' },
+          { text: 'MCP Server', link: '/guides/mcp' },
           { text: 'VS Code Extension', link: '/guides/vscode' },
         ],
       },

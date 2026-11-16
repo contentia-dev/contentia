@@ -24,8 +24,8 @@ Task-oriented walkthroughs for getting Contentia running and wired into your sta
   `getEntry`, `render`, Zod schemas) with incremental sync and dev-server hot-reload.
 - **[Vite](./vite)** — import content as ES modules at build time through the `contentia:` protocol,
   for fully static builds.
-- **[AI Assistant](./ai-assistant)** — the chat and session endpoints behind an editor's AI
-  assistant (`contentia/server/ai`), on the Vercel AI SDK.
+- **[MCP Server](./mcp)** — expose the Contentia API to AI agents over the Model Context Protocol
+  (`contentia/server/mcp`, or `contentia local mcp`).
 
 ## Tools
 

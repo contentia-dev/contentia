@@ -27,6 +27,7 @@ The CLI needs Node.js.
 contentia serve --config contentia.yaml # the Contentia API server, from one config file
 contentia hash-password                # bcrypt hash for a user in the server config
 contentia local serve                  # serve a content folder over JSON:API on :3030
+contentia local mcp                    # the same content to AI agents, as an MCP server over stdio
 contentia local generate --watch       # config.yaml -> typed config.gen.ts, kept fresh on save
 contentia local migrate -s ./a -d ./b  # copy all content from one storage backend to another
 contentia local list-backends          # show the storage backends migrate can use
@@ -90,6 +91,26 @@ instead. The VS Code extension starts the server this way.
 The server has no access control beyond the optional bearer token. It is meant for local
 development: keep the default `127.0.0.1` host, and use `--auth-token` if you bind it to a network
 interface. For production, run the [API server](../guides/api-server.md).
+
+## `local mcp`
+
+Runs an [MCP server](../guides/mcp) over stdio, for desktop clients and coding agents on your
+machine. It has two tools: `read_api_spec` reads the OpenAPI spec, and `api_request` calls the API.
+
+```sh
+contentia local mcp --root ./content          # the storage API over a local folder, in-process
+contentia local mcp --backend s3 --backend-options "$OPTIONS"
+contentia local mcp --base-url https://cms.example.com/api --auth-token "$CONTENTIA_TOKEN"
+```
+
+By default it serves the same storage API as `local serve`, over the same backends (`--root`,
+`--default-extension`, `--backend`, `--backend-options`), with no port and no access control. With
+`--base-url` it sends `api_request` calls to a deployed Contentia API instead, with `--auth-token`
+(or `CONTENTIA_TOKEN`) as the bearer token. The deployment's own `authorize` policy decides what the
+token may do.
+
+Stdout carries the MCP protocol, so all logs go to stderr, and the command never prompts to install
+a backend package. It exits when the client closes stdin.
 
 ## `local generate`
 
@@ -276,6 +297,7 @@ console.log(`${result.objectsCopied} copied, ${result.errors.length} errors`);
 | Export                                     | Use it to                                                     |
 | ------------------------------------------ | ------------------------------------------------------------- |
 | `layerStorageServer`                       | Serve any storage repository the way `local serve` does       |
+| `buildLocalMcpServer`, `runMcpStdioServer` | Build and run the MCP server the way `local mcp` does         |
 | `generateConfig`, `loadConfig`             | Generate or load the typed CMS config                         |
 | `runMigrate`, `loadMigrateConfig`          | Run a migration from a config object or file                  |
 | `migrateStorage`                           | Copy between two storage repositories you already constructed |

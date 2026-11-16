@@ -2,7 +2,7 @@
 
 The HTTP surface for [Contentia](https://www.npmjs.com/package/contentia): a single-endpoint
 JSON:API router over the `contentia` repositories and a self-contained OAuth 2.0 authorization
-server, both CMS-agnostic, plus the endpoints behind an editor's AI assistant. None of them has a
+server, both CMS-agnostic, plus an MCP server that exposes the API to AI agents. None of them has a
 React or admin-UI dependency.
 
 ```bash
@@ -11,14 +11,13 @@ pnpm add contentia
 
 ## Exports
 
-| Export                    | Purpose                                                                  |
-| ------------------------- | ------------------------------------------------------------------------ |
-| `contentia/server/api`    | Single-endpoint JSON:API router over the `contentia` repositories        |
-| `contentia/server/oauth2` | OAuth 2.0 authorization server (PKCE, passkey, TOTP, email)              |
-| `contentia/server/ai`     | AI chat + session endpoints for an editor assistant (optional `ai` peer) |
+| Export                    | Purpose                                                              |
+| ------------------------- | -------------------------------------------------------------------- |
+| `contentia/server/api`    | Single-endpoint JSON:API router over the `contentia` repositories    |
+| `contentia/server/oauth2` | OAuth 2.0 authorization server (PKCE, passkey, TOTP, email)          |
+| `contentia/server/mcp`    | MCP server for AI agents (optional `@modelcontextprotocol/sdk` peer) |
 
-The AI endpoints are documented in the [AI Assistant](https://contentia.dev/guides/ai-assistant)
-guide.
+The MCP server is documented in the [MCP Server](https://contentia.dev/guides/mcp) guide.
 
 #### `api` options
 

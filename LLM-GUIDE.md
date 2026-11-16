@@ -233,44 +233,44 @@ For a full self-contained login server (email/password, passkey, TOTP) use the
 
 ---
 
-### f) Add the AI assistant
+### f) Expose the API to AI agents over MCP
 
-`contentia/server/ai` mounts chat and session endpoints that power an editor's AI assistant. Install
-the optional peer first:
+`contentia/server/mcp` serves the Model Context Protocol with two tools: `read_api_spec` (an index
+of the OpenAPI spec, then the full contract for the operations you pick) and `api_request` (a
+request to the JSON:API with the caller's own token, so the API's `authorize` policy applies
+unchanged). Install the optional peer first:
 
 ```bash
-pnpm add ai @ai-sdk/anthropic   # or any other @ai-sdk/* provider
+pnpm add @modelcontextprotocol/sdk
 ```
 
-Then mount `decapAi` alongside your existing `contentiaApi`:
+Then mount `contentiaMcp` next to your existing `contentiaApi`:
 
 ```ts
-import { resolveBearer } from 'contentia/auth';
-import { decapAi } from 'contentia/server/ai';
-import { anthropic } from 'contentia/server/ai/providers';
+import { buildContentiaApiOpenApi, contentiaMcp } from 'contentia/server/mcp';
 
-const ai = decapAi({
-  model: anthropic('claude-sonnet-5-5'),
-  basePath: '/api/ai',
-  authenticateAccessToken: async token => {
-    const ctx = await resolveBearer(token, { verifySessionToken, lookupPatByHash });
-    if (!ctx) throw new Error('Unauthorized');
-    return { ...ctx.user, scopes: ctx.scopes };
+const mcp = contentiaMcp({
+  publicUrl: 'https://cms.example.com',
+  apiBasePath: '/api',
+  fetch: api.fetch,
+  openApi: buildContentiaApiOpenApi({ basePath: '/api' }),
+  verifyBearer: async (_authorization, request) => {
+    const result = await api.authenticateRequest(request);
+    return result instanceof Response ? null : result;
   },
-  callbacks: { createSession, getSession, getSessionsByDocument, updateSession, deleteSession },
 });
 
-// In your framework router alongside contentiaApi:
-app.all('/api/ai/*', c => ai.fetch(c.req.raw));
+// Before any catch-all route:
+app.all('/mcp', c => mcp.fetch(c.req.raw));
+app.get('/.well-known/oauth-protected-resource/*', c => mcp.fetch(c.req.raw));
+app.get('/.well-known/oauth-protected-resource', c => mcp.fetch(c.req.raw));
 ```
 
-The client half is a chat transport in the admin; Contentia does not ship one. The server declares
-two client-side tools (`getDocumentData` / `updateDocument`) with no `execute`, so the SDK ships
-them to the browser where the open editor entry lives. Add your own server-side tools via
-`config.tools`.
+MCP clients connect with a token in the `Authorization` header: the bundled login server does not
+yet publish authorization-server metadata or support dynamic client registration. For local work,
+`contentia local mcp --root ./content` runs the same tools over stdio.
 
-See [docs/guides/ai-assistant.md](./docs/guides/ai-assistant.md) and the options reference in
-[packages/contentia/src/server/ai/README.md](./packages/contentia/src/server/ai/README.md).
+See [docs/guides/mcp.md](./docs/guides/mcp.md).
 
 ---
 

@@ -15,6 +15,7 @@ Then:
 contentia serve --config contentia.yaml # the Contentia API server, from one config file
 contentia hash-password               # bcrypt hash for a user in the server config
 contentia local serve                 # serve a storage backend (local files by default) over JSON:API
+contentia local mcp                   # the same backend to AI agents, as an MCP server over stdio
 contentia local generate              # config.yaml -> typed config.gen.ts (add --watch to keep it fresh)
 contentia local migrate -s ./a -d ./b # copy a storage repository to another backend
 contentia local list-backends         # show every registered storage backend
@@ -36,6 +37,7 @@ All local-file dev tooling lives under the `local` namespace; the top level hold
 | `serve`               | Run the Contentia API from one YAML/JSON config: storage backend, OIDC / API keys / test users, CORS (see the Server Config guide)        |
 | `hash-password`       | Print the bcrypt hash of a password for `auth.login.users` (prompts twice, or reads stdin)                                                |
 | `local serve`         | JSON:API storage server for dev workflows: local files (`--root`) or any backend (`--backend`, `--backend-options`); `--json` for editors |
+| `local mcp`           | MCP server over stdio for AI agents: the same backends as `local serve`, or a remote Contentia API with `--base-url` and `--auth-token`   |
 | `local generate`      | Generate a typed TypeScript module from the CMS config file (`--input/-i`, `--output/-o`, `--watch/-w`, `--cms`)                          |
 | `local migrate`       | Copy every atom from one storage repository to another (fs, webdav, s3, github, gitlab, bitbucket, …); see flags below                    |
 | `local list-backends` | List every registered storage backend and its pinned package version                                                                      |
@@ -64,6 +66,18 @@ contentia local serve --json                       # machine-readable output (VS
 | `--backend`           | —     | Storage backend to serve (e.g. `fs`, `s3`, `github`). See `list-backends`. Default: `fs` on `--root`               |
 | `--backend-options`   | —     | JSON-encoded options for `--backend` (or set `CONTENTIA_BACKEND_OPTIONS` to keep credentials off the process list) |
 | `--json`              | —     | Print machine-readable JSON lines on stdout (for editors and scripts); never prompts to install packages           |
+
+### `local mcp` — MCP server for AI agents
+
+```sh
+contentia local mcp --root ./content                                        # local files, in-process
+contentia local mcp --base-url https://cms.example.com/api --auth-token "$CONTENTIA_TOKEN"   # a deployment
+```
+
+Two tools: `read_api_spec` (an index of the OpenAPI spec, then the full contract for the operations
+you pick) and `api_request` (a request to the API). Takes the same backend flags as `local serve`.
+Stdout carries the MCP protocol, so logs go to stderr. See the
+[MCP Server guide](https://contentia.dev/guides/mcp).
 
 ### `local generate` — config codegen
 
@@ -127,8 +141,8 @@ contentia local migrate --config migrate.yaml
 ## Programmatic API
 
 Everything the CLI does is also exported from the package root (`layerStorageServer`,
-`generateConfig`, `runMigrate`, the storage driver registry, and the `make*Command` factories for
-embedding the subcommands in another Effect CLI):
+`buildLocalMcpServer`, `generateConfig`, `runMigrate`, the storage driver registry, and the
+`make*Command` factories for embedding the subcommands in another Effect CLI):
 
 ```ts
 import { layerStorageServer } from '@contentia/cli';

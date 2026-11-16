@@ -9,6 +9,7 @@ import {
   makeGenerateCommand,
   makeHashPasswordCommand,
   makeListBackendsCommand,
+  makeMcpCommand,
   makeMigrateCommand,
   makeServeCommand,
 } from './commands.js';
@@ -19,10 +20,11 @@ import {
 // its bin is `contentia`; one-off use is `npx @contentia/cli`.
 const localCommand = Command.make('local').pipe(
   Command.withDescription(
-    'Local-file dev tooling: storage server (`serve`), config codegen (`generate`), and repository migrations (`migrate`).',
+    'Local-file dev tooling: storage server (`serve`), MCP server (`mcp`), config codegen (`generate`), and repository migrations (`migrate`).',
   ),
   Command.withSubcommands([
     makeServeCommand('serve', 'contentia local'),
+    makeMcpCommand('mcp', 'contentia local'),
     makeGenerateCommand('generate', 'contentia local'),
     makeMigrateCommand('migrate', 'contentia local'),
     makeListBackendsCommand(),

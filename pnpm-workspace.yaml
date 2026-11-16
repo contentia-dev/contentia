@@ -10,13 +10,6 @@ packages:
 
 catalogs:
 
-  # Vercel AI SDK, used by contentia/server/ai (optional peers of contentia, so only
-  # consumers that mount the AI endpoints install them).
-  ai:
-    "@ai-sdk/anthropic": "^4.0.16"
-    "@ai-sdk/openai": "^4.0.16"
-    "ai": "^7.0.31"
-
   astro:
     "@astrojs/check": "^0.9.12"
     "@astrojs/mdx": "^8.1.5"
@@ -65,6 +58,12 @@ catalogs:
     # Drop this once typescript-eslint supports TS 7:
     # https://github.com/typescript-eslint/typescript-eslint/issues/10940
     "typescript": "npm:@typescript/typescript6@^6.0.2"
+
+  # MCP SDK, used by contentia/server/mcp (an optional peer of contentia, so only consumers
+  # that mount the MCP server install it) and by the CLI's `contentia local mcp`.
+  mcp:
+    "@modelcontextprotocol/sdk": "1.32.2"
+
   octokit:
     "@octokit/auth-app": "^8.3.1"
     "@octokit/rest": "^22.0.1"

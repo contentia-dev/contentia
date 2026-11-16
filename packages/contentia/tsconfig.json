@@ -160,23 +160,8 @@
       "contentia/server/decap": [
         "./src/server/decap/index.ts"
       ],
-      "contentia/server/ai": [
-        "./src/server/ai/index.ts"
-      ],
-      "contentia/server/ai/providers": [
-        "./src/server/ai/providers/index.ts"
-      ],
-      "contentia/server/ai/tools": [
-        "./src/server/ai/tools/index.ts"
-      ],
-      "contentia/server/ai/i18n/en": [
-        "./src/server/ai/i18n/en.ts"
-      ],
-      "contentia/server/ai/i18n/nl": [
-        "./src/server/ai/i18n/nl.ts"
-      ],
-      "contentia/server/ai/i18n/types": [
-        "./src/server/ai/i18n/types.ts"
+      "contentia/server/mcp": [
+        "./src/server/mcp/index.ts"
       ]
     }
   },

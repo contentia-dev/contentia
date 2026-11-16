@@ -43,6 +43,7 @@
   "dependencies": {
     "@effect/platform-node": "catalog:default",
     "@effect/platform-node-shared": "catalog:default",
+    "@modelcontextprotocol/sdk": "catalog:mcp",
     "@standard-schema/spec": "catalog:schema",
     "bcryptjs": "catalog:",
     "effect": "catalog:default",

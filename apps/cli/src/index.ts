@@ -42,6 +42,9 @@ export type { BackendSpec, MigrateConfig, StorageDriver } from './drivers/types.
 
 export { watchFile } from './watch.js';
 
+export { buildLocalMcpServer, buildRemoteMcpServer, runMcpStdioServer } from './mcp.js';
+export type { LocalMcpServerOptions, RemoteMcpServerOptions } from './mcp.js';
+
 export {
   apiServerCommand,
   generateCommand,
@@ -50,8 +53,10 @@ export {
   makeGenerateCommand,
   makeHashPasswordCommand,
   makeListBackendsCommand,
+  makeMcpCommand,
   makeMigrateCommand,
   makeServeCommand,
+  mcpCommand,
   migrateCommand,
   resolveServeBackend,
   serveCommand,

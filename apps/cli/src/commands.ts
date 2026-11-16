@@ -7,13 +7,16 @@ import { identity } from 'effect/Function';
 import * as Layer from 'effect/Layer';
 import * as Logger from 'effect/Logger';
 import * as Redacted from 'effect/Redacted';
+import * as Runtime from 'effect/Runtime';
 
+import type { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { hashPassword } from 'contentia/crypto';
 
 import { cmsAdapters, DEFAULT_CMS_ADAPTER, findCmsAdapter } from './cms/registry.js';
 import type { CmsAdapter, CmsConfigCodegen } from './cms/types.js';
 import { buildStorageRepository, storageDrivers } from './drivers/registry.js';
 import type { BackendSpec, MigrateConfig } from './drivers/types.js';
+import { buildLocalMcpServer, buildRemoteMcpServer, runMcpStdioServer } from './mcp.js';
 import { loadMigrateConfig, runMigrate } from './migrate-runner.js';
 import type { MigrateEvent } from './migrate.js';
 import { buildServerApi, describeServerConfig, serverConfigWarnings } from './serve/build.js';
@@ -199,6 +202,100 @@ export const makeServeCommand = (name = 'serve', binName = 'contentia local') =>
   );
 
 export const serveCommand = makeServeCommand();
+
+// ---------------------------------------------------------------------------
+// `mcp` subcommand — the same content over MCP stdio instead of HTTP: an MCP
+// server (for Claude Code / Claude Desktop) wrapping either the storage
+// JSON:API in-process, over the same backends as `serve`, or a remote
+// Contentia deployment via --base-url.
+// ---------------------------------------------------------------------------
+
+const mcpBaseUrl = Flag.String('base-url').pipe(
+  Flag.withDescription(
+    'Proxy api_request calls to a remote Contentia JSON:API at this URL instead of a local backend',
+  ),
+  Flag.optional,
+);
+
+const mcpAuthToken = Flag.String('auth-token').pipe(
+  Flag.withDescription(
+    'Bearer token sent to the remote API, only used with --base-url (or set CONTENTIA_TOKEN, which keeps it out of the process list)',
+  ),
+  Flag.withFallbackConfig(Config.String('CONTENTIA_TOKEN')),
+  Flag.optional,
+);
+
+/**
+ * The stdio MCP server command. Like `makeServeCommand`, the name and bin
+ * label are parameterised so embedders can mount it under their own spelling
+ * (the `contentia` CLI uses `contentia local mcp`).
+ */
+export const makeMcpCommand = (name = 'mcp', binName = 'contentia local') =>
+  Command.make(
+    name,
+    {
+      root,
+      defaultExtension,
+      backend: serveBackend,
+      backendOptions: serveBackendOptions,
+      baseUrl: mcpBaseUrl,
+      authToken: mcpAuthToken,
+    },
+    flags =>
+      Effect.gen(function*() {
+        let server: McpServer;
+        if (flags.baseUrl._tag === 'Some') {
+          const baseUrl = flags.baseUrl.value;
+          server = yield* Effect.try({
+            try: () =>
+              buildRemoteMcpServer({
+                baseUrl,
+                authToken: flags.authToken._tag === 'Some' ? flags.authToken.value : undefined,
+              }),
+            catch: () => new Error(`${binName} ${name}: --base-url must be an absolute URL`),
+          });
+          yield* Effect.logInfo(`${binName} ${name}: proxying ${baseUrl} over stdio`);
+        } else {
+          const spec = yield* Effect.try({
+            try: () => resolveServeBackend(binName, flags),
+            catch: e => e instanceof Error ? e : new Error(String(e)),
+          });
+          const repository = yield* Effect.tryPromise({
+            // Never prompt to install a backend package: stdin carries the MCP protocol.
+            try: () => buildStorageRepository(spec.backend, spec.options, { noInstall: true }),
+            catch: e => e instanceof Error ? e : new Error(String(e)),
+          });
+          server = yield* Effect.try({
+            try: () => buildLocalMcpServer({ repository }),
+            catch: e => e instanceof Error ? e : new Error(String(e)),
+          });
+          const describe = spec.backend === 'fs' ? `fs ${String(spec.options.root)}` : spec.backend;
+          yield* Effect.logInfo(`${binName} ${name}: serving ${describe} over stdio`);
+        }
+        // Block until the client disconnects; interruption (SIGINT) aborts the
+        // signal, which closes the server cleanly.
+        yield* Effect.callback<void, Error>((resume, signal) => {
+          runMcpStdioServer(server, signal).then(
+            () => resume(Effect.void),
+            (error: unknown) => resume(Effect.fail(error instanceof Error ? error : new Error(String(error)))),
+          );
+        });
+      }).pipe(
+        // stdout carries the MCP JSON-RPC stream, so every log line goes to stderr. That
+        // includes a startup failure: log it here and mark it reported, or runMain prints it
+        // again on stdout. The exit code is unchanged.
+        Effect.tapError(error => Effect.logError(error)),
+        Effect.mapError(error => Object.assign(error, { [Runtime.errorReported]: false })),
+        Effect.provideService(Logger.LogToStderr, true),
+      ),
+  ).pipe(
+    Command.withDescription(
+      'Start an MCP (Model Context Protocol) server over stdio, exposing a storage backend (the local filesystem '
+        + 'by default) or a remote Contentia API via --base-url to MCP clients like Claude Code.',
+    ),
+  );
+
+export const mcpCommand = makeMcpCommand();
 
 // ---------------------------------------------------------------------------
 // Top-level `serve` — the Contentia API server for deployments (containers,

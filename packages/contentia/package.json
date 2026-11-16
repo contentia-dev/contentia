@@ -461,35 +461,10 @@
       "import": "./dist/server/decap/index.js",
       "default": "./dist/server/decap/index.js"
     },
-    "./server/ai": {
-      "types": "./dist/server/ai/index.d.ts",
-      "import": "./dist/server/ai/index.js",
-      "default": "./dist/server/ai/index.js"
-    },
-    "./server/ai/providers": {
-      "types": "./dist/server/ai/providers/index.d.ts",
-      "import": "./dist/server/ai/providers/index.js",
-      "default": "./dist/server/ai/providers/index.js"
-    },
-    "./server/ai/tools": {
-      "types": "./dist/server/ai/tools/index.d.ts",
-      "import": "./dist/server/ai/tools/index.js",
-      "default": "./dist/server/ai/tools/index.js"
-    },
-    "./server/ai/i18n/en": {
-      "types": "./dist/server/ai/i18n/en.d.ts",
-      "import": "./dist/server/ai/i18n/en.js",
-      "default": "./dist/server/ai/i18n/en.js"
-    },
-    "./server/ai/i18n/nl": {
-      "types": "./dist/server/ai/i18n/nl.d.ts",
-      "import": "./dist/server/ai/i18n/nl.js",
-      "default": "./dist/server/ai/i18n/nl.js"
-    },
-    "./server/ai/i18n/types": {
-      "types": "./dist/server/ai/i18n/types.d.ts",
-      "import": "./dist/server/ai/i18n/types.js",
-      "default": "./dist/server/ai/i18n/types.js"
+    "./server/mcp": {
+      "types": "./dist/server/mcp/index.d.ts",
+      "import": "./dist/server/mcp/index.js",
+      "default": "./dist/server/mcp/index.js"
     }
   },
   "scripts": {
@@ -512,23 +487,12 @@
   },
   "peerDependencies": {
     "@cloudflare/workers-types": "*",
-    "@ai-sdk/anthropic": "^4.0.16",
-    "@ai-sdk/openai": "^4.0.16",
-    "ai": "^7.0.31",
     "@octokit/auth-app": "^7.1.4",
-    "@octokit/rest": "^22.0.1"
+    "@octokit/rest": "^22.0.1",
+    "@modelcontextprotocol/sdk": "^1.32.1"
   },
   "peerDependenciesMeta": {
     "@cloudflare/workers-types": {
-      "optional": true
-    },
-    "@ai-sdk/anthropic": {
-      "optional": true
-    },
-    "@ai-sdk/openai": {
-      "optional": true
-    },
-    "ai": {
       "optional": true
     },
     "@octokit/auth-app": {
@@ -536,19 +500,20 @@
     },
     "@octokit/rest": {
       "optional": true
+    },
+    "@modelcontextprotocol/sdk": {
+      "optional": true
     }
   },
   "devDependencies": {
-    "@ai-sdk/anthropic": "catalog:ai",
-    "@ai-sdk/openai": "catalog:ai",
     "@cloudflare/workers-types": "catalog:types",
     "@hono/node-server": "catalog:server",
+    "@modelcontextprotocol/sdk": "catalog:mcp",
     "@octokit/auth-app": "catalog:octokit",
     "@octokit/rest": "catalog:octokit",
     "@types/js-yaml": "catalog:types",
     "@types/json-schema": "catalog:types",
     "@types/node": "catalog:types",
-    "ai": "catalog:ai",
     "rimraf": "catalog:tools",
     "tsc-alias": "^1.9.10",
     "typescript": "catalog:tools",

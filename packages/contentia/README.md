@@ -92,8 +92,9 @@ export default {
 ### Server
 
 `contentia/server/api` (the JSON:API router, `contentiaApi`) · `contentia/server/oauth2` (OAuth 2.0
-authorization server) · `contentia/server/ai` (AI chat endpoints; `ai` and `@ai-sdk/*` are optional
-peers). See [`src/server/README.md`](./src/server/README.md).
+authorization server) · `contentia/server/mcp` (MCP server for AI agents;
+`@modelcontextprotocol/sdk` is an optional peer). See
+[`src/server/README.md`](./src/server/README.md).
 
 ### Testing utilities
 
