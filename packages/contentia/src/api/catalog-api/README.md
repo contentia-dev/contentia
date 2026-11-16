@@ -102,15 +102,15 @@ The API uses two JSON:API resource types:
 
 ### `media-collection` attributes
 
-| Attribute    | Type      | Required | Description                                |
-| ------------ | --------- | -------- | ------------------------------------------ |
-| `type`       | `"media"` | yes      | Discriminator                              |
-| `name`       | string    | no       | Human-readable label                       |
-| `directory`  | string    | no       | Storage root directory for this collection |
-| `recursive`  | boolean   | no       | Include sub-directories in listings        |
-| `accept`     | string[]  | no       | Allowed MIME types or file extensions      |
-| `url`        | string    | no       | Public URL prefix for served media files   |
-| `pathFormat` | string    | no       | Template for generating media file paths   |
+| Attribute    | Type      | Required | Description                                                                                                                   |
+| ------------ | --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `type`       | `"media"` | yes      | Discriminator                                                                                                                 |
+| `name`       | string    | no       | Human-readable label                                                                                                          |
+| `directory`  | string    | no       | Storage root directory for this collection                                                                                    |
+| `recursive`  | boolean   | no       | Include sub-directories in listings                                                                                           |
+| `accept`     | string[]  | no       | Files the collection accepts: MIME types (`image/png`), wildcards (`image/*`), or file extensions (`.png`). Empty accepts any |
+| `url`        | string    | no       | Public URL prefix for served media files                                                                                      |
+| `pathFormat` | string    | no       | Template for generating media file paths                                                                                      |
 
 ## Request / response examples
 

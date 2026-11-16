@@ -55,6 +55,11 @@ export const MediaCollectionSettingsSchema = S.toStandardSchemaV1(S.Struct({
   name: S.optional(S.String),
   directory: S.optional(S.String),
   recursive: S.optional(S.Boolean),
+  /**
+   * The files the collection accepts, written as in the HTML `accept` attribute: MIME types
+   * (`image/png`), wildcards (`image/*`), or file extensions (`.png`), matched against an asset's
+   * filename and key. Empty or left out accepts any file.
+   */
   accept: S.optional(S.Array(S.String)),
   /*
     Example: 'https://example.com/_uploads/{filename}'

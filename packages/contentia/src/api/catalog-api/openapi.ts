@@ -81,7 +81,8 @@ const schemas: Record<string, OpenApiSchema> = {
       accept: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Allowed MIME types or file extensions.',
+        description: 'Files the collection accepts, as in the HTML `accept` attribute: MIME types (`image/png`), '
+          + 'wildcards (`image/*`), or file extensions (`.png`). Empty or left out accepts any file.',
       },
       url: { type: 'string', description: 'Public URL prefix for served media files.' },
       pathFormat: { type: 'string', description: 'Template for generating media file paths.' },

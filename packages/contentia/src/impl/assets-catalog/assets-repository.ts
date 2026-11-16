@@ -26,11 +26,30 @@ import { BadRequestError, ContentiaStream, ContentiaTask, EntryAlreadyExistsErro
 import type { Atom, Folder, FolderCreate, StorageRepository } from 'contentia/storage';
 import { pathCombine, pathToSegments } from 'contentia/storage';
 
+import { isAccepted } from './accept-list.js';
+
 /** Lift a ContentiaTask into an Effect, forwarding metadata to the outer emit. */
 const runForwarding = <A>(
   task: ContentiaTask.ContentiaTask<A>,
   emit: ContentiaTask.ContentiaMetadataEmit,
 ): Effect.Effect<A, ContentiaError> => ContentiaTask.runValueForwarding(task, emit);
+
+/** Fail with a 400 unless the collection's `accept` list admits an asset of this type and these names. */
+function checkAccepted(
+  settings: MediaCollectionSettings,
+  key: string,
+  mimeType: string,
+  names: readonly string[],
+): Effect.Effect<void, BadRequestError> {
+  const accept = settings.accept ?? [];
+  if (isAccepted(accept, { mimeType, names })) return Effect.void;
+  return Effect.fail(
+    new BadRequestError(
+      `Asset '${key}' of type '${mimeType}' is not allowed in collection '${settings.key}'. `
+        + `Allowed: ${accept.join(', ')}`,
+    ),
+  );
+}
 
 /** Encode a Uint8Array to a base64 string. Works in Node and Workers (no Buffer dep). */
 function bytesToBase64(bytes: Uint8Array): string {
@@ -282,17 +301,8 @@ export class CatalogAssetsRepository extends AssetsRepository {
     return ContentiaTask.make<Asset>(emit =>
       Effect.gen({ self: this }, function*() {
         const path = yield* this.getAssetPath(create.key, emit);
-        if (
-          path.settings.accept && path.settings.accept.length > 0
-          && !path.settings.accept.includes(create.mimeType)
-        ) {
-          return yield* Effect.fail(
-            new BadRequestError(
-              `MIME type '${create.mimeType}' is not allowed in collection '${path.settings.key}'. `
-                + `Allowed: ${path.settings.accept.join(', ')}`,
-            ),
-          );
-        }
+        const names = create.filename ? [create.filename, create.key] : [create.key];
+        yield* checkAccepted(path.settings, create.key, create.mimeType, names);
 
         const bytes = yield* Effect.promise(() => consumeBinary(create.content));
         const storedContent: Record<string, unknown> = {
@@ -334,6 +344,12 @@ export class CatalogAssetsRepository extends AssetsRepository {
       Effect.gen({ self: this }, function*() {
         const path = yield* this.getAssetPath(update.key, emit);
         const existing = yield* ContentiaTask.runValueForwarding(this.storageRepository.getObject(path.physical), emit);
+        if (update.mimeType) {
+          // A new type must pass the collection's accept list, as it would have on upload.
+          const filename = existing.content.filename;
+          const names = typeof filename === 'string' ? [filename, update.key] : [update.key];
+          yield* checkAccepted(path.settings, update.key, update.mimeType, names);
+        }
         const merged: Record<string, unknown> = { ...existing.content };
         if (update.mimeType) merged.mimeType = update.mimeType;
         if (update.cacheControl) merged.cacheControl = update.cacheControl;

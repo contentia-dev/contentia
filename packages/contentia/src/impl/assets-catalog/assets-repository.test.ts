@@ -294,3 +294,72 @@ describe('CatalogAssetsRepository — folder operations', () => {
     if (result._tag === 'Failure') expect(result.failure.code).toBe('not_found');
   });
 });
+
+/** A settings provider whose media collection only accepts `accept`. */
+function makeAcceptingSettingsProvider(accept: readonly string[]): CatalogProvider {
+  const media: MediaCollectionSettings = {
+    type: 'media',
+    key: 'uploads',
+    name: 'Uploads',
+    directory: 'uploads',
+    accept,
+  };
+  return new class extends TestSettingsProvider {
+    override getCatalog() {
+      return ContentiaTask.succeed<Catalog>({ collections: { uploads: media } } as Catalog);
+    }
+    override getMediaCollectionSettings() {
+      return ContentiaTask.succeed(media);
+    }
+  }();
+}
+
+describe('CatalogAssetsRepository — the collection accept list', () => {
+  const accepting = (accept: readonly string[]) =>
+    new CatalogAssetsRepository(new InMemoryStorageRepository(), makeAcceptingSettingsProvider(accept));
+
+  it('createAsset admits a MIME type under a wildcard', async () => {
+    const created = await ContentiaTask.runPromise(
+      accepting(['image/*']).createAsset({ key: KEY('photo.png'), content: PNG, mimeType: 'image/png' }),
+    );
+    expect(created.content.contentType).toBe('image/png');
+  });
+
+  it('createAsset admits a file by its extension', async () => {
+    const created = await ContentiaTask.runPromise(
+      accepting(['.png']).createAsset({ key: KEY('photo.png'), content: PNG, mimeType: 'application/octet-stream' }),
+    );
+    expect(created.key).toBe(KEY('photo.png'));
+  });
+
+  it('createAsset turns away what no entry matches, naming what is allowed', async () => {
+    const result = await ContentiaTask.runPromiseResult(
+      accepting(['image/*', '.svg']).createAsset({ key: KEY('doc.pdf'), content: PNG, mimeType: 'application/pdf' }),
+    );
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') {
+      expect(result.failure.code).toBe('bad_request');
+      expect(result.failure.message).toContain('Allowed: image/*, .svg');
+    }
+  });
+
+  it('updateAsset turns away a MIME type the list does not admit, and keeps the stored one', async () => {
+    const repo = accepting(['image/*']);
+    const key = KEY('photo.png');
+    await ContentiaTask.runPromise(repo.createAsset({ key, content: PNG, mimeType: 'image/png' }));
+
+    const result = await ContentiaTask.runPromiseResult(repo.updateAsset({ key, mimeType: 'text/html' }));
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure.code).toBe('bad_request');
+    expect((await ContentiaTask.runPromise(repo.getAsset(key))).content.contentType).toBe('image/png');
+  });
+
+  it('updateAsset accepts a MIME type the list admits', async () => {
+    const repo = accepting(['image/*']);
+    const key = KEY('photo.png');
+    await ContentiaTask.runPromise(repo.createAsset({ key, content: PNG, mimeType: 'image/png' }));
+
+    const updated = await ContentiaTask.runPromise(repo.updateAsset({ key, mimeType: 'image/webp' }));
+    expect(updated.content.contentType).toBe('image/webp');
+  });
+});
