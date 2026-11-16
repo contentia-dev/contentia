@@ -16,6 +16,10 @@ import { buildDocumentsOpenApi } from 'contentia/documents-api';
 import { buildStorageOpenApi } from 'contentia/storage-api';
 import { createMarkdownRenderer, defineLoader, type MarkdownRenderer, type SiteConfig } from 'vitepress';
 
+import { assetsHttp } from './assets/http.js';
+import { catalogHttp } from './catalog/http.js';
+import { documentsHttp } from './documents/http.js';
+import { EXAMPLE_SERVER } from './example-server.js';
 import type { HttpExample } from './http-example.js';
 import { storageHttp } from './storage/http.js';
 
@@ -54,9 +58,6 @@ interface Spec {
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'];
 
-/** The server the examples talk to; the cURL tab of the reference's setup group exports it. */
-const EXAMPLE_SERVER = 'https://cms.example.com';
-
 /** `objects` → `Objects`: tag names are the reference's section headings. */
 const capitalize = (tag: string) => tag.charAt(0).toUpperCase() + tag.slice(1);
 
@@ -72,15 +73,21 @@ const DISCOVERY_TAGS = new Set(['Info', 'Meta', 'Openapi']);
  * and an example server instead of the API's relative `/`, which vitepress-openapi can't resolve.
  * An operation under two tags (`POST /atoms` is under atoms and folders) would render twice, with
  * duplicate anchors and code groups whose tabs fight each other; it keeps its last, most specific
- * tag.
+ * tag. An operation with an example gets it as `x-example`, the values its Try it window starts
+ * with.
  */
-function forDocs(spec: Spec, server: string): Spec {
+function forDocs(spec: Spec, server: string, http: Readonly<Record<string, HttpExample>>): Spec {
+  const forOperation = (operation: Operation) => {
+    const example = operation.operationId ? http[operation.operationId] : undefined;
+    return {
+      ...operation,
+      tags: operation.tags?.slice(-1).map(capitalize),
+      ...(example && { 'x-example': example }),
+    };
+  };
   const withTags = (item: Partial<Record<string, Operation>>) =>
     Object.fromEntries(
-      Object.entries(item).map(([key, value]) => [
-        key,
-        METHODS.includes(key) && value ? { ...value, tags: value.tags?.slice(-1).map(capitalize) } : value,
-      ]),
+      Object.entries(item).map(([key, value]) => [key, METHODS.includes(key) && value ? forOperation(value) : value]),
     );
   return {
     ...spec,
@@ -123,8 +130,8 @@ const codeGroup = (tabs: readonly (readonly [label: string, lang: string, code: 
     '\n',
   );
 
-function reference(api: string, spec: Spec): ApiReference {
-  const docs = forDocs(spec, `${EXAMPLE_SERVER}/${api}`);
+function reference(api: string, spec: Spec, http: Readonly<Record<string, HttpExample>> = {}): ApiReference {
+  const docs = forDocs(spec, `${EXAMPLE_SERVER}/${api}`, http);
   const tags = (docs.tags ?? []).map(tag => tag.name).filter(name => !DISCOVERY_TAGS.has(name));
   return { spec: docs, tags };
 }
@@ -152,7 +159,7 @@ function codeSamples(
 }
 
 export default defineLoader({
-  watch: ['./storage/*.ts'],
+  watch: ['./storage/*.ts', './*/http.ts'],
   async load(files): Promise<Data> {
     const config = (globalThis as { VITEPRESS_CONFIG?: SiteConfig }).VITEPRESS_CONFIG!;
     const md = await createMarkdownRenderer(config.srcDir, config.markdown, config.site.base, config.logger);
@@ -160,12 +167,12 @@ export default defineLoader({
     const storage = buildStorageOpenApi() as unknown as Spec;
     return {
       storage: {
-        ...reference('storage', storage),
+        ...reference('storage', storage, storageHttp),
         samples: codeSamples(md, storage, storageHttp, examplesOf('storage')),
       },
-      documents: reference('documents', buildDocumentsOpenApi() as unknown as Spec),
-      assets: reference('assets', buildAssetsOpenApi() as unknown as Spec),
-      catalog: reference('catalog', buildCatalogOpenApi() as unknown as Spec),
+      documents: reference('documents', buildDocumentsOpenApi() as unknown as Spec, documentsHttp),
+      assets: reference('assets', buildAssetsOpenApi() as unknown as Spec, assetsHttp),
+      catalog: reference('catalog', buildCatalogOpenApi() as unknown as Spec, catalogHttp),
     };
   },
 });

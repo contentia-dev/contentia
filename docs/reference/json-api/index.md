@@ -19,6 +19,14 @@ and response schemas. The list is rendered from the OpenAPI spec the server serv
 `GET /openapi.json` and `GET /openapi.yaml`, so it always matches the code. The Locks API has no
 spec; its page documents its endpoints by hand.
 
+Every endpoint has a **Try it** button. It opens a request window, filled in with an example request
+you can edit and send. The request goes to a Contentia instance running in your browser: the four
+API servers over one
+[`WebStorageRepository`](../api/contentia/storage/web/classes/WebStorageRepository) on
+`sessionStorage`, with an open access policy. Nothing is sent over the network. The servers share
+one store, so a document you create through the Documents API also shows up in a Storage API
+listing. Your content stays in the tab until you close it or reset the sandbox from the window.
+
 ## Access policy
 
 The Storage, Documents, Assets, and Catalog API builders all require an `authorize` callback. It
