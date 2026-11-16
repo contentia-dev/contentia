@@ -1,0 +1,28 @@
+# Dependabot version updates. Security-update PRs are a separate repo setting
+# (Settings → Code security) and are not held back by the cooldown below.
+version: 2
+updates:
+  # Covers pnpm-lock.yaml and the catalogs in pnpm-workspace.yaml.
+  - package-ecosystem: npm
+    directories: [/, /examples]
+    schedule:
+      interval: weekly
+    # Only propose releases that are a week old, so a compromised publish is
+    # usually caught and yanked before it reaches this repo.
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # Bumps the SHA pins (and their version comments) in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']
