@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js `24.x` and pnpm `>=8 <11` (see the root `package.json`'s `engines` field). The repo's
+- Node.js `24.x` and pnpm `>=12 <13` (see the root `package.json`'s `engines` field). The repo's
   `packageManager` field pins the exact pnpm version — run `corepack use pnpm@<version>` (or install
   that pnpm globally) if `pnpm --version` doesn't match.
 

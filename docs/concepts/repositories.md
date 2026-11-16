@@ -249,7 +249,7 @@ This allows:
 ### HTTP Connection Reuse in Proxy Repositories
 
 The `*-jsonapi-proxy` repositories (storage, documents, assets) send every request through an Effect
-`HttpClient` (`effect/unstable/http`) owned by a shared
+`HttpClient` (`effect/http`) owned by a shared
 [`JsonApiHttpTransport`](../reference/api/contentia/json-api/classes/JsonApiHttpTransport)
 (`contentia/json-api`). Each repository accepts an optional `httpClient` in its constructor options;
 when omitted, a process-wide default backed by `globalThis.fetch` is used, which already reuses

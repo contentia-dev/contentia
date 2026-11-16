@@ -49,8 +49,8 @@
     "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"
   },
   "dependencies": {
-    "es-module-lexer": "catalog:",
     "contentia": "workspace:*",
+    "es-module-lexer": "catalog:",
     "magic-string": "catalog:",
     "minimatch": "catalog:"
   },

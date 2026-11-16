@@ -19,7 +19,7 @@ import {
   type ListResourcesOptions,
   type Resource,
 } from 'contentia/assets';
-import type * as HttpClient from 'effect/unstable/http/HttpClient';
+import type * as HttpClient from 'effect/http/HttpClient';
 
 import {
   type ContentiaDone,

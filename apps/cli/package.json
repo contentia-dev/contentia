@@ -46,16 +46,16 @@
     "@standard-schema/spec": "catalog:schema",
     "bcryptjs": "catalog:",
     "effect": "catalog:default",
-    "undici": "catalog:default",
-    "ws": "catalog:default",
     "gray-matter": "catalog:",
     "js-yaml": "catalog:",
     "json-schema": "catalog:schema",
     "minimatch": "catalog:",
-    "trash": "catalog:"
+    "trash": "catalog:",
+    "undici": "catalog:default",
+    "ws": "catalog:default"
   },
   "devDependencies": {
-    "@hono/node-server": "^2.0.2",
+    "@hono/node-server": "^2.1.8",
     "@octokit/rest": "catalog:octokit",
     "@types/js-yaml": "catalog:types",
     "@types/node": "catalog:types",

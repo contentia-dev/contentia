@@ -163,8 +163,8 @@ interface ImportMetaToken {
 }
 
 /**
- * Locate every real `import.meta` token, returning the same `[s, e)` bounds
- * es-module-lexer reports for a `d === -2` entry.
+ * Locate every real `import.meta` token, returning the same `[start, end)` bounds
+ * es-module-lexer reports for an `import-meta` entry.
  *
  * The lexer is exact and fast, but it cannot parse JSX, so it throws on a
  * `.tsx`/`.jsx` module (a component that reaches for a `contentia:` glob). When it
@@ -175,7 +175,9 @@ interface ImportMetaToken {
 function importMetaTokens(code: string): ImportMetaToken[] {
   try {
     const [imports] = parse(code);
-    return imports.filter(entry => entry.d === -2).map(entry => ({ start: entry.s, end: entry.e }));
+    return imports
+      .filter(entry => entry.type === 'import-meta')
+      .map(entry => ({ start: entry.start, end: entry.end }));
   } catch {
     const masked = maskStringsAndComments(code);
     const tokens: ImportMetaToken[] = [];
@@ -311,7 +313,7 @@ export async function rewriteContentiaGlobs(
   repos: ContentiaRepositories,
 ): Promise<RewriteResult | null> {
   // es-module-lexer must be initialized before `parse` is called.
-  await init;
+  await init();
 
   const globs = parseContentiaGlobs(code);
   if (globs.length === 0) return null;

@@ -1,12 +1,12 @@
 import path from 'node:path';
 
+import { Command, Flag, Prompt } from 'effect/cli';
 import * as Config from 'effect/Config';
 import * as Effect from 'effect/Effect';
 import { identity } from 'effect/Function';
 import * as Layer from 'effect/Layer';
 import * as Logger from 'effect/Logger';
 import * as Redacted from 'effect/Redacted';
-import { Command, Flag, Prompt } from 'effect/unstable/cli';
 
 import { hashPassword } from 'contentia/crypto';
 
@@ -51,51 +51,51 @@ const parseJsonOptions = (
   return parsed as Record<string, unknown>;
 };
 
-const root = Flag.directory('root').pipe(
+const root = Flag.Directory('root').pipe(
   Flag.withAlias('r'),
   Flag.withDescription('FS shortcut: root directory to serve (default: cwd)'),
   Flag.withDefault(process.cwd()),
 );
 
-const port = Flag.integer('port').pipe(
+const port = Flag.Int('port').pipe(
   Flag.withAlias('p'),
   Flag.withDescription('Listen port; 0 picks a free one (default: 3030)'),
   Flag.withDefault(3030),
 );
 
-const host = Flag.string('host').pipe(
+const host = Flag.String('host').pipe(
   Flag.withAlias('H'),
   Flag.withDescription('Listen host (default: 127.0.0.1)'),
   Flag.withDefault('127.0.0.1'),
 );
 
-const defaultExtension = Flag.string('default-extension').pipe(
+const defaultExtension = Flag.String('default-extension').pipe(
   Flag.withDescription('FS shortcut: default file extension for new objects (default: md)'),
   Flag.withDefault('md'),
 );
 
-const authToken = Flag.string('auth-token').pipe(
+const authToken = Flag.String('auth-token').pipe(
   Flag.withDescription(
     `Require 'Authorization: Bearer <token>' on every request (or set CONTENTIA_AUTH_TOKEN)`,
   ),
-  Flag.withFallbackConfig(Config.string('CONTENTIA_AUTH_TOKEN')),
+  Flag.withFallbackConfig(Config.String('CONTENTIA_AUTH_TOKEN')),
   Flag.optional,
 );
 
-const serveBackend = Flag.string('backend').pipe(
+const serveBackend = Flag.String('backend').pipe(
   Flag.withDescription('Storage backend to serve (e.g. fs, s3, github). See list-backends. Default: fs on --root'),
   Flag.optional,
 );
 
-const serveBackendOptions = Flag.string('backend-options').pipe(
+const serveBackendOptions = Flag.String('backend-options').pipe(
   Flag.withDescription(
     'JSON-encoded options for --backend (or set CONTENTIA_BACKEND_OPTIONS, which keeps credentials out of the process list)',
   ),
-  Flag.withFallbackConfig(Config.string('CONTENTIA_BACKEND_OPTIONS')),
+  Flag.withFallbackConfig(Config.String('CONTENTIA_BACKEND_OPTIONS')),
   Flag.optional,
 );
 
-const serveJson = Flag.boolean('json').pipe(
+const serveJson = Flag.Boolean('json').pipe(
   Flag.withDescription(
     'Print machine-readable JSON lines on stdout (for editors and scripts); never prompts to install packages',
   ),
@@ -190,7 +190,7 @@ export const makeServeCommand = (name = 'serve', binName = 'contentia local') =>
           flags.json ? writeServeEvent({ event: 'error', message: error.message }) : Effect.void
         ),
         // In --json mode stdout carries only ServeEvent lines; logs go to stderr.
-        flags.json ? Effect.provide(Logger.layer([Logger.consolePretty({ stderr: true })])) : identity,
+        flags.json ? Effect.provideService(Logger.LogToStderr, true) : identity,
       ),
   ).pipe(
     Command.withDescription(
@@ -206,13 +206,13 @@ export const serveCommand = makeServeCommand();
 // prompts and never installs packages.
 // ---------------------------------------------------------------------------
 
-const apiServerConfig = Flag.string('config').pipe(
+const apiServerConfig = Flag.String('config').pipe(
   Flag.withAlias('c'),
   Flag.withDescription('Server config file, .yaml/.yml/.json (or set CONTENTIA_CONFIG)'),
-  Flag.withFallbackConfig(Config.string('CONTENTIA_CONFIG')),
+  Flag.withFallbackConfig(Config.String('CONTENTIA_CONFIG')),
 );
 
-const apiServerCheck = Flag.boolean('check').pipe(
+const apiServerCheck = Flag.Boolean('check').pipe(
   Flag.withDescription('Validate the config and build every repository, then exit without listening'),
   Flag.withDefault(false),
 );
@@ -265,8 +265,8 @@ export const makeHashPasswordCommand = (name = 'hash-password', binName = 'conte
     Effect.gen(function*() {
       let password: string;
       if (process.stdin.isTTY === true) {
-        password = Redacted.value(yield* Prompt.password({ message: 'Password' }));
-        const repeated = Redacted.value(yield* Prompt.password({ message: 'Repeat password' }));
+        password = Redacted.value(yield* Prompt.Password({ message: 'Password' }));
+        const repeated = Redacted.value(yield* Prompt.Password({ message: 'Repeat password' }));
         if (password !== repeated) return yield* Effect.fail(new Error(`${binName} ${name}: passwords don't match`));
       } else {
         password = yield* Effect.promise(readStdin);
@@ -288,12 +288,12 @@ export const makeHashPasswordCommand = (name = 'hash-password', binName = 'conte
 // Which config format is read is the adapter's business: see `cms/registry.ts`.
 // ---------------------------------------------------------------------------
 
-const generateCms = Flag.string('cms').pipe(
+const generateCms = Flag.String('cms').pipe(
   Flag.withDescription(cmsFlagDescription('CMS whose config format to read')),
   Flag.withDefault(DEFAULT_CMS_ADAPTER.name),
 );
 
-const generateInput = Flag.string('input').pipe(
+const generateInput = Flag.String('input').pipe(
   Flag.withAlias('i'),
   Flag.withDescription(
     'Path to the CMS config file (default: auto-discover, e.g. ./config.{yml,yaml} or ./src/config.{yml,yaml})',
@@ -301,7 +301,7 @@ const generateInput = Flag.string('input').pipe(
   Flag.optional,
 );
 
-const generateOutput = Flag.string('output').pipe(
+const generateOutput = Flag.String('output').pipe(
   Flag.withAlias('o'),
   Flag.withDescription(
     'Path to generated .ts (default: config.gen.ts next to the input)',
@@ -309,7 +309,7 @@ const generateOutput = Flag.string('output').pipe(
   Flag.optional,
 );
 
-const generateWatch = Flag.boolean('watch').pipe(
+const generateWatch = Flag.Boolean('watch').pipe(
   Flag.withAlias('w'),
   Flag.withDescription('Regenerate whenever the input file changes'),
   Flag.withDefault(false),
@@ -431,77 +431,77 @@ export const generateCommand = makeGenerateCommand();
 //      `--source-backend fs --source-options '{"root":...}'`)
 // ---------------------------------------------------------------------------
 
-const migrateConfigFile = Flag.string('config').pipe(
+const migrateConfigFile = Flag.String('config').pipe(
   Flag.withAlias('c'),
   Flag.withDescription('Path to a JSON/YAML migration config file'),
   Flag.optional,
 );
 
-const migrateSourceBackend = Flag.string('source-backend').pipe(
+const migrateSourceBackend = Flag.String('source-backend').pipe(
   Flag.withDescription('Source backend name (e.g. fs, vercel, surrealdb). See list-backends.'),
   Flag.optional,
 );
 
-const migrateSourceOptions = Flag.string('source-options').pipe(
+const migrateSourceOptions = Flag.String('source-options').pipe(
   Flag.withDescription('JSON-encoded options for the source backend'),
   Flag.optional,
 );
 
-const migrateDestinationBackend = Flag.string('destination-backend').pipe(
+const migrateDestinationBackend = Flag.String('destination-backend').pipe(
   Flag.withDescription('Destination backend name'),
   Flag.optional,
 );
 
-const migrateDestinationOptions = Flag.string('destination-options').pipe(
+const migrateDestinationOptions = Flag.String('destination-options').pipe(
   Flag.withDescription('JSON-encoded options for the destination backend'),
   Flag.optional,
 );
 
-const migrateSource = Flag.directory('source').pipe(
+const migrateSource = Flag.Directory('source').pipe(
   Flag.withAlias('s'),
   Flag.withDescription('FS shortcut: source repository root directory'),
   Flag.optional,
 );
 
-const migrateDestination = Flag.directory('destination').pipe(
+const migrateDestination = Flag.Directory('destination').pipe(
   Flag.withAlias('d'),
   Flag.withDescription('FS shortcut: destination repository root directory'),
   Flag.optional,
 );
 
-const migrateDefaultExtension = Flag.string('default-extension').pipe(
+const migrateDefaultExtension = Flag.String('default-extension').pipe(
   Flag.withDescription(
     'FS shortcut: default file extension on the destination (default: md)',
   ),
   Flag.withDefault('md'),
 );
 
-const migrateFrom = Flag.string('from').pipe(
+const migrateFrom = Flag.String('from').pipe(
   Flag.withDescription(`Folder key to start the migration from (default: '', the root)`),
   Flag.withDefault(''),
 );
 
-const migrateOverwrite = Flag.boolean('overwrite').pipe(
+const migrateOverwrite = Flag.Boolean('overwrite').pipe(
   Flag.withDescription('Overwrite objects that already exist on the destination'),
   Flag.withDefault(false),
 );
 
-const migrateDryRun = Flag.boolean('dry-run').pipe(
+const migrateDryRun = Flag.Boolean('dry-run').pipe(
   Flag.withDescription('Walk the source and log what would happen without writing anything'),
   Flag.withDefault(false),
 );
 
-const migrateConcurrency = Flag.integer('concurrency').pipe(
+const migrateConcurrency = Flag.Int('concurrency').pipe(
   Flag.withDescription('Number of object copies to run in parallel per folder (default: 4)'),
   Flag.withDefault(4),
 );
 
-const migratePageSize = Flag.integer('page-size').pipe(
+const migratePageSize = Flag.Int('page-size').pipe(
   Flag.withDescription('Page size used when listing folders on the source (default: 1000)'),
   Flag.withDefault(1000),
 );
 
-const migrateNoInstall = Flag.boolean('no-install').pipe(
+const migrateNoInstall = Flag.Boolean('no-install').pipe(
   Flag.withDescription('Refuse to auto-install missing backend packages (fail instead)'),
   Flag.withDefault(false),
 );

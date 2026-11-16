@@ -556,7 +556,7 @@
     "@types/node": "catalog:types",
     "ai": "catalog:ai",
     "rimraf": "catalog:tools",
-    "tsc-alias": "^1.8.16",
+    "tsc-alias": "^1.9.10",
     "typescript": "catalog:tools",
     "vitest": "catalog:tools"
   },

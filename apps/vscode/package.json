@@ -9,7 +9,7 @@
   "repository": "https://github.com/contentia-dev/contentia",
   "icon": "media/contentia-icon.png",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.146.0"
   },
   "categories": [
     "Other"
@@ -195,9 +195,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@types/node": "catalog:types",
-    "@types/vscode": "^1.90.0",
     "@contentia/cli": "workspace:*",
+    "@types/node": "catalog:types",
+    "@types/vscode": "^1.146.0",
     "contentia": "workspace:*",
     "rimraf": "catalog:tools",
     "tsup": "catalog:tools",

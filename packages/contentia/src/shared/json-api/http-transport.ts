@@ -1,9 +1,9 @@
 import * as Effect from 'effect/Effect';
-import * as FetchHttpClient from 'effect/unstable/http/FetchHttpClient';
-import * as HttpClient from 'effect/unstable/http/HttpClient';
-import * as HttpClientRequest from 'effect/unstable/http/HttpClientRequest';
-import type * as HttpClientResponse from 'effect/unstable/http/HttpClientResponse';
-import type { HttpMethod } from 'effect/unstable/http/HttpMethod';
+import * as FetchHttpClient from 'effect/http/FetchHttpClient';
+import * as HttpClient from 'effect/http/HttpClient';
+import * as HttpClientRequest from 'effect/http/HttpClientRequest';
+import type * as HttpClientResponse from 'effect/http/HttpClientResponse';
+import type { HttpMethod } from 'effect/http/HttpMethod';
 
 import { type ContentiaError, ErrorCodeToClassMap, InvalidData } from 'contentia/core';
 

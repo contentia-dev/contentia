@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { NodeRuntime, NodeServices } from '@effect/platform-node';
+import { Command } from 'effect/cli';
 import * as Effect from 'effect/Effect';
-import { Command } from 'effect/unstable/cli';
 
 import packageJson from '../package.json' with { type: 'json' };
 import {

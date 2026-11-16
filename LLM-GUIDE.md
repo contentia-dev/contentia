@@ -344,10 +344,11 @@ These are the things that consistently bite first-time integrators:
    maps extensions to serializers, e.g. `{ md, yaml, yml, json, raw }`. If you only register `md`,
    reading or saving YAML and JSON files fails.
 
-9. **Effect Platform 4.x moved HTTP types into `effect/unstable/http/*`.** If you're using
-   `@effect/platform-node`, import from `effect/unstable/http/HttpRouter`, not
-   `@effect/platform/HttpRouter`. The platform-node package only exports the Node.js server
-   primitives (`NodeHttpServer`, `NodeRuntime`). Additionally:
+9. **Effect 4 ships HTTP and CLI modules inside `effect` itself: `effect/http/*` and `effect/cli`.**
+   If you're using `@effect/platform-node`, import from `effect/http/HttpRouter`, not
+   `@effect/platform/HttpRouter` or the pre-4.0 beta path `effect/unstable/http/HttpRouter`. The
+   platform-node package only exports the Node.js server primitives (`NodeHttpServer`,
+   `NodeRuntime`). Additionally:
    - `Effect.catchAll` → use `Effect.result()` to convert failures to `Result<A, E>`, then branch on
      `Result.isSuccess` / `Result.isFailure`. The `.success` field holds the value on success.
    - `HttpRouter.add(method, path, handler)` at the **module** level returns a `Layer` (not an

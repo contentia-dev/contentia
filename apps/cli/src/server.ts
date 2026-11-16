@@ -1,11 +1,11 @@
 import { NodeHttpServer } from '@effect/platform-node';
 import * as Effect from 'effect/Effect';
+import * as HttpRouter from 'effect/http/HttpRouter';
+import * as HttpServer from 'effect/http/HttpServer';
+import type * as HttpServerError from 'effect/http/HttpServerError';
+import * as HttpServerRequest from 'effect/http/HttpServerRequest';
+import * as HttpServerResponse from 'effect/http/HttpServerResponse';
 import * as Layer from 'effect/Layer';
-import * as HttpRouter from 'effect/unstable/http/HttpRouter';
-import * as HttpServer from 'effect/unstable/http/HttpServer';
-import type * as HttpServerError from 'effect/unstable/http/HttpServerError';
-import * as HttpServerRequest from 'effect/unstable/http/HttpServerRequest';
-import * as HttpServerResponse from 'effect/unstable/http/HttpServerResponse';
 import { createServer } from 'node:http';
 
 import { allowAll } from 'contentia/json-api';
@@ -137,9 +137,9 @@ const layerOnListening = (
   onListening
     ? Layer.effectDiscard(Effect.gen(function*() {
       const { address } = yield* HttpServer.HttpServer;
-      // `address.hostname` is what the socket reports (e.g. `::1`); the host the
+      // The bound IP is what the socket reports (e.g. `::1`); the host the
       // caller asked for is the one clients can actually dial.
-      const url = address._tag === 'TcpAddress'
+      const url = address._tag !== 'UnixPathAddress'
         ? `http://${host.includes(':') ? `[${host}]` : host}:${address.port}`
         : HttpServer.formatAddress(address);
       yield* onListening(url);

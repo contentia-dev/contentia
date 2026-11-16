@@ -20,25 +20,25 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.31.1",
+    "@changesets/cli": "^3.0.3",
     "@eslint/js": "catalog:lint",
     "@types/node": "catalog:types",
     "@typescript-eslint/eslint-plugin": "catalog:lint",
     "@typescript-eslint/parser": "catalog:lint",
     "@vitest/coverage-v8": "catalog:tools",
-    "vitest": "catalog:tools",
-    "dprint": "^0.54.0",
+    "dprint": "^0.64.3",
     "eslint": "catalog:lint",
     "globals": "catalog:lint",
     "husky": "^9.1.7",
     "rimraf": "catalog:tools",
     "turbo": "catalog:tools",
-    "typescript": "catalog:tools",
-    "typescript-eslint": "catalog:lint"
+    "typescript": "catalog:lint",
+    "typescript-eslint": "catalog:lint",
+    "vitest": "catalog:tools"
   },
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@12.18.0",
   "engines": {
     "node": "24.x",
-    "pnpm": ">=11 <12"
+    "pnpm": ">=12 <13"
   }
 }

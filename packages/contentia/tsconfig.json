@@ -18,169 +18,168 @@
     "ignoreDeprecations": "6.0",
     "rootDir": "src",
     "outDir": "dist",
-    "baseUrl": ".",
     "types": [
       "node"
     ],
     "paths": {
       "contentia/assets/api": [
-        "src/api/assets-api/index.ts"
+        "./src/api/assets-api/index.ts"
       ],
       "contentia/catalog-api": [
-        "src/api/catalog-api/index.ts"
+        "./src/api/catalog-api/index.ts"
       ],
       "contentia/documents/api": [
-        "src/api/documents-api/index.ts"
+        "./src/api/documents-api/index.ts"
       ],
       "contentia/storage/api": [
-        "src/api/storage-api/index.ts"
+        "./src/api/storage-api/index.ts"
       ],
       "contentia/assets": [
-        "src/domain/assets/index.ts"
+        "./src/domain/assets/index.ts"
       ],
       "contentia/catalog": [
-        "src/domain/catalog/index.ts"
+        "./src/domain/catalog/index.ts"
       ],
       "contentia/documents": [
-        "src/domain/documents/index.ts"
+        "./src/domain/documents/index.ts"
       ],
       "contentia/storage": [
-        "src/domain/storage/index.ts"
+        "./src/domain/storage/index.ts"
       ],
       "contentia/documents/testing": [
-        "src/domain/documents/testing/index.ts"
+        "./src/domain/documents/testing/index.ts"
       ],
       "contentia/storage/testing": [
-        "src/domain/storage/testing/index.ts"
+        "./src/domain/storage/testing/index.ts"
       ],
       "contentia/assets/catalog": [
-        "src/impl/assets-catalog/index.ts"
+        "./src/impl/assets-catalog/index.ts"
       ],
       "contentia/assets/jsonapi-proxy": [
-        "src/impl/assets-jsonapi-proxy/index.ts"
+        "./src/impl/assets-jsonapi-proxy/index.ts"
       ],
       "contentia/assets/obsidian": [
-        "src/impl/assets-obsidian/index.ts"
+        "./src/impl/assets-obsidian/index.ts"
       ],
       "contentia/assets/r2": [
-        "src/impl/assets-r2/index.ts"
+        "./src/impl/assets-r2/index.ts"
       ],
       "contentia/catalog-decap": [
-        "src/impl/catalog-decap/index.ts"
+        "./src/impl/catalog-decap/index.ts"
       ],
       "contentia/catalog-convention": [
-        "src/impl/catalog-convention/index.ts"
+        "./src/impl/catalog-convention/index.ts"
       ],
       "contentia/documents/catalog": [
-        "src/impl/documents-catalog/index.ts"
+        "./src/impl/documents-catalog/index.ts"
       ],
       "contentia/documents/drizzle": [
-        "src/impl/documents-drizzle/index.ts"
+        "./src/impl/documents-drizzle/index.ts"
       ],
       "contentia/documents/jsonapi-proxy": [
-        "src/impl/documents-jsonapi-proxy/index.ts"
+        "./src/impl/documents-jsonapi-proxy/index.ts"
       ],
       "contentia/documents/obsidian": [
-        "src/impl/documents-obsidian/index.ts"
+        "./src/impl/documents-obsidian/index.ts"
       ],
       "contentia/storage/drizzle": [
-        "src/impl/storage-drizzle/index.ts"
+        "./src/impl/storage-drizzle/index.ts"
       ],
       "contentia/storage/fs": [
-        "src/impl/storage-fs/index.ts"
+        "./src/impl/storage-fs/index.ts"
       ],
       "contentia/storage/jsonapi-proxy": [
-        "src/impl/storage-jsonapi-proxy/index.ts"
+        "./src/impl/storage-jsonapi-proxy/index.ts"
       ],
       "contentia/storage/r2": [
-        "src/impl/storage-r2/index.ts"
+        "./src/impl/storage-r2/index.ts"
       ],
       "contentia/storage/s3": [
-        "src/impl/storage-s3/index.ts"
+        "./src/impl/storage-s3/index.ts"
       ],
       "contentia/storage/web-fs": [
-        "src/impl/storage-web-fs/index.ts"
+        "./src/impl/storage-web-fs/index.ts"
       ],
       "contentia/storage/webdav": [
-        "src/impl/storage-webdav/index.ts"
+        "./src/impl/storage-webdav/index.ts"
       ],
       "contentia/serializers/json": [
-        "src/serializers/storage-serializers-json/index.ts"
+        "./src/serializers/storage-serializers-json/index.ts"
       ],
       "contentia/serializers/markdown": [
-        "src/serializers/storage-serializers-markdown/index.ts"
+        "./src/serializers/storage-serializers-markdown/index.ts"
       ],
       "contentia/serializers/raw": [
-        "src/serializers/storage-serializers-raw/index.ts"
+        "./src/serializers/storage-serializers-raw/index.ts"
       ],
       "contentia/serializers/yaml": [
-        "src/serializers/storage-serializers-yaml/index.ts"
+        "./src/serializers/storage-serializers-yaml/index.ts"
       ],
       "contentia/auth": [
-        "src/shared/auth/index.ts"
+        "./src/shared/auth/index.ts"
       ],
       "contentia/core": [
-        "src/shared/core/index.ts"
+        "./src/shared/core/index.ts"
       ],
       "contentia/compat": [
-        "src/shared/core/compat.ts"
+        "./src/shared/core/compat.ts"
       ],
       "contentia/crypto": [
-        "src/shared/crypto/index.ts"
+        "./src/shared/crypto/index.ts"
       ],
       "contentia/file-sanitizer": [
-        "src/shared/file-sanitizer/index.ts"
+        "./src/shared/file-sanitizer/index.ts"
       ],
       "contentia/i18n": [
-        "src/shared/i18n/index.ts"
+        "./src/shared/i18n/index.ts"
       ],
       "contentia/i18n/en": [
-        "src/shared/i18n/translations/en.ts"
+        "./src/shared/i18n/translations/en.ts"
       ],
       "contentia/i18n/nl": [
-        "src/shared/i18n/translations/nl.ts"
+        "./src/shared/i18n/translations/nl.ts"
       ],
       "contentia/json-api": [
-        "src/shared/json-api/index.ts"
+        "./src/shared/json-api/index.ts"
       ],
       "contentia/sanitizer": [
-        "src/shared/sanitizer/index.ts"
+        "./src/shared/sanitizer/index.ts"
       ],
       "contentia/server/api": [
-        "src/server/api/index.ts"
+        "./src/server/api/index.ts"
       ],
       "contentia/server/oauth2": [
-        "src/server/oauth2/index.ts"
+        "./src/server/oauth2/index.ts"
       ],
       "contentia/server/oauth2/i18n": [
-        "src/server/oauth2/i18n/index.ts"
+        "./src/server/oauth2/i18n/index.ts"
       ],
       "contentia/server/oauth2/i18n/en": [
-        "src/server/oauth2/i18n/translations/en.ts"
+        "./src/server/oauth2/i18n/translations/en.ts"
       ],
       "contentia/server/oauth2/i18n/nl": [
-        "src/server/oauth2/i18n/translations/nl.ts"
+        "./src/server/oauth2/i18n/translations/nl.ts"
       ],
       "contentia/server/decap": [
-        "src/server/decap/index.ts"
+        "./src/server/decap/index.ts"
       ],
       "contentia/server/ai": [
-        "src/server/ai/index.ts"
+        "./src/server/ai/index.ts"
       ],
       "contentia/server/ai/providers": [
-        "src/server/ai/providers/index.ts"
+        "./src/server/ai/providers/index.ts"
       ],
       "contentia/server/ai/tools": [
-        "src/server/ai/tools/index.ts"
+        "./src/server/ai/tools/index.ts"
       ],
       "contentia/server/ai/i18n/en": [
-        "src/server/ai/i18n/en.ts"
+        "./src/server/ai/i18n/en.ts"
       ],
       "contentia/server/ai/i18n/nl": [
-        "src/server/ai/i18n/nl.ts"
+        "./src/server/ai/i18n/nl.ts"
       ],
       "contentia/server/ai/i18n/types": [
-        "src/server/ai/i18n/types.ts"
+        "./src/server/ai/i18n/types.ts"
       ]
     }
   },
