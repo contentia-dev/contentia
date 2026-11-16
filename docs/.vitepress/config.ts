@@ -58,6 +58,12 @@ export default defineConfig({
   metaChunk: true,
   lastUpdated: true,
   sitemap: { hostname: siteUrl },
+  vite: {
+    // Bundle vitepress-openapi into the SSR build. Left external, Node loads it on its own, and its
+    // `import { useData } from 'vitepress'` then hits VitePress's Node entry, which has no `useData`:
+    // the HTTP API pages would ship without their endpoint lists in the static HTML.
+    ssr: { noExternal: ['vitepress-openapi'] },
+  },
   markdown: {
     // ```mermaid fences become the raw diagram source; theme/mermaid.ts renders them client-side.
     config: md => {
@@ -136,25 +142,17 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/reference/' },
           {
-            text: 'JSON:API',
-            collapsed: true,
+            // One page per API server: its conventions, then every endpoint rendered from the
+            // server's OpenAPI spec. Not collapsible, so the API list is always one glance away.
+            text: 'HTTP API',
             items: [
               { text: 'Overview', link: '/reference/json-api/' },
               { text: 'Storage API', link: '/reference/json-api/storage' },
               { text: 'Documents API', link: '/reference/json-api/documents' },
               { text: 'Assets API', link: '/reference/json-api/assets' },
               { text: 'Catalog API', link: '/reference/json-api/catalog' },
+              { text: 'Locks API', link: '/reference/json-api/locks' },
               { text: 'Error Responses', link: '/reference/json-api/errors' },
-              {
-                text: 'OpenAPI Reference',
-                collapsed: true,
-                items: [
-                  { text: 'Storage API', link: '/reference/json-api/openapi-storage' },
-                  { text: 'Documents API', link: '/reference/json-api/openapi-documents' },
-                  { text: 'Assets API', link: '/reference/json-api/openapi-assets' },
-                  { text: 'Catalog API', link: '/reference/json-api/openapi-catalog' },
-                ],
-              },
             ],
           },
           { text: 'Imports', link: '/reference/imports' },

@@ -1,39 +1,38 @@
-# JSON:API Reference
+# HTTP API
 
-Contentia exposes its content over HTTP as [JSON:API v1.1](https://jsonapi.org/) servers. This
-section documents every endpoint, grouped by API server.
+Contentia serves content over HTTP as [JSON:API v1.1](https://jsonapi.org/) servers. Each server is
+a `fetch(request): Promise<Response>` handler: mount it on your runtime yourself, or let
+`contentia serve` mount all of them for you. All responses use the `application/vnd.api+json`
+content type.
 
-- [Storage API](./storage) — low-level key/value atom and folder storage
-- [Documents API](./documents) — versioned content with a publish/unpublish lifecycle
-- [Assets API](./assets) — binary file and folder management
-- [Catalog API](./catalog) — collection settings
-- [Locks API](./locks) — advisory entry locking for admin UIs
-- [Error Responses](./errors) — shared error format and codes
+| Server                       | Default base path | Purpose                                            |
+| ---------------------------- | ----------------- | -------------------------------------------------- |
+| [Storage API](./storage)     | configurable      | Low-level key/value atom and folder storage        |
+| [Documents API](./documents) | configurable      | Versioned content with publish/unpublish lifecycle |
+| [Assets API](./assets)       | `/api/assets`     | Binary file and folder management                  |
+| [Catalog API](./catalog)     | configurable      | Collection settings (document and media folders)   |
+| [Locks API](./locks)         | configurable      | Advisory entry locking for admin UIs               |
+| [Error Responses](./errors)  |                   | The shared error format and codes                  |
 
-### Interactive OpenAPI Reference
+Each server's page covers its conventions, then lists every endpoint with its parameters and request
+and response schemas. The list is rendered from the OpenAPI spec the server serves itself, at
+`GET /openapi.json` and `GET /openapi.yaml`, so it always matches the code. The Locks API has no
+spec; its page documents its endpoints by hand.
 
-Rendered from the type-checked `openapi.ts` sources at build time — updated automatically on every
-docs rebuild.
+## Access policy
 
-- [Storage API →](./openapi-storage)
-- [Documents API →](./openapi-documents)
-- [Assets API →](./openapi-assets)
-- [Catalog API →](./openapi-catalog)
+The Storage, Documents, Assets, and Catalog API builders all require an `authorize` callback. It
+runs before every action, including the two OpenAPI routes (only `GET /`, the API's description of
+itself, skips it), and receives the action descriptor plus the originating `Request`. Return `true`
+to allow, `false` for a 403, or a
+[`ContentiaError`](../api/contentia/core/errors/classes/ContentiaError) for a custom status.
 
-## Overview
+`authorize` decides _what a caller may do_; authenticating them is still your job. Validate the
+credential inside the callback, or mount the handler behind `contentia/server/api`, which checks a
+Bearer token first. For a deliberately open surface, say so with
+[`allowAll`](../api/contentia/json-api/functions/allowAll) from `contentia/json-api`.
 
-Contentia exposes three HTTP API servers, each following the [JSON:API v1.1](https://jsonapi.org/)
-specification. All responses use the `application/vnd.api+json` content type.
-
-| Server        | Default Base Path | Purpose                                            |
-| ------------- | ----------------- | -------------------------------------------------- |
-| Storage API   | configurable      | Low-level key/value atom and folder storage        |
-| Documents API | configurable      | Versioned content with publish/unpublish lifecycle |
-| Assets API    | `/api/assets`     | Binary file and folder management                  |
-| Catalog API   | configurable      | Collection settings (document and media folders)   |
-| Locks API     | configurable      | Advisory entry locking for admin UIs (ADR-007)     |
-
-### JSON:API Conventions
+## Conventions
 
 - Single resources are returned as `{ "data": { ... } }`.
 - Collections are returned as `{ "data": [ ... ], "links": { ... }, "meta": { "page": { ... } } }`.
@@ -52,6 +51,6 @@ specification. All responses use the `application/vnd.api+json` content type.
   offset- and page-based pagination. Sending a cursor param to an unsupported backend returns a
   `400 Bad Request` with a `invalid_data` error. Inspect `GET /capabilities`
   (`attributes.pagination.styles.cursor`) to confirm cursor support before using these params.
-  **Page size is capped at 100.** `page[size]` / `page[limit]` values above 100 are silently clamped
-  to 100 — the request succeeds but fewer items are returned. The response pagination links will
-  reflect the clamped value.
+  **Page size is clamped to 1–100.** `page[size]` / `page[limit]` values outside that range are
+  silently clamped into it, so a request for 500 items succeeds with 100. The response pagination
+  links reflect the clamped value.

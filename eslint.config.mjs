@@ -23,6 +23,11 @@ export default tseslint.config(
     },
   },
   {
+    // API reference examples: each ends on the call it demonstrates, so its result is unused.
+    files: ['docs/reference/examples/*/**'],
+    rules: { '@typescript-eslint/no-unused-vars': 'off' },
+  },
+  {
     ignores: [
       // Standalone examples workspace — not part of this pnpm project
       'examples/**',

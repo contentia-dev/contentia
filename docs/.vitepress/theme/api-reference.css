@@ -1,0 +1,9 @@
+/*
+ * The API reference pages (vitepress-openapi's <OASpec>), laid out like Stripe's: each operation's
+ * right column, the endpoint and its code samples, stays in view while its details scroll past.
+ */
+.OAPath .grid.sm\:grid-cols-2 > :last-child {
+  position: sticky;
+  top: calc(var(--vp-nav-height) + 24px);
+  align-self: start;
+}

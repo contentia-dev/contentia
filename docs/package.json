@@ -7,22 +7,24 @@
   "scripts": {
     "generate-adapter-docs": "node scripts/generate-adapter-docs.mjs",
     "generate-api-docs": "node scripts/generate-api-docs.mjs",
-    "generate-openapi-docs": "node scripts/generate-openapi-docs.mjs",
-    "prebuild-docs": "npm run generate-adapter-docs && npm run generate-api-docs && npm run generate-openapi-docs",
+    "prebuild-docs": "npm run generate-adapter-docs && npm run generate-api-docs",
     "dev": "npm run prebuild-docs && vitepress dev",
     "build": "npm run prebuild-docs && vitepress build",
     "preview": "vitepress preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc -p reference/examples/tsconfig.json"
   },
   "devDependencies": {
-    "@scalar/api-reference": "catalog:docs",
-    "js-yaml": "catalog:",
+    "@types/node": "catalog:types",
     "contentia": "workspace:*",
+    "js-yaml": "catalog:",
     "mermaid": "catalog:docs",
     "typedoc": "catalog:docs",
     "typedoc-plugin-markdown": "catalog:docs",
     "typedoc-vitepress-theme": "catalog:docs",
+    "typescript": "catalog:tools",
     "vitepress": "catalog:vue",
+    "vitepress-openapi": "catalog:docs",
     "vitest": "catalog:tools",
     "vue": "catalog:vue"
   },
