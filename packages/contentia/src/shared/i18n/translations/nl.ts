@@ -83,6 +83,18 @@ export const nl: Translation = {
   'storage.r2.failedToListDirectory': 'De mapinhoud kon niet worden weergegeven.',
   'storage.r2.failedToCreateOrUpdateObject': 'Het object kon niet worden aangemaakt of bijgewerkt.',
 
+  // storage-s3
+  'storage.s3.fileNotFound': 'Het opgevraagde bestand kon niet worden gevonden.',
+  'storage.s3.directoryNotFound': 'De opgevraagde map kon niet worden gevonden.',
+  'storage.s3.entryAlreadyExists': 'Er bestaat al een item met deze sleutel.',
+  'storage.s3.contentRequired': 'Inhoud is vereist om dit item aan te maken.',
+  'storage.s3.invalidRequest': 'Het verzoek kon niet worden verwerkt.',
+  'storage.s3.failedToReadObject': 'De inhoud van het object kon niet worden gelezen.',
+  'storage.s3.failedToWriteObject': 'Het object kon niet worden opgeslagen.',
+  'storage.s3.failedToDeleteObject': 'Het object kon niet worden verwijderd.',
+  'storage.s3.failedToGetObjectMetadata': 'De objectmetadata kon niet worden opgehaald.',
+  'storage.s3.failedToListDirectory': 'De mapinhoud kon niet worden weergegeven.',
+
   // storage-drizzle (LCMS-547)
   'storage.drizzle.fileNotFound': 'Het opgevraagde object kon niet worden gevonden.',
   'storage.drizzle.directoryNotFound': 'De opgevraagde map kon niet worden gevonden.',

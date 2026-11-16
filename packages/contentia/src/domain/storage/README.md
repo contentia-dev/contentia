@@ -113,7 +113,7 @@ isIgnored('posts/hello.md'); // false
 - `contentia/storage/r2` - Cloudflare R2
 - `contentia/storage/fs` - Local filesystem
 - `contentia/storage/drizzle` - SQL via Drizzle ORM
-- `contentia/storage/s3` - S3→R2Bucket adapter (pairs with `R2StorageRepository`)
+- `contentia/storage/s3` - Any S3-compatible object store (AWS S3, MinIO, B2, R2 over S3, …)
 - `contentia/storage/webdav` - WebDAV server
 - `contentia/storage/jsonapi-proxy` - Storage JSON:API proxy
 - `contentia/storage/web-fs` - Browser File System API (any directory handle: origin-private or

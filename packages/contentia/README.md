@@ -66,28 +66,28 @@ export default {
 
 ### Implementations
 
-| Export                              | Backs                                                                                                                                                                     |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contentia/storage/fs`              | Filesystem                                                                                                                                                                |
-| `contentia/storage/r2`              | Cloudflare R2                                                                                                                                                             |
-| `contentia/storage/s3`              | S3→R2Bucket adapter (`createS3Bucket()`) — use with `R2StorageRepository`; **not** a `StorageRepository` itself. Full S3 `StorageRepository`: `@contentia/aws/storage-s3` |
-| `contentia/storage/webdav`          | WebDAV server                                                                                                                                                             |
-| `contentia/storage/drizzle`         | SQL via Drizzle                                                                                                                                                           |
-| `contentia/storage/jsonapi-proxy`   | Remote JSON:API server                                                                                                                                                    |
-| `contentia/storage/web`             | Web Storage (`localStorage` / `sessionStorage`) — browser / SSR-safe                                                                                                      |
-| `contentia/storage/web-fs`          | Browser File System API (`FileSystemDirectoryHandle`) — local-first, no server required                                                                                   |
-| `contentia/storage-github-cdn`      | Read-only public GitHub repo via jsDelivr CDN — no token, no `@octokit/*` dependency                                                                                      |
-| `contentia/documents/catalog`       | Documents on top of `storage`                                                                                                                                             |
-| `contentia/documents/drizzle`       | Documents in SQL                                                                                                                                                          |
-| `contentia/documents/jsonapi-proxy` | Documents via JSON:API proxy                                                                                                                                              |
-| `contentia/documents/obsidian`      | Obsidian-vault-backed documents                                                                                                                                           |
-| `contentia/assets/catalog`          | Assets on top of `storage`                                                                                                                                                |
-| `contentia/assets/r2`               | Assets in R2                                                                                                                                                              |
-| `contentia/assets/jsonapi-proxy`    | Assets via JSON:API proxy                                                                                                                                                 |
-| `contentia/assets/obsidian`         | Obsidian-vault-backed assets — **Node.js / Bun only** (uses `node:fs` / `node:path` / `node:stream`; not available on Cloudflare Workers)                                 |
-| `contentia/catalog-convention`      | In-memory / file-backed settings                                                                                                                                          |
-| `contentia/catalog-decap`           | Decap-CMS-compatible settings                                                                                                                                             |
-| `contentia/locks/in-process`        | In-process advisory document locking (ADR-007) — `InProcessLockManager`, single-node only (`scope: 'in-process'`)                                                         |
+| Export                              | Backs                                                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `contentia/storage/fs`              | Filesystem                                                                                                                                |
+| `contentia/storage/r2`              | Cloudflare R2                                                                                                                             |
+| `contentia/storage/s3`              | Any S3-compatible store (AWS S3, MinIO, B2, R2 over its S3 endpoint, …)                                                                   |
+| `contentia/storage/webdav`          | WebDAV server                                                                                                                             |
+| `contentia/storage/drizzle`         | SQL via Drizzle                                                                                                                           |
+| `contentia/storage/jsonapi-proxy`   | Remote JSON:API server                                                                                                                    |
+| `contentia/storage/web`             | Web Storage (`localStorage` / `sessionStorage`) — browser / SSR-safe                                                                      |
+| `contentia/storage/web-fs`          | Browser File System API (`FileSystemDirectoryHandle`) — local-first, no server required                                                   |
+| `contentia/storage-github-cdn`      | Read-only public GitHub repo via jsDelivr CDN — no token, no `@octokit/*` dependency                                                      |
+| `contentia/documents/catalog`       | Documents on top of `storage`                                                                                                             |
+| `contentia/documents/drizzle`       | Documents in SQL                                                                                                                          |
+| `contentia/documents/jsonapi-proxy` | Documents via JSON:API proxy                                                                                                              |
+| `contentia/documents/obsidian`      | Obsidian-vault-backed documents                                                                                                           |
+| `contentia/assets/catalog`          | Assets on top of `storage`                                                                                                                |
+| `contentia/assets/r2`               | Assets in R2                                                                                                                              |
+| `contentia/assets/jsonapi-proxy`    | Assets via JSON:API proxy                                                                                                                 |
+| `contentia/assets/obsidian`         | Obsidian-vault-backed assets — **Node.js / Bun only** (uses `node:fs` / `node:path` / `node:stream`; not available on Cloudflare Workers) |
+| `contentia/catalog-convention`      | In-memory / file-backed settings                                                                                                          |
+| `contentia/catalog-decap`           | Decap-CMS-compatible settings                                                                                                             |
+| `contentia/locks/in-process`        | In-process advisory document locking (ADR-007) — `InProcessLockManager`, single-node only (`scope: 'in-process'`)                         |
 
 ### Server
 

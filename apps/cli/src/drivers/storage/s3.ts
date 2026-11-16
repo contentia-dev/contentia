@@ -1,5 +1,4 @@
-import { R2StorageRepository } from 'contentia/storage-r2';
-import { createS3Bucket, type S3Commands } from 'contentia/storage-s3';
+import { type S3ClientLike, type S3Commands, S3StorageRepository } from 'contentia/storage-s3';
 
 import { defaultSerializerRegistry } from '../serializers.js';
 import type { StorageDriver } from '../types.js';
@@ -46,8 +45,7 @@ const readOptions = (raw: Record<string, unknown>): S3Options => {
 /**
  * Any S3-compatible object store (AWS S3, Cloudflare R2 over its S3 endpoint,
  * MinIO, …). The `@aws-sdk/client-s3` client + command classes are lazy-loaded
- * (auto-installed on demand) and fed through contentia's built-in `createS3Bucket`
- * adapter into the `R2StorageRepository`.
+ * (auto-installed on demand) and handed to contentia's `S3StorageRepository`.
  */
 export const s3Driver: StorageDriver = {
   name: 's3',
@@ -62,7 +60,7 @@ export const s3Driver: StorageDriver = {
       endpoint?: string,
       forcePathStyle?: boolean,
       credentials: { accessKeyId: string, secretAccessKey: string, sessionToken?: string },
-    }) => unknown;
+    }) => S3ClientLike;
     const client = new S3Client({
       region: options.region,
       endpoint: options.endpoint,
@@ -80,18 +78,8 @@ export const s3Driver: StorageDriver = {
       DeleteObjectCommand: mod.DeleteObjectCommand,
       ListObjectsV2Command: mod.ListObjectsV2Command,
     } as S3Commands;
-    const bucket = createS3Bucket({
-      // `client` is an `S3ClientLike` structurally; the SDK's real client satisfies it.
-      client: client as never,
-      bucketName: options.bucket,
-      commands,
-      keyPrefix: options.keyPrefix,
-    });
-    // `createS3Bucket` returns an `R2BucketLike`; the R2 repo types its first arg
-    // as the Cloudflare `R2Bucket` global. They're runtime-compatible — this
-    // adapter exists precisely to bridge them — so cast across the nominal gap.
-    return new R2StorageRepository(
-      bucket as never,
+    return new S3StorageRepository(
+      { client, bucket: options.bucket, commands, keyPrefix: options.keyPrefix },
       defaultSerializerRegistry,
       options.defaultExtension,
     );

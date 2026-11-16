@@ -81,6 +81,18 @@ export const en = {
   'storage.r2.failedToListDirectory': 'The folder contents could not be listed.',
   'storage.r2.failedToCreateOrUpdateObject': 'The object could not be created or updated.',
 
+  // storage-s3
+  'storage.s3.fileNotFound': 'The requested file could not be found.',
+  'storage.s3.directoryNotFound': 'The requested folder could not be found.',
+  'storage.s3.entryAlreadyExists': 'An item with this key already exists.',
+  'storage.s3.contentRequired': 'Content is required to create this item.',
+  'storage.s3.invalidRequest': 'The request could not be processed.',
+  'storage.s3.failedToReadObject': 'The object contents could not be read.',
+  'storage.s3.failedToWriteObject': 'The object could not be written.',
+  'storage.s3.failedToDeleteObject': 'The object could not be deleted.',
+  'storage.s3.failedToGetObjectMetadata': 'The object metadata could not be retrieved.',
+  'storage.s3.failedToListDirectory': 'The folder contents could not be listed.',
+
   // storage-drizzle (LCMS-547)
   'storage.drizzle.fileNotFound': 'The requested object could not be found.',
   'storage.drizzle.directoryNotFound': 'The requested folder could not be found.',

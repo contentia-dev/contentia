@@ -10,10 +10,8 @@ and file extensions are handled transparently.
 R2 storage is one of the two flagship backends for Contentia: zero egress fees, S3-compatible API,
 and it runs natively alongside a Cloudflare Workers deployment. It requires an `R2Bucket` binding
 (from `@cloudflare/workers-types`, an optional peer dependency of this package), so it's typically
-used from a Worker — a `wrangler.toml` R2 bucket binding, or any object implementing the same
-`head`/`get`/`put`/`delete`/`list` surface (see `contentia/storage/s3`'s `createS3Bucket()` for an
-adapter that lets any S3-compatible store — including R2 via its S3 endpoint — pass as an
-`R2Bucket`-like object).
+used from a Worker with a `wrangler.toml` R2 bucket binding. To reach R2 from outside a Worker, use
+[`contentia/storage/s3`](../storage-s3) against R2's S3 endpoint.
 
 ## Usage
 
@@ -74,9 +72,8 @@ export default {
   `storage-fs`'s `listAtoms` (though not its `listAtomSummaries`, which is deliberately silent — see
   LCMS-809 in that package's README), `storage-web`, `storage-web-fs`, WebDAV, GitLab, and Bitbucket
   on both methods, but differs from `contentia/storage-github`, `storage-drizzle`, and
-  `storage-github-cdn`, which silently return `total: 0` either way. `storage-s3` (any S3-compatible
-  client wrapped via `createS3Bucket`) inherits this exact behavior, since it plugs into the same
-  `R2StorageRepository`. See LCMS-1004.
+  `storage-github-cdn`, which silently return `total: 0` either way. `storage-s3` behaves the same
+  way, for the same reason. See LCMS-1004.
 
 ## Testing
 
