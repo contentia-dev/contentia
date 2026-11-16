@@ -246,7 +246,7 @@ describe('BitbucketStorageRepository listing', () => {
     seedFile('top.md', 'z');
 
     const collected = await ContentiaStream.runPromiseCollect(
-      makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      makeRepo().listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     const byKey = Object.fromEntries(collected.data.map(s => [s.key, s.type] as const));
     expect(byKey).toEqual({ notes: 'folder-summary', top: 'object-summary' });
@@ -254,7 +254,7 @@ describe('BitbucketStorageRepository listing', () => {
 
   it('reports a missing folder as a recoverable NotFoundError', async () => {
     const collected = await ContentiaStream.runPromiseCollect(
-      makeRepo().listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } }),
+      makeRepo().listAtomSummaries('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data).toEqual([]);
     expect(collected.recoverableErrors).toHaveLength(1);

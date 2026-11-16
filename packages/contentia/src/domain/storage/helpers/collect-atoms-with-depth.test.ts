@@ -16,7 +16,7 @@ describe('collectAtomSummariesWithDepth', () => {
     const listFolderLevel = (key: string) =>
       key === ''
         ? Effect.succeed([obj('a'), folder('b'), obj('c')])
-        : Effect.fail(new NotFoundError({ key, message: 'should not recurse' }));
+        : Effect.fail(new NotFoundError(`should not recurse into ${key}`));
 
     const result = await run(collectAtomSummariesWithDepth('', listFolderLevel, 1));
     expect(result.map(s => s.key)).toEqual(['a', 'b', 'c']);
@@ -84,7 +84,7 @@ describe('collectAtomSummariesWithDepth', () => {
       'also-ok': [obj('also-ok/file')],
     };
     const listFolderLevel = (key: string) => {
-      if (key === 'bad') return Effect.fail(new NotFoundError({ key, message: 'gone' }));
+      if (key === 'bad') return Effect.fail(new NotFoundError(`${key} is gone`));
       return Effect.succeed(tree[key] ?? []);
     };
 
@@ -114,7 +114,7 @@ describe('collectAtomSummariesWithDepth', () => {
   });
 
   it('propagates root-level failures (not swallowed)', async () => {
-    const err = new NotFoundError({ key: '', message: 'root gone' });
+    const err = new NotFoundError('root gone');
     await expect(
       run(collectAtomSummariesWithDepth('', () => Effect.fail(err), 2)),
     ).rejects.toThrow();

@@ -12,7 +12,7 @@ import type {
   StorageObjectCreate,
   StorageObjectUpdate,
 } from 'contentia/storage';
-import { CompatibilityDate, StorageRepository } from 'contentia/storage';
+import { CompatibilityDate, StorageRepository, unsupportedChanges } from 'contentia/storage';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { migrateStorage } from './migrate.js';
@@ -29,8 +29,9 @@ class StubStorageRepository extends StorageRepository {
     return ContentiaTask.succeed<Capabilities>({
       compatibilityDate: CompatibilityDate.make('2026-05-11'),
       fileExtensions: { supported: false, description: '' },
-      pagination: { supported: false, description: '', styles: { offset: false, page: false, cursor: false } },
-    } as Capabilities);
+      pagination: { supported: false, description: '' },
+      changes: unsupportedChanges,
+    });
   }
 
   seed(key: string, content: Record<string, unknown> = {}): this {

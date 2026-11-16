@@ -12,8 +12,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { ContentiaTask, NotImplementedError } from 'contentia/core';
-import type { DocumentsCapabilities } from 'contentia/documents';
+import { ContentiaStream, ContentiaTask, NotImplementedError } from 'contentia/core';
 import { DocumentsRepository } from 'contentia/documents';
 import { InProcessLockManager } from 'contentia/locks/in-process';
 import type { Key, Lock, LockOwner, LockToken, OwnedLock } from 'contentia/storage';
@@ -25,20 +24,70 @@ import { buildLocksApi } from './locks.js';
 const ALICE: LockOwner = { id: 'alice@example.com', name: 'Alice' };
 const BOB: LockOwner = { id: 'bob@example.com', name: 'Bob' };
 
+const notNeeded = () => new NotImplementedError('not needed for lock tests');
+
 /**
- * A documents repository that supports nothing but locking: `/locks` only ever
- * touches the five lock methods, so the rest stays unimplemented.
+ * Every abstract `DocumentsRepository` member, failing with NotImplementedError:
+ * `/locks` only ever touches the lock methods, so the rest stays unimplemented.
  */
-class LockingDocumentsRepository extends DocumentsRepository {
+abstract class UnimplementedDocumentsRepository extends DocumentsRepository {
+  override getCapabilities() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override listRecords() {
+    return ContentiaStream.fail(notNeeded());
+  }
+  override listRecordSummaries() {
+    return ContentiaStream.fail(notNeeded());
+  }
+  override getDocument() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override createDocument() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override updateDocument() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override deleteDocument() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override unpublish() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override getUnpublished() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override createUnpublished() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override updateUnpublished() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override deleteUnpublished() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override publish() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override getRevision() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override createRevision() {
+    return ContentiaTask.fail(notNeeded());
+  }
+  override listRevisions() {
+    return ContentiaStream.fail(notNeeded());
+  }
+}
+
+/** A documents repository that supports nothing but locking. */
+class LockingDocumentsRepository extends UnimplementedDocumentsRepository {
   readonly manager: InProcessLockManager;
 
   constructor(now: () => number) {
     super();
     this.manager = new InProcessLockManager({ defaultTtlMs: 60_000, now });
-  }
-
-  override getCapabilities(): ContentiaTask.ContentiaTask<DocumentsCapabilities> {
-    return ContentiaTask.fail(new NotImplementedError('not needed for lock tests'));
   }
 
   override acquireLock(
@@ -68,11 +117,7 @@ class LockingDocumentsRepository extends DocumentsRepository {
 }
 
 /** A repository with no lock support: every lock call is NotImplementedError. */
-class PlainDocumentsRepository extends DocumentsRepository {
-  override getCapabilities(): ContentiaTask.ContentiaTask<DocumentsCapabilities> {
-    return ContentiaTask.fail(new NotImplementedError('not needed for lock tests'));
-  }
-}
+class PlainDocumentsRepository extends UnimplementedDocumentsRepository {}
 
 function setup(now: () => number) {
   const documents = new LockingDocumentsRepository(now);

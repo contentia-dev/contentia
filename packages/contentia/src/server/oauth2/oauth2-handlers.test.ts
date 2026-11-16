@@ -43,7 +43,7 @@ vi.mock('./email/email.js', () => ({
 
 // Imports after mock registration
 import { requestPasswordReset, resetPassword } from './email/email.js';
-import { contentiaOauth2, handleLogout, handleLogoutAll } from './oauth2.js';
+import { contentiaOauth2, DEFAULT_TOTP_ISSUER, handleLogout, handleLogoutAll } from './oauth2.js';
 import type { OAuthCallbacks, OAuthConfig, OAuthSession, User } from './oauth2.js';
 import { generateRegistrationOptions, verifyAuthentication, verifyRegistration } from './passkey/passkey.js';
 import { setupOAuthTOTP, verifyOAuthTOTPSetup } from './totp/totp.js';
@@ -168,7 +168,7 @@ describe('handleTotpSetupPage', () => {
     vi.mocked(setupOAuthTOTP).mockResolvedValue({
       secret: 'BASE32SECRET',
       qrCode: 'data:image/png;base64,abc123',
-      otpauth: 'otpauth://totp/Test%20CMS:user@example.com?secret=BASE32SECRET&issuer=Test%20CMS',
+      uri: 'otpauth://totp/Test%20CMS:user@example.com?secret=BASE32SECRET&issuer=Test%20CMS',
     });
   });
 
@@ -272,6 +272,31 @@ describe('handleTotpSetupPage', () => {
     expect(response.headers.get('Content-Type')).toContain('text/html');
     const html = await response.text();
     expect(html.length).toBeGreaterThan(0);
+  });
+
+  it('defaults the issuer to DEFAULT_TOTP_ISSUER when totp.issuer is omitted', async () => {
+    const user = makeUser();
+    const callbacks = makeCallbacks({ getUserById: vi.fn().mockResolvedValue(user) });
+    const totpCbs = makeTotpCallbacks();
+    totpCbs.getPendingTotpSession.mockResolvedValue({ userId: user.id, purpose: 'setup' });
+    const config = makeConfig(callbacks, { totp: { enabled: true, callbacks: totpCbs } });
+    const router = contentiaOauth2(config);
+
+    const request = new Request(
+      makeUrl('setup/totp', {
+        redirect_uri: 'https://auth.example.com/oauth2/authorize',
+        setup_token: 'valid-token',
+      }),
+      { method: 'GET' },
+    );
+    const response = await router.fetch(request);
+
+    expect(response.status).toBe(200);
+    expect(setupOAuthTOTP).toHaveBeenCalledWith(
+      user.id,
+      user.email,
+      expect.objectContaining({ issuer: DEFAULT_TOTP_ISSUER }),
+    );
   });
 });
 
@@ -465,9 +490,8 @@ describe('handlePasskeySetupPage', () => {
         pubKeyCredParams: [],
         timeout: 60000,
         attestation: 'none',
-        authenticatorSelection: {},
+        authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
         excludeCredentials: [],
-        extensions: {},
       },
     });
   });
@@ -885,7 +909,7 @@ describe('handlePasskeyAuthenticateVerify', () => {
 describe('handleForgotPassword', () => {
   const passwordResetConfig = (prCbs: ReturnType<typeof makePasswordResetCallbacks>) => ({
     emailProvider: {
-      sendEmail: vi.fn().mockResolvedValue({ success: true }),
+      send: vi.fn().mockResolvedValue({ success: true }),
     },
     callbacks: prCbs,
     resetBaseUrl: undefined,
@@ -1003,7 +1027,7 @@ describe('handleForgotPassword', () => {
 
 describe('handleForgotPassword — CAPTCHA CSP', () => {
   const passwordResetConfig = (prCbs: ReturnType<typeof makePasswordResetCallbacks>) => ({
-    emailProvider: { sendEmail: vi.fn().mockResolvedValue({ success: true }) },
+    emailProvider: { send: vi.fn().mockResolvedValue({ success: true }) },
     callbacks: prCbs,
     resetBaseUrl: undefined,
     fromEmail: 'noreply@example.com',
@@ -1097,7 +1121,7 @@ describe('handleForgotPassword — CAPTCHA CSP', () => {
 
 describe('handleResetPassword', () => {
   const passwordResetConfig = (prCbs: ReturnType<typeof makePasswordResetCallbacks>) => ({
-    emailProvider: { sendEmail: vi.fn().mockResolvedValue({ success: true }) },
+    emailProvider: { send: vi.fn().mockResolvedValue({ success: true }) },
     callbacks: prCbs,
     resetBaseUrl: undefined,
     fromEmail: 'noreply@example.com',

@@ -196,7 +196,9 @@ describe('GithubCdnStorageRepository.getCapabilities', () => {
     const { repo } = makeRepo();
     const caps = await ContentiaTask.runPromise(repo.getCapabilities());
     expect(caps.pagination.supported).toBe(true);
+    if (!caps.pagination.supported) throw new Error('expected pagination support');
     expect(caps.pagination.styles.cursor).toBe(false);
+    if (!caps.fileExtensions.supported) throw new Error('expected file extension support');
     expect(caps.fileExtensions.supportedExtensions).toHaveProperty('json');
   });
 });

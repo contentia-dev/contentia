@@ -17,9 +17,11 @@ import {
   processCustomLogo,
   templateVars,
 } from './html.js';
+import type { TemplateVariables } from './html.js';
 import { generateWebAuthnScript, renderEnhancedLoginPage } from './login-page.js';
 import { renderLogoutAllSuccessPage, renderLogoutSuccessPage } from './logout-page.js';
 import { renderPasskeySetupPage } from './passkey-setup-page.js';
+import type { PasskeySetupPageOptions } from './passkey-setup-page.js';
 import {
   renderForgotPasswordPage,
   renderForgotPasswordSuccessPage,
@@ -47,20 +49,23 @@ describe('html tagged template', () => {
     const mySlot = Symbol('mySlot');
     const template = html`Hello ${mySlot}!`;
     expect(typeof template).toBe('function');
-    expect(template({ [mySlot]: 'world' })).toBe('Hello world!');
+    const values: TemplateVariables & { [mySlot]: string } = { [mySlot]: 'world' };
+    expect(template(values)).toBe('Hello world!');
   });
 
   it('uses empty string for unset symbol', () => {
     const a = Symbol('a');
     const b = Symbol('b');
     const template = html`${a}|${b}`;
-    expect(template({ [a]: 'X' })).toBe('X|');
+    const values: TemplateVariables & { [a]: string } = { [a]: 'X' };
+    expect(template(values)).toBe('X|');
   });
 
   it('passes through static string values', () => {
     const s = Symbol('s');
     const template = html`<div>${s}</div>`;
-    expect(template({ [s]: '<b>safe</b>' })).toBe('<div><b>safe</b></div>');
+    const values: TemplateVariables & { [s]: string } = { [s]: '<b>safe</b>' };
+    expect(template(values)).toBe('<div><b>safe</b></div>');
   });
 });
 
@@ -456,23 +461,21 @@ describe('renderTotpSetupPage', () => {
 // ---------------------------------------------------------------------------
 
 describe('renderPasskeySetupPage', () => {
-  const base = {
+  const base: PasskeySetupPageOptions = {
     setupToken: 'setup-tok-1',
     redirectUri: '/admin',
     userId: 'user-42',
     registrationOptions: {
       challenge: 'base64challenge==',
-      rpId: 'example.com',
-      rpName: 'Test App',
-      userId: 'user-42',
-      userName: 'user@example.com',
+      rp: { id: 'example.com', name: 'Test App' },
+      user: { id: 'user-42', name: 'user@example.com', displayName: 'user@example.com' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
       timeout: 60000,
-      attestation: 'none' as const,
+      attestation: 'none',
       authenticatorSelection: {
-        authenticatorAttachment: 'platform' as const,
-        residentKey: 'required' as const,
-        requireResidentKey: true,
-        userVerification: 'required' as const,
+        authenticatorAttachment: 'platform',
+        residentKey: 'required',
+        userVerification: 'required',
       },
       excludeCredentials: [],
     },

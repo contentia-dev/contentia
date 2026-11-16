@@ -48,6 +48,7 @@ vi.mock('./email/email.js', () => ({
 
 // Imports after mock registration
 import { verifyPassword } from 'contentia/crypto';
+import type { PasswordResetConfig } from './email/email.js';
 import { contentiaOauth2, handleAuthorize } from './oauth2.js';
 import type { CaptchaConfig, OAuthCallbacks, OAuthConfig, User } from './oauth2.js';
 import { getAuthorizationPageHTML } from './templates/authorization-page.js';
@@ -117,9 +118,12 @@ function makeConfig(callbacks: OAuthCallbacks, overrides: Partial<OAuthConfig> =
   };
 }
 
-function makePasswordResetConfig(prCbs: ReturnType<typeof makePasswordResetCallbacks>) {
+function makePasswordResetConfig(prCbs: ReturnType<typeof makePasswordResetCallbacks>): PasswordResetConfig {
   return {
-    resetTokenExpirySeconds: 3600,
+    // requestPasswordReset is mocked above, so the provider is never called.
+    emailProvider: { send: vi.fn().mockResolvedValue({ success: true }) },
+    resetBaseUrl: undefined,
+    tokenExpiration: 3600,
     fromEmail: 'noreply@example.com',
     callbacks: prCbs,
   };

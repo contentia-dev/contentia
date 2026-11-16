@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ContentiaStream, ContentiaTask, InvalidData } from 'contentia/core';
+import type { Sanitizer, SanitizeResult } from 'contentia/sanitizer';
 
 import { R2AssetsRepository } from './r2-assets-repository.js';
 
@@ -82,6 +83,20 @@ const makeBucket = (forbiddenPrefix?: string) => {
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
+const sanitizeResult = (data: Uint8Array): SanitizeResult => ({
+  data,
+  fileType: 'png',
+  strippedMetadata: { hadTextMetadata: false, hadTimestamps: false },
+  ignored: false,
+});
+
+/** A sanitizer whose `sanitize` is the given mock; the other members are inert. */
+const makeSanitizer = (sanitize: Sanitizer['sanitize']): Sanitizer => ({
+  sanitize,
+  getSupportedFileTypes: () => ['png'],
+  canSanitize: () => ({ canSanitize: true, detectedType: 'png' }),
+});
+
 /**
  * Bucket variant that simulates R2 eventual consistency: writes land
  * durably in `store`, but `head` / `get` against any key starting with
@@ -139,7 +154,7 @@ describe('R2AssetsRepository constructor', () => {
 
   it('constructs without error when a sanitizer is provided', () => {
     const bucket = makeBucket();
-    const sanitizer = { sanitize: vi.fn().mockResolvedValue({ data: PNG }) };
+    const sanitizer = makeSanitizer(vi.fn<Sanitizer['sanitize']>().mockResolvedValue(sanitizeResult(PNG)));
     expect(() =>
       new R2AssetsRepository({
         bucket: bucket as unknown as R2Bucket,
@@ -164,11 +179,11 @@ describe('R2AssetsRepository constructor', () => {
 
   it('calls sanitize when a sanitizer is provided', async () => {
     const sanitizedBody = new Uint8Array([0x00, 0x01]);
-    const sanitize = vi.fn().mockResolvedValue({ data: sanitizedBody });
+    const sanitize = vi.fn<Sanitizer['sanitize']>().mockResolvedValue(sanitizeResult(sanitizedBody));
     const bucket = makeBucket();
     const repo = new R2AssetsRepository({
       bucket: bucket as unknown as R2Bucket,
-      sanitizer: { sanitize },
+      sanitizer: makeSanitizer(sanitize),
     });
     await ContentiaTask.runPromiseCollect(
       repo.createAsset({ key: 'sanitized.png', content: PNG, mimeType: 'image/png' }),

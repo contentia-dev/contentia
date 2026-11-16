@@ -471,7 +471,7 @@
     "clean": "rimraf dist .turbo",
     "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch & tsc-alias -p tsconfig.json --watch",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"

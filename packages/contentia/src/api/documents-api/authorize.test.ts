@@ -84,7 +84,7 @@ describe('documents-api authorize hook', () => {
         body: JSON.stringify({
           operations: [
             { op: 'remove', ref: { type: 'document', id: 'a' } },
-            { op: 'add', data: { type: 'unpublished', id: 'b', attributes: { title: 'x' } } },
+            { op: 'add', data: { type: 'unpublished', id: 'b', attributes: { status: 'draft', title: 'x' } } },
           ],
         }),
       }),

@@ -85,15 +85,17 @@ describe('requiredScopeFor', () => {
 });
 
 describe('createScopePolicy', () => {
-  function ctx(overrides: Partial<AuthorizeContext> & { user?: Partial<User> } = {}): AuthorizeContext {
+  function ctx(
+    { user, ...overrides }: Partial<Omit<AuthorizeContext, 'user'>> & { user?: Partial<User> } = {},
+  ): AuthorizeContext {
     return {
-      user: { id: 'u1', email: 'u1@example.com', ...overrides.user } as User,
+      user: { id: 'u1', email: 'u1@example.com', ...user },
       request: new Request('https://example.com'),
       method: 'GET',
       domain: 'documents',
       operation: 'read',
       ...overrides,
-    } as AuthorizeContext;
+    };
   }
 
   it('allows when the principal has the required scope', () => {

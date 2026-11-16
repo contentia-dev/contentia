@@ -1,5 +1,6 @@
 import { BadRequestError, ContentiaStream, ContentiaTask, NotFoundError } from 'contentia/core';
 import * as Effect from 'effect/Effect';
+import * as Result from 'effect/Result';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -35,7 +36,7 @@ describe('FileSystemStorageRepository natural ordering', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['1', '2', '10', '11']);
@@ -48,7 +49,7 @@ describe('FileSystemStorageRepository natural ordering', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['invoice-1', 'invoice-2', 'invoice-10']);
@@ -62,7 +63,7 @@ describe('FileSystemStorageRepository ignoreList', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['real']);
@@ -74,7 +75,7 @@ describe('FileSystemStorageRepository ignoreList', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['real']);
@@ -87,13 +88,13 @@ describe('FileSystemStorageRepository ignoreList', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['real', 'subfolder']);
 
     const nestedCollected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('subfolder', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('subfolder', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(nestedCollected.data).toEqual([]);
@@ -108,7 +109,7 @@ describe('FileSystemStorageRepository pagination total', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { page: 1, perPage: 2 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { page: 1, perPage: 2 } }),
     );
 
     expect(collected.data).toHaveLength(2);
@@ -119,7 +120,7 @@ describe('FileSystemStorageRepository pagination total', () => {
 describe('FileSystemStorageRepository listing a missing folder', () => {
   it('listAtomSummaries treats a missing folder as an empty listing with no warnings (#809)', async () => {
     const repo = makeRepo();
-    const stream = repo.listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } });
+    const stream = repo.listAtomSummaries('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } });
     const collected = await Effect.runPromise(ContentiaStream.runCollect(stream));
 
     expect(collected.data).toEqual([]);
@@ -129,7 +130,7 @@ describe('FileSystemStorageRepository listing a missing folder', () => {
 
   it('listAtoms yields no data and a NotFoundError as a recoverable error', async () => {
     const repo = makeRepo();
-    const stream = repo.listAtoms('does/not/exist', { pagination: { offset: 0, limit: 100 } });
+    const stream = repo.listAtoms('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } });
     const collected = await Effect.runPromise(ContentiaStream.runCollect(stream));
 
     expect(collected.data).toEqual([]);
@@ -147,7 +148,7 @@ describe('FileSystemStorageRepository listAtomSummaries timestamps (LCMS-278)', 
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data).toHaveLength(1);
@@ -171,7 +172,7 @@ describe('FileSystemStorageRepository listAtomSummaries timestamps (LCMS-278)', 
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     const folderSummary = collected.data.find(s => s.type === 'folder-summary');
@@ -217,7 +218,8 @@ describe('FileSystemStorageRepository rawSerializer extra-field error propagatio
       repo.createObject({ key: 'notes/simple', type: 'object', content: { body: 'hello world' } }),
     );
     expect(result).toMatchObject({ _tag: 'Success' });
-    expect((result as { success: { content: { body: unknown } } }).success.content.body).toBe('hello world');
+    if (!Result.isSuccess(result)) throw new Error('expected createObject to succeed');
+    expect(result.success.content.body).toBe('hello world');
   });
 });
 
@@ -239,7 +241,7 @@ describe('FileSystemStorageRepository removeAtoms dotted-key (LCMS-278)', () => 
 
     // Confirm both files exist independently.
     const before = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('releases', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('releases', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     expect(before.data.map(s => s.key)).toContain('releases/v1.2-notes');
     expect(before.data.map(s => s.key)).toContain('releases/v1.9-notes');
@@ -253,7 +255,7 @@ describe('FileSystemStorageRepository removeAtoms dotted-key (LCMS-278)', () => 
 
     // v1.2-notes gone, v1.9-notes untouched.
     const after = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('releases', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('releases', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     const keys = after.data.map(s => s.key);
     expect(keys).not.toContain('releases/v1.2-notes');

@@ -780,16 +780,21 @@ const makeStorageCaps = (): Capabilities => ({
   compatibilityDate: '2026-01-01' as Capabilities['compatibilityDate'],
   fileExtensions: { supported: false, description: 'none' },
   pagination: { supported: false, description: 'none' },
+  changes: { supported: false, description: 'none' },
 });
 
 const makeDocumentsCaps = (): DocumentsCapabilities => ({
   compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
   pagination: { supported: false, description: 'none' },
+  versionTracking: { supported: false, description: 'none' },
+  changes: { supported: false, description: 'none' },
 });
 
 const makeAssetsCaps = (): AssetsCapabilities => ({
   compatibilityDate: '2026-01-01' as AssetsCapabilities['compatibilityDate'],
   pagination: { supported: false, description: 'none' },
+  versionTracking: { supported: false, description: 'none' },
+  changes: { supported: false, description: 'none' },
 });
 
 describe('sub-API routing — GET /storage/capabilities (LCMS-305)', () => {

@@ -1,3 +1,4 @@
+import type { Asset } from 'contentia/assets';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -24,6 +25,9 @@ const jsonResponse = (body: unknown, status = 200) =>
   });
 
 const noContent = () => new Response(null, { status: 204 });
+
+/** An Asset carrying only its key: the hint-based lookups read nothing else. */
+const assetRef = (key: string): Asset => ({ type: 'asset', key, content: {} });
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -251,7 +255,7 @@ describe('AssetsJsonApiProxyRepository.listResources — filters & cursor pagina
   });
 
   it('serializes options.filters as filter[<name>] query params', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ data: [] }));
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ data: [] }));
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
@@ -268,7 +272,7 @@ describe('AssetsJsonApiProxyRepository.listResources — filters & cursor pagina
   });
 
   it('cursor start ({ after: undefined }) sends an empty-but-present page[after]= param', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ data: [] }));
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ data: [] }));
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
@@ -344,7 +348,7 @@ describe('AssetsJsonApiProxyRepository.listResources', () => {
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
     const collected = await ContentiaStream.runPromiseCollect(
-      proxy.listResources('images/', { depth: 1 }),
+      proxy.listResources('images/', { depth: 1, pagination: { offset: 0, limit: 10 } }),
     );
 
     expect(collected.data).toHaveLength(1);
@@ -378,6 +382,7 @@ describe('AssetsJsonApiProxyRepository.getCapabilities', () => {
     const { value } = await ContentiaTask.runPromiseCollect(proxy.getCapabilities());
 
     expect(value.pagination.supported).toBe(true);
+    if (!value.pagination.supported) throw new Error('expected pagination support');
     expect(value.pagination.styles.offset).toBe(true);
   });
 
@@ -432,7 +437,7 @@ describe('AssetsJsonApiProxyRepository.getCapabilities', () => {
 
 describe('AssetsJsonApiProxyRepository.getResource', () => {
   it('returns a Resource decoded from GET /resources/{key}', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: {
           type: 'asset',
@@ -500,7 +505,7 @@ describe('AssetsJsonApiProxyRepository.getResource', () => {
   });
 
   it('adds include=variations,urls query params when hints are set', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'asset', id: 'images/photo.jpg', attributes: {} },
       })
@@ -559,7 +564,7 @@ describe('AssetsJsonApiProxyRepository.getAsset', () => {
 
 describe('AssetsJsonApiProxyRepository.createAsset', () => {
   it('POSTs multipart FormData and returns the created Asset', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'asset', id: 'images/new.png', attributes: {} },
       })
@@ -575,11 +580,11 @@ describe('AssetsJsonApiProxyRepository.createAsset', () => {
     expect(collected.value.key).toBe('images/new.png');
     expect(collected.value.type).toBe('asset');
 
-    const [rawUrl, calledInit] = fetchMock.mock.calls[0] as [string | URL, RequestInit];
+    const [rawUrl, calledInit] = fetchMock.mock.calls[0]!;
     const calledUrl = String(rawUrl);
     expect(calledUrl).toMatch(/\/resources$/);
-    expect(calledInit.method).toBe('POST');
-    expect(calledInit.body).toBeInstanceOf(FormData);
+    expect(calledInit?.method).toBe('POST');
+    expect(calledInit?.body).toBeInstanceOf(FormData);
   });
 
   it('re-emits upstream meta.warnings from the POST response as local recoverableErrors', async () => {
@@ -600,7 +605,7 @@ describe('AssetsJsonApiProxyRepository.createAsset', () => {
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
     const content = new Uint8Array([1, 2, 3]);
     const collected = await ContentiaTask.runPromiseCollect(
-      proxy.createAsset({ key: 'images/new.png', content }),
+      proxy.createAsset({ key: 'images/new.png', content, mimeType: 'image/png' }),
     );
 
     expect(collected.recoverableErrors).toHaveLength(1);
@@ -615,7 +620,12 @@ describe('AssetsJsonApiProxyRepository.createAsset', () => {
     // Pass an object that is not ArrayBuffer, Uint8Array, or ReadableStream
     await expect(
       ContentiaTask.runPromiseCollect(
-        proxy.createAsset({ key: 'images/new.png', content: 'not-a-buffer' as unknown as ArrayBuffer }),
+        proxy.createAsset({
+          key: 'images/new.png',
+          // @ts-expect-error -- deliberately not binary content, to exercise the runtime content check
+          content: 'not-a-buffer',
+          mimeType: 'image/png',
+        }),
       ),
     ).rejects.toBeInstanceOf(InvalidData);
   });
@@ -625,7 +635,7 @@ describe('AssetsJsonApiProxyRepository.createAsset', () => {
 
 describe('AssetsJsonApiProxyRepository.updateAsset', () => {
   it('PATCHes the resource and returns the updated Asset', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'asset', id: 'images/photo.jpg', attributes: { mimeType: 'image/jpeg' } },
       })
@@ -638,11 +648,11 @@ describe('AssetsJsonApiProxyRepository.updateAsset', () => {
     );
 
     expect(collected.value.key).toBe('images/photo.jpg');
-    const [rawUrl, calledInit] = fetchMock.mock.calls[0] as [string | URL, RequestInit];
+    const [rawUrl, calledInit] = fetchMock.mock.calls[0]!;
     const calledUrl = String(rawUrl);
     expect(calledUrl).toContain(encodeURIComponent('images/photo.jpg'));
-    expect(calledInit.method).toBe('PATCH');
-    const body = parseBody(calledInit.body) as { data: { type: string, id: string } };
+    expect(calledInit?.method).toBe('PATCH');
+    const body = parseBody(calledInit?.body) as { data: { type: string, id: string } };
     expect(body.data.type).toBe('asset');
     expect(body.data.id).toBe('images/photo.jpg');
   });
@@ -695,21 +705,21 @@ describe('AssetsJsonApiProxyRepository.updateAsset', () => {
 
 describe('AssetsJsonApiProxyRepository.deleteFolder', () => {
   it('sends DELETE to /resources/{key} without ?recursive when not requested', async () => {
-    const fetchMock = vi.fn(async () => noContent());
+    const fetchMock = vi.fn<typeof fetch>(async () => noContent());
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
     await ContentiaTask.runPromiseCollect(proxy.deleteFolder('images/'));
 
-    const [rawUrl, calledInit] = fetchMock.mock.calls[0] as [string | URL, RequestInit];
+    const [rawUrl, calledInit] = fetchMock.mock.calls[0]!;
     const calledUrl = String(rawUrl);
     expect(calledUrl).toContain(encodeURIComponent('images/'));
     expect(calledUrl).not.toContain('recursive');
-    expect(calledInit.method).toBe('DELETE');
+    expect(calledInit?.method).toBe('DELETE');
   });
 
   it('appends ?recursive=true when requested', async () => {
-    const fetchMock = vi.fn(async () => noContent());
+    const fetchMock = vi.fn<typeof fetch>(async () => noContent());
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
@@ -848,7 +858,7 @@ describe('AssetsJsonApiProxyRepository.getFolder', () => {
 
 describe('AssetsJsonApiProxyRepository.createFolder', () => {
   it('POSTs a folder resource to /resources and returns the created Folder', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'folder', id: 'uploads/', attributes: {} },
       })
@@ -863,11 +873,11 @@ describe('AssetsJsonApiProxyRepository.createFolder', () => {
     expect(collected.value.key).toBe('uploads/');
     expect(collected.value.type).toBe('folder');
 
-    const [rawUrl, calledInit] = fetchMock.mock.calls[0] as [string | URL, RequestInit];
+    const [rawUrl, calledInit] = fetchMock.mock.calls[0]!;
     const calledUrl = String(rawUrl);
     expect(calledUrl).toMatch(/\/resources$/);
-    expect(calledInit.method).toBe('POST');
-    const body = parseBody(calledInit.body) as { data: { type: string, id: string } };
+    expect(calledInit?.method).toBe('POST');
+    const body = parseBody(calledInit?.body) as { data: { type: string, id: string } };
     expect(body.data.type).toBe('folder');
     expect(body.data.id).toBe('uploads/');
   });
@@ -937,7 +947,7 @@ describe('AssetsJsonApiProxyRepository.getVariations', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getVariations([asset]));
 
     expect(collected.data).toHaveLength(1);
@@ -958,7 +968,7 @@ describe('AssetsJsonApiProxyRepository.getVariations', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getVariations([asset]));
 
     expect(collected.data).toHaveLength(0);
@@ -983,7 +993,7 @@ describe('AssetsJsonApiProxyRepository.getVariations', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     // First call populates the cache
     await ContentiaStream.runPromiseCollect(proxy.getVariations([asset]));
     const callsAfterFirst = fetchMock.mock.calls.length;
@@ -1016,7 +1026,7 @@ describe('AssetsJsonApiProxyRepository.getUrls', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getUrls([asset]));
 
     expect(collected.data).toHaveLength(1);
@@ -1036,7 +1046,7 @@ describe('AssetsJsonApiProxyRepository.getUrls', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getUrls([asset]));
 
     expect(collected.data).toHaveLength(0);
@@ -1063,8 +1073,8 @@ describe('AssetsJsonApiProxyRepository.getUrls', () => {
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
     const assets = [
-      { key: 'images/a.jpg', type: 'asset' as const },
-      { key: 'images/b.jpg', type: 'asset' as const },
+      assetRef('images/a.jpg'),
+      assetRef('images/b.jpg'),
     ];
     const collected = await ContentiaStream.runPromiseCollect(proxy.getUrls(assets));
 
@@ -1092,7 +1102,7 @@ describe('AssetsJsonApiProxyRepository.getMetadata', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getMetadata([asset]));
 
     expect(collected.data).toHaveLength(1);
@@ -1113,7 +1123,7 @@ describe('AssetsJsonApiProxyRepository.getMetadata', () => {
     );
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     const collected = await ContentiaStream.runPromiseCollect(proxy.getMetadata([asset]));
 
     expect(collected.data).toHaveLength(0);
@@ -1135,7 +1145,7 @@ describe('AssetsJsonApiProxyRepository.getMetadata', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const proxy = new AssetsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
-    const asset = { key: 'images/photo.jpg', type: 'asset' as const };
+    const asset = assetRef('images/photo.jpg');
     await ContentiaStream.runPromiseCollect(proxy.getMetadata([asset]));
     const callsAfterFirst = fetchMock.mock.calls.length;
     await ContentiaStream.runPromiseCollect(proxy.getMetadata([asset]));
@@ -1146,7 +1156,7 @@ describe('AssetsJsonApiProxyRepository.getMetadata', () => {
 
 describe('AssetsJsonApiProxyRepository change signals', () => {
   it('getSyncToken parses attributes.syncToken and forwards filter[folder]', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'sync-token', id: 'images', attributes: { syncToken: 'tok-7', folder: 'images' } },
       })

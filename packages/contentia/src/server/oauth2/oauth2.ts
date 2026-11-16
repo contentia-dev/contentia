@@ -15,6 +15,7 @@ import type { GateInput, UnsafeReason } from './safety-gate.js';
 import { assertRuntimeSafety, assertRuntimeSafetyAsync, suppressedReasons, UNSAFE_REASONS } from './safety-gate.js';
 import {
   type OAuthTotpConfig,
+  type OAuthTotpOptions,
   setupOAuthTOTP,
   verifyOAuthTOTPSetup,
   verifyOAuthTOTPWithReplayProtection,
@@ -73,6 +74,11 @@ import { buildCspWithLogo } from './templates/html.js';
  * `otpauth://` URI minted without an explicit `totp.issuer`.
  */
 export const DEFAULT_TOTP_ISSUER = 'Contentia';
+
+/** Fill in the defaults of the configured TOTP options, giving the config the TOTP module takes. */
+function resolveTotpConfig(totp: OAuthTotpOptions): OAuthTotpConfig {
+  return { ...totp, issuer: totp.issuer || DEFAULT_TOTP_ISSUER };
+}
 
 // Security constants for post-quantum resistance
 const SECURITY_CONSTANTS = {
@@ -318,7 +324,7 @@ export interface OAuthConfig {
   /** Passkey (WebAuthn) configuration - if provided, enables passkey authentication */
   passkey?: PasskeyOptions;
   /** TOTP 2FA configuration - if provided, enables TOTP verification */
-  totp?: OAuthTotpConfig;
+  totp?: OAuthTotpOptions;
   /** Password reset configuration - if provided, enables forgot password flow on login page */
   passwordReset?: PasswordResetConfig;
   /** CAPTCHA configuration - if provided, enables CAPTCHA on login and forgot password forms */
@@ -1469,19 +1475,15 @@ async function handleTotpSetupPage(
   // Generate TOTP secret and QR code using setupOAuthTOTP. The issuer is the
   // label shown in the user's authenticator app and is baked into every
   // enrolled otpauth:// URI, so changing it later breaks existing enrollments.
-  const issuer = config.totp.issuer || DEFAULT_TOTP_ISSUER;
-  const setupData = await setupOAuthTOTP(pendingSession.userId, user.email, {
-    enabled: true,
-    issuer,
-    callbacks: config.totp.callbacks,
-  });
+  const totp = resolveTotpConfig(config.totp);
+  const setupData = await setupOAuthTOTP(pendingSession.userId, user.email, totp);
 
   // Import and render the TOTP setup page
   const html = renderTotpSetupPage({
     baseUrl: url.origin + (config.basePath || ''),
     qrCodeDataUrl: setupData.qrCode,
     secret: setupData.secret,
-    issuer,
+    issuer: totp.issuer,
     email: user.email,
     setupToken,
     redirectUri,
@@ -1535,11 +1537,7 @@ async function handleTotpSetupVerify(
   }
 
   // Verify the TOTP code
-  const result = await verifyOAuthTOTPSetup(pendingSession.userId, totpCode, {
-    enabled: true,
-    issuer: config.totp.issuer || DEFAULT_TOTP_ISSUER,
-    callbacks: config.totp.callbacks,
-  });
+  const result = await verifyOAuthTOTPSetup(pendingSession.userId, totpCode, resolveTotpConfig(config.totp));
   const isValid = result.success;
 
   if (!isValid) {

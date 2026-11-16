@@ -431,6 +431,7 @@ describe('ObsidianDocumentsRepository — getCapabilities', () => {
     // Pagination is forwarded from FileSystemStorageRepository
     expect(caps.pagination).toBeDefined();
     expect(caps.pagination.supported).toBe(true);
+    if (!caps.pagination.supported) throw new Error('expected pagination support');
     expect(caps.pagination.styles).toBeDefined();
   });
 });

@@ -268,8 +268,9 @@ describe('ObsidianAssetsRepository — getCapabilities', () => {
     const repo = new ObsidianAssetsRepository(vaultDir);
     const caps = await ContentiaTask.runPromise(repo.getCapabilities());
     expect(caps.filtering).toBeDefined();
-    expect(caps.filtering.supported).toBe(true);
-    const filterNames = caps.filtering!.filters.map(f => f.name);
+    expect(caps.filtering?.supported).toBe(true);
+    if (!caps.filtering?.supported) throw new Error('expected filtering support');
+    const filterNames = caps.filtering.filters.map(f => f.name);
     expect(filterNames).toContain('search');
   });
 });

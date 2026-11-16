@@ -2,7 +2,7 @@ import type { AssetsRepository, Resource } from 'contentia/assets';
 import { describe, expect, it, vi } from 'vitest';
 import { allowAll } from '../../shared/json-api/authorize.js';
 
-import { AuthenticationError, ContentiaTask, ForbiddenError, NotFoundError } from 'contentia/core';
+import { AuthenticationError, ContentiaStream, ContentiaTask, ForbiddenError, NotFoundError } from 'contentia/core';
 
 import { type AssetsAuthorizeInput, buildAssetsApi } from './server.js';
 
@@ -26,7 +26,7 @@ const readonlyRepo: Partial<AssetsRepository> = {
       versionTracking: { supported: false, description: '' },
       changes: { supported: false, description: '' },
     }),
-  listResources: () => ContentiaTask.succeed([] as never),
+  listResources: () => ContentiaStream.empty({}),
   getResource: (_key: string) => ContentiaTask.succeed([makeAsset(_key)] as never),
   createAsset: () => ContentiaTask.succeed(makeAsset('new.png') as never),
   createFolder: () => ContentiaTask.succeed({ type: 'folder', key: 'new/', createdAt: '', updatedAt: '' } as never),
@@ -284,7 +284,7 @@ describe('assets-api authorize — POST /operations pre-flight (LCMS-1010)', () 
   });
 
   it('passes the correct granular action to authorize for each operation type', async () => {
-    const authorize = vi.fn(async () => true as const);
+    const authorize = vi.fn(async (_input: AssetsAuthorizeInput) => true as const);
     const api = buildAssetsApi({ repository: readonlyRepo as AssetsRepository, authorize });
 
     const content = btoa('fake binary');

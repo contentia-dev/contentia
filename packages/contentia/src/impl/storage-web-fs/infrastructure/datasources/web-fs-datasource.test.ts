@@ -9,6 +9,7 @@ import {
   QuotaExceededError,
   StaleHandleError,
 } from 'contentia/core';
+import type { ContentiaResult } from 'contentia/core';
 import * as Result from 'effect/Result';
 
 import { describe, expect, it } from 'vitest';
@@ -241,7 +242,7 @@ describe('WebFsDataSource.createFolder', () => {
 
 describe('WebFsDataSource.deleteAtoms', () => {
   const collect = async (ds: WebFsDataSource, keys: readonly string[]) => {
-    const results: Result.Result<string, unknown>[] = [];
+    const results: ContentiaResult<string>[] = [];
     for await (const r of ds.deleteAtoms(keys)) results.push(r);
     return results;
   };

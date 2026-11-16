@@ -165,9 +165,9 @@ describe('errorToJsonApiMapper', () => {
   // `ContentiaError` class imported at the top of this file, simulating exactly
   // that cross-module-instance shape.
   class LookalikeNotFoundError extends Error {
-    static override TITLE = NotFoundError.TITLE;
-    static override STATUS = NotFoundError.STATUS;
-    static override CODE = NotFoundError.CODE;
+    static TITLE = NotFoundError.TITLE;
+    static STATUS = NotFoundError.STATUS;
+    static CODE = NotFoundError.CODE;
     status = NotFoundError.STATUS;
     code = NotFoundError.CODE;
     title = NotFoundError.TITLE;
@@ -362,13 +362,23 @@ describe('recoverableErrorsToWarnings', () => {
 
 describe('contentiaErrorFromJsonApiError', () => {
   it('reconstructs a NotFoundError from a JSON:API error object', () => {
-    const err = contentiaErrorFromJsonApiError({ code: NotFoundError.CODE, detail: 'gone', status: '404' });
+    const err = contentiaErrorFromJsonApiError({
+      code: NotFoundError.CODE,
+      title: NotFoundError.TITLE,
+      detail: 'gone',
+      status: '404',
+    });
     expect(err).toBeInstanceOf(NotFoundError);
     expect(err.message).toBe('gone');
   });
 
   it('falls back to UnknownError for unrecognised code', () => {
-    const err = contentiaErrorFromJsonApiError({ code: 'completely_unknown' as never, detail: 'hmm', status: '500' });
+    const err = contentiaErrorFromJsonApiError({
+      code: 'completely_unknown',
+      title: 'Completely Unknown',
+      detail: 'hmm',
+      status: '500',
+    });
     expect(err).toBeInstanceOf(UnknownError);
   });
 });

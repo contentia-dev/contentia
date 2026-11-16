@@ -242,7 +242,7 @@ async function generateTestKeyPair(): Promise<{
 }
 
 /** Sign data with an ECDSA private key, returning raw (r||s) signature */
-async function signEcdsa(privateKey: CryptoKey, data: Uint8Array): Promise<Uint8Array> {
+async function signEcdsa(privateKey: CryptoKey, data: Uint8Array<ArrayBuffer>): Promise<Uint8Array> {
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, data);
   return new Uint8Array(sig);
 }
@@ -1370,7 +1370,7 @@ describe('algorithm support agreement', () => {
 
   async function authenticate(
     credentialId: string,
-    sign: (data: Uint8Array) => Promise<Uint8Array>,
+    sign: (data: Uint8Array<ArrayBuffer>) => Promise<Uint8Array>,
     signCount = 1,
   ): Promise<{ success: boolean, userId?: string, error?: string }> {
     const challengeBytes = new Uint8Array(32);

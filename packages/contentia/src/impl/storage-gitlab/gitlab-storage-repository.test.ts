@@ -255,7 +255,7 @@ describe('GitlabStorageRepository listing', () => {
     seedFile('world.md', 'hello');
 
     const collected = await ContentiaStream.runPromiseCollect(
-      makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      makeRepo().listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key).sort()).toEqual(['hello', 'world']);
@@ -268,7 +268,7 @@ describe('GitlabStorageRepository listing', () => {
     seedFile('other.md', 'x');
 
     const collected = await ContentiaStream.runPromiseCollect(
-      makeRepo().listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      makeRepo().listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     const byKey = Object.fromEntries(collected.data.map(s => [s.key, s.type] as const));
@@ -277,7 +277,7 @@ describe('GitlabStorageRepository listing', () => {
 
   it('reports a missing folder as a recoverable NotFoundError, not a fatal failure', async () => {
     const collected = await ContentiaStream.runPromiseCollect(
-      makeRepo().listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } }),
+      makeRepo().listAtomSummaries('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data).toEqual([]);
     expect(collected.recoverableErrors).toHaveLength(1);
@@ -329,7 +329,7 @@ describe('GitlabStorageRepository CRUD round-trip', () => {
     expect(server.files.has('notes/.keep')).toBe(true);
 
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
     expect(collected.data.map(s => s.key)).toEqual(['notes']);
     expect(collected.data[0].type).toBe('folder-summary');

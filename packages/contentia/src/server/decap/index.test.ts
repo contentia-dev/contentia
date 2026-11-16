@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createEmbeddedContentia, DEFAULT_DEV_TOKEN } from './index.js';
+import type { EmbeddedContentiaOptions } from './index.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,7 +42,7 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
-function makeEmbedded(overrides: Parameters<typeof createEmbeddedContentia>[0] = {} as never) {
+function makeEmbedded(overrides: Partial<EmbeddedContentiaOptions> = {}) {
   return createEmbeddedContentia({
     contentDir: tmpDir,
     decapConfig: DEFAULT_DECAP_CONFIG,

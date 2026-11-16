@@ -330,6 +330,7 @@ describe('handleAuthorize GET — CAPTCHA CSP', () => {
         captchaCspAdditions: ' https://js.hcaptcha.com; frame-src https://newassets.hcaptcha.com',
       }),
       passkey: {
+        enabled: true,
         rpName: 'Test',
         rpId: 'auth.example.com',
         origin: 'https://auth.example.com',
@@ -548,6 +549,7 @@ describe('handleAuthorize POST — TOTP required → TOTP page', () => {
     const config = makeConfig(callbacks, {
       totp: {
         enabled: true,
+        issuer: 'Test CMS',
         callbacks: totpCallbacks,
       },
     });
@@ -587,7 +589,7 @@ describe('handleAuthorize GET — TOTP session', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'login' });
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const request = new Request(
@@ -607,7 +609,7 @@ describe('handleAuthorize GET — TOTP session', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const request = new Request(
@@ -652,7 +654,7 @@ describe('handleAuthorize POST — TOTP verification', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'login' });
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const response = await handleAuthorize(
@@ -672,7 +674,7 @@ describe('handleAuthorize POST — TOTP verification', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'login' });
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     await handleAuthorize(
@@ -689,7 +691,7 @@ describe('handleAuthorize POST — TOTP verification', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'login' });
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const response = await handleAuthorize(
@@ -709,7 +711,7 @@ describe('handleAuthorize POST — TOTP verification', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue({ userId: 'user-1', purpose: 'login' });
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const response = await handleAuthorize(
@@ -727,7 +729,7 @@ describe('handleAuthorize POST — TOTP verification', () => {
     const totpCbs = makeTotpCallbacks();
     totpCbs.getPendingTotpSession.mockResolvedValue(null);
     const config = makeConfig(callbacks, {
-      totp: { enabled: true, callbacks: totpCbs },
+      totp: { enabled: true, issuer: 'Test CMS', callbacks: totpCbs },
     });
 
     const response = await handleAuthorize(

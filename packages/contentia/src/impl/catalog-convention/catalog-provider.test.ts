@@ -5,6 +5,7 @@ import type {
   AtomSummary,
   Folder,
   FolderCreate,
+  RemoveAtomsDone,
   StorageObject,
   StorageObjectCreate,
   StorageObjectUpdate,
@@ -58,9 +59,9 @@ function makeMemoryStorage(initial?: Map<string, StorageObject>): StorageReposit
 
     removeAtoms(
       keys: readonly string[],
-    ): ContentiaStream.ContentiaStream<string, { removed: number, skipped: number }> {
+    ): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
       for (const key of keys) store.delete(key);
-      return ContentiaStream.empty({ removed: keys.length, skipped: 0 });
+      return ContentiaStream.empty<RemoveAtomsDone>({ removed: keys.length, skipped: 0 });
     },
 
     listAtoms(_folderKey: string, _options: unknown): ContentiaStream.ContentiaStream<Atom, object> {

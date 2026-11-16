@@ -1,3 +1,4 @@
+import type { ContentiaResult } from 'contentia/core';
 import * as Result from 'effect/Result';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { R2DataSource } from './r2-datasource.js';
@@ -427,14 +428,15 @@ describe('R2DataSource.deleteObjects', () => {
   it('yields a NotFoundError failure for keys that cannot be resolved', async () => {
     const ds = makeDS();
 
-    const results: Array<Result.Result<unknown, unknown>> = [];
+    const results: Array<ContentiaResult<string>> = [];
     for await (const result of ds.deleteObjects(['missing'])) {
       results.push(result);
     }
     expect(results).toHaveLength(1);
-    expect(Result.isFailure(results[0]!)).toBe(true);
-    const failure = (results[0] as Result.Failure<unknown>).failure;
-    expect((failure as { code?: string }).code).toBe('not_found');
+    const first = results[0]!;
+    expect(Result.isFailure(first)).toBe(true);
+    if (!Result.isFailure(first)) throw new Error('expected a failure');
+    expect(first.failure.code).toBe('not_found');
   });
 
   it('yields InternalError with failedToDeleteObject translation when the bucket rejects', async () => {
@@ -442,17 +444,15 @@ describe('R2DataSource.deleteObjects', () => {
     await bucket.put('a.md', 'a');
     bucket.failNextCall('delete');
 
-    const results: Array<Result.Result<unknown, unknown>> = [];
+    const results: Array<ContentiaResult<string>> = [];
     for await (const result of ds.deleteObjects(['a'])) {
       results.push(result);
     }
     expect(results).toHaveLength(1);
-    expect(Result.isFailure(results[0]!)).toBe(true);
-    const failure = (results[0] as Result.Failure<unknown>).failure as {
-      code?: string,
-      translation?: { message?: string },
-    };
-    expect(failure.code).toBe('internal_error');
-    expect(failure.translation?.message).toBe('storage.r2.failedToDeleteObject');
+    const first = results[0]!;
+    expect(Result.isFailure(first)).toBe(true);
+    if (!Result.isFailure(first)) throw new Error('expected a failure');
+    expect(first.failure.code).toBe('internal_error');
+    expect(first.failure.translation?.message).toBe('storage.r2.failedToDeleteObject');
   });
 });

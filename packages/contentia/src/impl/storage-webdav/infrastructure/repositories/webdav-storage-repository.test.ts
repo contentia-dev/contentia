@@ -198,7 +198,7 @@ describe('WebDavStorageRepository natural ordering', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['1', '2', '10', '11']);
@@ -211,7 +211,7 @@ describe('WebDavStorageRepository natural ordering', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['invoice-1', 'invoice-2', 'invoice-10']);
@@ -224,7 +224,7 @@ describe('WebDavStorageRepository pagination total', () => {
 
     const repo = makeRepo();
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { page: 1, perPage: 2 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { page: 1, perPage: 2 } }),
     );
 
     expect(collected.data).toHaveLength(2);
@@ -235,7 +235,7 @@ describe('WebDavStorageRepository pagination total', () => {
 describe('WebDavStorageRepository listing a missing folder', () => {
   it('listAtomSummaries yields no data and a NotFoundError as a recoverable error', async () => {
     const repo = makeRepo();
-    const stream = repo.listAtomSummaries('does/not/exist', { pagination: { offset: 0, limit: 100 } });
+    const stream = repo.listAtomSummaries('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } });
     const collected = await Effect.runPromise(ContentiaStream.runCollect(stream));
 
     expect(collected.data).toEqual([]);
@@ -246,7 +246,7 @@ describe('WebDavStorageRepository listing a missing folder', () => {
 
   it('listAtoms yields no data and a NotFoundError as a recoverable error', async () => {
     const repo = makeRepo();
-    const stream = repo.listAtoms('does/not/exist', { pagination: { offset: 0, limit: 100 } });
+    const stream = repo.listAtoms('does/not/exist', { depth: 1, pagination: { offset: 0, limit: 100 } });
     const collected = await Effect.runPromise(ContentiaStream.runCollect(stream));
 
     expect(collected.data).toEqual([]);
@@ -316,7 +316,7 @@ describe('WebDavStorageRepository — non-404 PROPFIND errors surface as recover
     const repo = makeRepo(srv);
 
     const collected = await Effect.runPromise(
-      ContentiaStream.runCollect(repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } })),
+      ContentiaStream.runCollect(repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } })),
     );
 
     expect(collected.data).toEqual([]);
@@ -330,7 +330,7 @@ describe('WebDavStorageRepository — non-404 PROPFIND errors surface as recover
     const repo = makeRepo(srv);
 
     const collected = await Effect.runPromise(
-      ContentiaStream.runCollect(repo.listAtoms('', { pagination: { offset: 0, limit: 100 } })),
+      ContentiaStream.runCollect(repo.listAtoms('', { depth: 1, pagination: { offset: 0, limit: 100 } })),
     );
 
     expect(collected.data).toEqual([]);
@@ -528,7 +528,7 @@ describe('WebDavStorageRepository — basePath round-trip', () => {
     );
 
     const collected = await ContentiaStream.runPromiseCollect(
-      repo.listAtomSummaries('', { pagination: { offset: 0, limit: 100 } }),
+      repo.listAtomSummaries('', { depth: 1, pagination: { offset: 0, limit: 100 } }),
     );
 
     expect(collected.data.map(s => s.key)).toEqual(['inside']);

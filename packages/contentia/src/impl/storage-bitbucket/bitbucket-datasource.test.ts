@@ -89,11 +89,11 @@ describe('BitbucketDataSource constructor', () => {
 describe('BitbucketDataSource encodePath (via getFileContents URL)', () => {
   const captureRequestedUrl = (): { fetch: typeof fetch, urls: string[] } => {
     const urls: string[] = [];
-    const fetch: typeof fetch = async input => {
+    const fetchImpl: typeof fetch = async input => {
       urls.push(typeof input === 'string' ? input : input.toString());
       return new Response('body', { status: 200 });
     };
-    return { fetch, urls };
+    return { fetch: fetchImpl, urls };
   };
 
   const makeSource = (fetchImpl: typeof fetch) =>

@@ -23,7 +23,7 @@ function spyRepo() {
     ContentiaStream.make<string, RemoveAtomsDone>(emit =>
       Effect.gen(function*() {
         for (const k of keys) yield* emit.data(k);
-        return { removed: keys.length };
+        return { removed: keys.length, skipped: 0 };
       })
     )
   );

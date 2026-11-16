@@ -165,6 +165,20 @@ export interface OAuthTotpConfig {
   callbacks: OAuthTotpCallbacks;
 }
 
+/**
+ * TOTP options accepted by `OAuthConfig.totp`: {@link OAuthTotpConfig} with an
+ * optional `issuer`. The OAuth handlers fill in the default before calling the
+ * functions in this module, which all take a complete `OAuthTotpConfig`.
+ */
+export interface OAuthTotpOptions extends Omit<OAuthTotpConfig, 'issuer'> {
+  /**
+   * Issuer name (displayed in authenticator app). Defaults to
+   * `DEFAULT_TOTP_ISSUER` ('Contentia'). It is baked into every enrolled
+   * `otpauth://` URI, so changing it later breaks existing enrollments.
+   */
+  issuer?: string;
+}
+
 // ============================================================================
 // Base32 Encoding/Decoding
 // ============================================================================

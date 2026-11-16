@@ -123,7 +123,7 @@ describe('plugin hooks', () => {
     const config = plugin.config as () => {
       optimizeDeps: {
         rolldownOptions: {
-          plugins: Array<{ transform: { handler: (c: string) => Promise<{ code: string } | null> } }>,
+          plugins: Array<{ name: string, transform: { handler: (c: string) => Promise<{ code: string } | null> } }>,
         },
       },
     };
