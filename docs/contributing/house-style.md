@@ -42,8 +42,15 @@ packages depend on domain, not on implementations.
 ## Effect-based repositories
 
 Repository methods return `ContentiaTask<T>` (single result) or `ContentiaStream<T, D>` (multiple
-results with a typed done value) — both Effect-based. Consume them via the `contentia/compat`
-helpers (`runTask`, `collectStream`) rather than importing Effect directly in calling code.
+results with a typed done value) — both Effect-based. Outside Effect, consume them as plain
+JavaScript rather than importing Effect in calling code: `await` a task (or call
+`task.run(options)`), and iterate a stream with `for await` or load it with
+`stream.collect(options)`.
+
+Those members live on each task or stream object, not on Effect's `Channel`. Build tasks and streams
+through the `ContentiaTask` / `ContentiaStream` constructors and combinators; if you reach for
+Effect's own `Channel` functions, pass the result through `ContentiaTask.fromChannel` /
+`ContentiaStream.fromChannel`, or `await` on it silently resolves to the task object itself.
 
 When a higher-level repository delegates to a lower-level one, use the **forwarding** drainers
 (`ContentiaTask.runValueForwarding`, `ContentiaStream.runCollectForwarding`) so recoverable warnings

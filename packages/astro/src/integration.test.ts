@@ -14,9 +14,8 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createFsStorage, createRepositories } from '@contentia/vite-plugin';
+import type { AstroIntegrationLogger, RefreshContentOptions } from 'astro';
 import { NotImplementedError } from 'contentia/core/errors';
-
-import { collectStream } from 'contentia/compat';
 
 import { contentia } from './integration.js';
 import { resolveRepositories } from './repositories.js';
@@ -59,15 +58,17 @@ function fakeServer() {
   };
 }
 
-const silentLogger = {
+const silentLogger: AstroIntegrationLogger = {
   info: () => {},
   warn: vi.fn(),
   error: () => {},
   debug: () => {},
-  options: {},
+  flush: () => {},
+  close: () => {},
+  options: { destination: { write: () => {} }, level: 'silent' },
   label: 'test',
   fork: () => silentLogger,
-} as never;
+};
 
 type Hooks = ReturnType<typeof contentia>['hooks'];
 
@@ -117,7 +118,7 @@ describe('astro:server:setup', () => {
     const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
     callSetup(integration.hooks, dir);
 
-    const refreshContent = vi.fn(async () => {});
+    const refreshContent = vi.fn(async (_options: RefreshContentOptions) => {});
     const { server } = fakeServer();
     await integration.hooks['astro:server:setup']?.({
       server,
@@ -141,7 +142,7 @@ describe('astro:server:setup', () => {
     const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 60 } });
     callSetup(integration.hooks, dir);
 
-    const refreshContent = vi.fn(async () => {});
+    const refreshContent = vi.fn(async (_options: RefreshContentOptions) => {});
     const { server } = fakeServer();
     await integration.hooks['astro:server:setup']?.({
       server,
@@ -173,7 +174,7 @@ describe('astro:server:setup', () => {
     const integration = contentia({ dir, defaultExtension: 'md', refresh: { debounceMs: 10 } });
     callSetup(integration.hooks, dir);
 
-    const refreshContent = vi.fn(async () => {});
+    const refreshContent = vi.fn(async (_options: RefreshContentOptions) => {});
     const { server } = fakeServer();
     await integration.hooks['astro:server:setup']?.({
       server,
@@ -363,11 +364,11 @@ describe('resolveRepositories', () => {
     await fs.writeFile(path.join(root, 'posts', 'x.md'), '---\ntitle: X\n---\n');
 
     const { documents } = resolveRepositories({ dir: 'posts', defaultExtension: 'md' }, root);
-    const { items } = await collectStream(documents.listRecordSummaries({
+    const { items } = await documents.listRecordSummaries({
       folder: 'x',
       depth: 1,
       pagination: { perPage: 10 },
-    }));
+    }).collect();
 
     // `dir: 'posts'` roots storage at <root>/posts, so the document written at
     // posts/x.md is reachable — proving the path was joined, not ignored.

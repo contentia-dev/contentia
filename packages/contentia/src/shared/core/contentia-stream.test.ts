@@ -6,6 +6,7 @@ import { NotFoundError } from 'contentia/core';
 
 import * as Element from './contentia-element.js';
 import type { ContentiaElement } from './contentia-element.js';
+import { iterateChunks } from './contentia-iterator.js';
 import {
   type ContentiaChunk,
   type ContentiaStream,
@@ -33,13 +34,13 @@ import {
 import type { ContentiaDone, ContentiaProgress } from './contentia-types.js';
 
 /**
- * Drain a ContentiaStream by manual async iteration. Returns the collected chunks
- * and the done value that came from the iterator's terminal `return` value.
+ * Drain a ContentiaStream chunk by chunk, outside Effect. Returns the collected chunks (data and
+ * metadata elements, as emitted) and the done value from the iterator's terminal `return` value.
  */
 async function drainIterator<A, D extends ContentiaDone>(
   stream: ContentiaStream<A, D>,
 ): Promise<{ chunks: ContentiaChunk<A>[], done: D | undefined }> {
-  const it = stream[Symbol.asyncIterator]();
+  const it = iterateChunks(stream);
   const chunks: ContentiaChunk<A>[] = [];
   let done: D | undefined;
   while (true) {

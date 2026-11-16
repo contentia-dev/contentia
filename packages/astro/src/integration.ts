@@ -25,7 +25,6 @@ import path from 'node:path';
 
 import { DEFAULT_LOCAL_API_BASE_PATH, mountLocalApi } from '@contentia/vite-plugin';
 import type { AstroIntegration } from 'astro';
-import { runTask } from 'contentia/compat';
 import type { ChangeSummary, Unsubscribe } from 'contentia/storage';
 import type { ApiAccess } from './api-access.js';
 
@@ -266,13 +265,13 @@ async function liveCollectionTypes(
       repositories.storage,
       options.configKey,
     );
-    const { collections } = await runTask(catalog.getCatalog());
+    const { collections } = await catalog.getCatalog();
 
     members = [];
     for (const [name, settings] of Object.entries(collections ?? {})) {
       if (settings.type !== 'document') continue;
 
-      const schema = await runTask(catalog.getCollectionSchema(name)).catch(() => undefined);
+      const schema = await catalog.getCollectionSchema(name).run().catch(() => undefined);
       // No fields is not a failure — it is a catalog that cannot describe this
       // collection. Leaving it out of the interface is what makes the loader
       // fall back to `Record<string, unknown>` for it.

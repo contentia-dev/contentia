@@ -9,7 +9,6 @@
  * meaningless on half its inputs.
  */
 
-import { collectStream, runTask } from 'contentia/compat';
 import { NotFoundError, NotImplementedError } from 'contentia/core/errors';
 import type { StorageRepository } from 'contentia/storage';
 
@@ -141,7 +140,7 @@ export function createObjectsSyncSource(
 
   const read = async (key: string): Promise<SourceRecord | undefined> => {
     try {
-      const object = await runTask(storage.getObject(key));
+      const object = await storage.getObject(key);
       return { key, content: object.content ?? {} };
     } catch (error) {
       if (error instanceof NotFoundError) return undefined;
@@ -162,14 +161,14 @@ export function createObjectsSyncSource(
     capabilities: async () => ({ changes: false, versions: false }),
 
     listSummaries: async () => {
-      const { items } = await collectStream(storage.listAtomSummaries(folder, listOptions));
+      const { items } = await storage.listAtomSummaries(folder, listOptions).collect();
       return items
         .filter(item => item.type === 'object-summary')
         .map(item => ({ key: item.key, version: undefined }));
     },
 
     listRecords: async () => {
-      const { items } = await collectStream(storage.listAtoms(folder, listOptions));
+      const { items } = await storage.listAtoms(folder, listOptions).collect();
       return items
         .filter(item => item.type === 'object')
         .map(item => ({

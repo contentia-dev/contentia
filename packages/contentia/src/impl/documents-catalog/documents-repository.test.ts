@@ -14,6 +14,7 @@ import type {
   AtomSummary,
   Folder,
   FolderCreate,
+  RemoveAtomsDone,
   StorageObject,
   StorageObjectCreate,
   StorageObjectUpdate,
@@ -66,9 +67,9 @@ function makeMemoryStorage(): StorageRepository {
 
     removeAtoms(
       keys: readonly string[],
-    ): ContentiaStream.ContentiaStream<string, { removed: number, skipped: number }> {
+    ): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
       for (const key of keys) store.delete(key);
-      return ContentiaStream.empty({ removed: keys.length, skipped: 0 });
+      return ContentiaStream.empty<RemoveAtomsDone>({ removed: keys.length, skipped: 0 });
     },
 
     listAtoms(folderKey: string, _options: unknown): ContentiaStream.ContentiaStream<Atom, { total: number }> {
@@ -417,11 +418,9 @@ describe('CatalogDocumentsRepository', () => {
 
       const allDocs: import('contentia/documents').Record[] = [];
       for await (
-        const chunk of repo.listRecords({ folder: 'posts', pagination: { offset: 0, limit: 100 }, depth: 1 })
+        const item of repo.listRecords({ folder: 'posts', pagination: { offset: 0, limit: 100 }, depth: 1 })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') allDocs.push(el.value);
-        }
+        allDocs.push(item);
       }
 
       expect(allDocs.length).toBeGreaterThanOrEqual(2);
@@ -902,6 +901,7 @@ describe('CatalogDocumentsRepository — getCapabilities', () => {
     // Pagination is forwarded from the underlying storage mock
     expect(caps.pagination).toBeDefined();
     expect(caps.pagination.supported).toBe(true);
+    if (!caps.pagination.supported) throw new Error('expected pagination support');
     expect(caps.pagination.styles).toBeDefined();
   });
 });

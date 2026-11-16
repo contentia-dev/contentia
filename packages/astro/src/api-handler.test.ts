@@ -12,8 +12,6 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { runTask } from 'contentia/compat';
-
 import { createApiHandler } from './api-handler.js';
 import { type ContentiaRepositories, resolveRepositories } from './repositories.js';
 
@@ -28,17 +26,20 @@ beforeEach(async () => {
   await fs.mkdir(path.join(dir, 'posts'), { recursive: true });
   repositories = resolveRepositories({ dir: '.', defaultExtension: 'md' }, dir);
 
-  await runTask(repositories.documents.createDocument({
+  await repositories.documents.createDocument({
     key: 'posts/live',
+    type: 'published',
+    status: 'published',
     content: { title: 'Live', body: 'Published.' },
     language: 'en',
-  }));
-  await runTask(repositories.documents.createUnpublished({
+  });
+  await repositories.documents.createUnpublished({
     key: 'posts/secret',
+    type: 'unpublished',
     content: { title: 'Secret draft', body: 'Not for the public.' },
     language: 'en',
     status: 'draft',
-  }));
+  });
 });
 
 afterEach(async () => {
@@ -113,7 +114,7 @@ describe('the default published access', () => {
 
     expect(response.status).toBe(403);
     // And nothing was written.
-    await expect(runTask(repositories.documents.getDocument('posts/intruder'))).rejects.toThrow();
+    await expect(repositories.documents.getDocument('posts/intruder').run()).rejects.toThrow();
   });
 
   it('refuses to delete a document', async () => {
@@ -122,7 +123,7 @@ describe('the default published access', () => {
     });
 
     expect(response.status).toBe(403);
-    await expect(runTask(repositories.documents.getDocument('posts/live'))).resolves.toBeDefined();
+    await expect(repositories.documents.getDocument('posts/live').run()).resolves.toBeDefined();
   });
 
   it('refuses to write through the storage route', async () => {

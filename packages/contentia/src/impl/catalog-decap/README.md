@@ -16,7 +16,6 @@ authoritative, all `put*` methods are disabled — `DecapCatalogProvider` is int
 
 ```ts
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
-import { runTask } from 'contentia/compat';
 import { yamlSerializer } from 'contentia/serializers/yaml';
 import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
@@ -27,16 +26,16 @@ const storage = new FileSystemStorageRepository(
 );
 
 // Seed the Decap config once, e.g. via your app's setup script:
-// await runTask(storage.createOrUpdateObject({
+// await storage.createOrUpdateObject({
 //   key: 'config',
 //   type: 'object',
 //   content: { collections: [...], media_folder: '/uploads', public_folder: '/uploads' },
 //   metadata: { extension: 'yaml' },
-// }));
+// });
 
 const catalog = new DecapCatalogProvider({ storage, configKey: 'config' });
 
-const postsSettings = await runTask(catalog.getDocumentCollectionSettings('posts'));
+const postsSettings = await catalog.getDocumentCollectionSettings('posts');
 ```
 
 ### Constructor options

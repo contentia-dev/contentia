@@ -1,16 +1,16 @@
-import { runTask } from 'contentia/compat';
 import { IllegalStateException, QuotaExceededError } from 'contentia/core';
+import type { StorageFormat, StorageObjectContent, StorageSerializer } from 'contentia/storage';
 import { describe, expect, it } from 'vitest';
 
 import { InMemoryWebStorage } from '../../testing.js';
 import { WebStorageRepository } from './web-storage-repository.js';
 
-const jsonSerializer = {
-  format: 'json' as const,
-  async serializeDocumentFileContents(content: unknown): Promise<string> {
+const jsonSerializer: StorageSerializer<StorageFormat> = {
+  format: 'json' as StorageFormat,
+  async serializeDocumentFileContents(content: StorageObjectContent): Promise<string> {
     return JSON.stringify(content);
   },
-  async deserializeDocumentFileContents(raw: string): Promise<unknown> {
+  async deserializeDocumentFileContents(raw: string): Promise<StorageObjectContent> {
     return JSON.parse(raw);
   },
 };
@@ -31,18 +31,18 @@ describe('WebStorageRepository: namespace isolation', () => {
       namespace: 'app-b',
     });
 
-    await runTask(repoA.createObject({ key: 'shared-key', type: 'object', content: { owner: 'a' } }));
-    await runTask(repoB.createObject({ key: 'shared-key', type: 'object', content: { owner: 'b' } }));
+    await repoA.createObject({ key: 'shared-key', type: 'object', content: { owner: 'a' } });
+    await repoB.createObject({ key: 'shared-key', type: 'object', content: { owner: 'b' } });
 
-    const fromA = await runTask(repoA.getObject('shared-key'));
-    const fromB = await runTask(repoB.getObject('shared-key'));
+    const fromA = await repoA.getObject('shared-key');
+    const fromB = await repoB.getObject('shared-key');
     expect(fromA.content).toMatchObject({ owner: 'a' });
     expect(fromB.content).toMatchObject({ owner: 'b' });
 
     // Deleting from one namespace must not remove the other namespace's object.
-    await runTask(repoA.removeAtoms(['shared-key']));
-    await expect(runTask(repoA.getObject('shared-key'))).rejects.toThrow();
-    const stillThere = await runTask(repoB.getObject('shared-key'));
+    await repoA.removeAtoms(['shared-key']).collect();
+    await expect(repoA.getObject('shared-key').run()).rejects.toThrow();
+    const stillThere = await repoB.getObject('shared-key');
     expect(stillThere.content).toMatchObject({ owner: 'b' });
   });
 
@@ -56,8 +56,8 @@ describe('WebStorageRepository: namespace isolation', () => {
       defaultExtension: 'json',
       namespace: 'contentia',
     });
-    await runTask(repo.createObject({ key: 'a', type: 'object', content: {} }));
-    await runTask(repo.removeAtoms(['a']));
+    await repo.createObject({ key: 'a', type: 'object', content: {} });
+    await repo.removeAtoms(['a']).collect();
 
     expect(shared.getItem('some-other-app-setting')).toBe('do-not-touch');
   });
@@ -79,7 +79,7 @@ describe('WebStorageRepository: quota-exceeded mapping', () => {
     });
 
     await expect(
-      runTask(repo.createObject({ key: 'too-big', type: 'object', content: { big: 'x'.repeat(10) } })),
+      repo.createObject({ key: 'too-big', type: 'object', content: { big: 'x'.repeat(10) } }).run(),
     ).rejects.toBeInstanceOf(QuotaExceededError);
   });
 });
@@ -111,12 +111,12 @@ describe('WebStorageRepository: SSR safety', () => {
     expect((globalThis as { localStorage?: Storage }).localStorage).toBeUndefined();
 
     const repo = new WebStorageRepository({ serializerRegistry: { json: jsonSerializer }, defaultExtension: 'json' });
-    await expect(runTask(repo.getObject('anything'))).rejects.toBeInstanceOf(IllegalStateException);
+    await expect(repo.getObject('anything').run()).rejects.toBeInstanceOf(IllegalStateException);
   });
 
   it('getCapabilities works without ever needing a Storage', async () => {
     const repo = new WebStorageRepository({ serializerRegistry: { json: jsonSerializer }, defaultExtension: 'json' });
-    const caps = await runTask(repo.getCapabilities());
+    const caps = await repo.getCapabilities();
     expect(caps.fileExtensions.supported).toBe(true);
   });
 });

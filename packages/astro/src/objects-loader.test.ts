@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { runTask } from 'contentia/compat';
 import { ContentiaTask } from 'contentia/core';
-import { NotImplementedError } from 'contentia/core/errors';
+import { InternalError, NotImplementedError } from 'contentia/core/errors';
 import type { StorageObject } from 'contentia/storage';
 import { InMemoryStorageRepository } from 'contentia/storage/testing';
 
@@ -12,7 +11,7 @@ import { createFakeLoaderContext } from './testing/loader-context.js';
 async function makeStorage(...keys: string[]): Promise<InMemoryStorageRepository> {
   const storage = new InMemoryStorageRepository();
   for (const key of keys) {
-    await runTask(storage.createObject({ key, content: { title: key } }));
+    await storage.createObject({ key, content: { title: key } });
   }
   return storage;
 }
@@ -84,7 +83,7 @@ describe('createObjectsSyncSource — getRecord', () => {
   it('rethrows errors that are not NotFoundError', async () => {
     class BrokenStorage extends InMemoryStorageRepository {
       override getObject(_key: string): ContentiaTask.ContentiaTask<StorageObject> {
-        return ContentiaTask.fail(new Error('unexpected internal error'));
+        return ContentiaTask.fail(new InternalError('unexpected internal error'));
       }
     }
     const source = createObjectsSyncSource(new BrokenStorage(), 'data', {});

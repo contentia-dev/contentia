@@ -72,9 +72,9 @@ a delegation chain.
 
 ### Routing warnings into observability
 
-Where a host app drains a task at its boundary, the `onProgress` option of `runTask` /
-`collectStream` (`contentia/compat`) is the attach point for routing recoverable warnings into its
-observability stack. Each warning arrives as `{ _tag: 'RecoverableError', error }` with the typed
+Where a host app runs a task at its boundary, the `onProgress` option of `task.run()` /
+`stream.collect()` is the attach point for routing recoverable warnings into its observability
+stack. Each warning arrives as `{ _tag: 'RecoverableError', error }` with the typed
 `ContentiaError`, so its `.code` / `.message` / `.cause` / `.translation` fields are all available
 for tagging. Over HTTP, the JSON:API servers serialize the same warnings into `meta.warnings`, so a
 client can surface or forward them.
@@ -94,9 +94,7 @@ recording them at `level: 'warning'` (Sentry) / severity `WARN` (OTel) keeps ale
 failures, not user-visible partial successes. Example:
 
 ```ts
-import { runTask } from 'contentia/compat';
-
-const doc = await runTask(documents.getDocument(key), {
+const doc = await documents.getDocument(key).run({
   onProgress: meta => {
     if (meta._tag !== 'RecoverableError') return;
     const e = meta.error;

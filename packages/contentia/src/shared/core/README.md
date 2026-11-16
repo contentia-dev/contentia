@@ -76,26 +76,29 @@ All error classes extend `ContentiaError` and carry `.status`, `.code`, and `.ti
 type ContentiaResult<T> = Result<T, ContentiaError>;
 ```
 
-Compatible with Effect's `Result` type. Use the `contentia/compat` helpers (`runTask`,
-`collectStream`) to consume tasks/streams without importing Effect directly.
+Compatible with Effect's `Result` type.
 
-## Compat helpers (`contentia/compat`)
+## Using tasks and streams without Effect
 
-Promise wrappers for `ContentiaTask` and `ContentiaStream` — no `effect` import needed at the call
-site.
+`ContentiaTask` is awaitable and `ContentiaStream` is async-iterable, so no `effect` import is
+needed at the call site.
 
 ```typescript
-import { collectStream, runTask } from 'contentia/compat';
-
 // Run a ContentiaTask to completion — resolves with the value or rejects with a ContentiaError
-const object = await runTask(repository.getObject(key));
+const object = await repository.getObject(key);
 
-// Collect all data items from a ContentiaStream — resolves with { items, done }
+// Iterate a ContentiaStream item by item
+for await (const atom of repository.listAtoms(folderKey, { depth: 1, pagination: {} })) {
+  console.log(atom.key);
+}
+
+// Or collect all data items from a ContentiaStream — resolves with { items, done }
 // `offset` is required for offset-style pagination; `{ limit: 100 }` alone would silently return the full list.
 // `Pagination` is a union of PaginationOffsetSchema, PaginationPageBasedSchema, PaginationBeforeSchema, PaginationAfterSchema.
-const { items, done } = await collectStream(
-  repository.listAtoms(folderKey, { depth: 1, pagination: { offset: 0, limit: 100 } }),
-);
+const { items, done } = await repository.listAtoms(folderKey, {
+  depth: 1,
+  pagination: { offset: 0, limit: 100 },
+}).collect();
 console.log(items); // Atom[]
 ```
 

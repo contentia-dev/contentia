@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectStream, runTask } from '../../../../shared/core/compat.js';
 import { InvalidData, NotImplementedError } from '../../../../shared/core/index.js';
 import type { FilteringCapability } from '../../../storage/index.js';
 import { SyncToken } from '../../../storage/index.js';
@@ -14,14 +13,14 @@ const bareRepo = (): AssetsRepository => Object.create(AssetsRepository.prototyp
 
 describe('AssetsRepository change-signal defaults', () => {
   it('getSyncToken fails with NotImplementedError by default', async () => {
-    await expect(runTask(bareRepo().getSyncToken())).rejects.toMatchObject({
+    await expect(bareRepo().getSyncToken().run()).rejects.toMatchObject({
       code: NotImplementedError.CODE,
     });
   });
 
   it('listChanges fails with NotImplementedError by default', async () => {
     await expect(
-      collectStream(bareRepo().listChanges({ since: SyncToken.make('0') })),
+      bareRepo().listChanges({ since: SyncToken.make('0') }).collect(),
     ).rejects.toMatchObject({ code: NotImplementedError.CODE });
   });
 });

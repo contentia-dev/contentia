@@ -9,8 +9,8 @@ import type * as Scope from 'effect/Scope';
 
 import type { ContentiaError } from 'contentia/core';
 
-import { attachAsyncIterator } from './contentia-iterator.js';
-import type { ContentiaMetadata, ContentiaMetadataChunk, ContentiaProgress } from './contentia-types.js';
+import { defineMember, iterateChunks } from './contentia-iterator.js';
+import type { ContentiaMetadata, ContentiaMetadataChunk, ContentiaProgress, RunOptions } from './contentia-types.js';
 
 /**
  * `ContentiaTask<A, R>` — a single-result sibling to {@link ContentiaStream.ContentiaStream}.
@@ -23,12 +23,57 @@ import type { ContentiaMetadata, ContentiaMetadataChunk, ContentiaProgress } fro
  * terminate the task without yielding a value. Use ContentiaTask for operations
  * that return one item (`getObject`, `createFolder`, etc.); use ContentiaStream
  * for operations that return many.
+ *
+ * Without Effect, `await` a task to run it: `const obj = await repo.getObject(key)`. Like a
+ * Drizzle query, a task is lazy: nothing happens until it is awaited, and every `await` runs it
+ * again. Use {@link ContentiaTask.run} to pass options such as `onProgress`.
  */
 export interface ContentiaTask<A, R = never>
   extends
     Channel.Channel<ContentiaMetadataChunk, ContentiaError, A, unknown, unknown, unknown, R>,
-    AsyncIterable<ContentiaMetadataChunk, A>
-{}
+    AsyncIterable<ContentiaMetadataChunk, A>,
+    PromiseLike<A>
+{
+  /**
+   * Run the task and resolve with its value; rejects with the fatal `ContentiaError`. The same as
+   * `await task`, plus options: pass `onProgress` to receive progress events and recoverable
+   * warnings as the task runs.
+   */
+  run(options?: RunOptions): Promise<A>;
+}
+
+/**
+ * Give a Channel the ContentiaTask members: `run`, `then` (so it can be awaited) and the async
+ * iterator over its metadata chunks. Every constructor and combinator in this module returns
+ * through here.
+ *
+ * Effect's own Channel functions return plain Channels without these members. If you build a task
+ * with them, pass the result through `fromChannel` before handing it to code that awaits it.
+ */
+export const fromChannel = <A, R = never>(
+  channel: Channel.Channel<ContentiaMetadataChunk, ContentiaError, A, unknown, unknown, unknown, R>,
+): ContentiaTask<A, R> => {
+  const task = channel as ContentiaTask<A, R>;
+  if (Object.hasOwn(task, 'run')) return task;
+  const run = (options?: RunOptions): Promise<A> => runWithOptions(task, options);
+  const then: PromiseLike<A>['then'] = (onfulfilled, onrejected) => run().then(onfulfilled, onrejected);
+  defineMember(task, 'run', run);
+  defineMember(task, 'then', then);
+  defineMember(task, Symbol.asyncIterator, () => iterateChunks(task));
+  return task;
+};
+
+const runWithOptions = <A, R>(self: ContentiaTask<A, R>, options: RunOptions | undefined): Promise<A> => {
+  const onProgress = options?.onProgress;
+  const drained = onProgress
+    ? drainWithValue(self, chunk => {
+      for (const meta of chunk) onProgress(meta);
+      return Effect.void;
+    })
+    : runValue(self);
+  // A task with unfilled service requirements (R != never) rejects here; see `iterateChunks`.
+  return Effect.runPromise(drained as Effect.Effect<A, ContentiaError>);
+};
 
 const recoverableErrorTag = 'RecoverableError' as const;
 const progressTag = 'Progress' as const;
@@ -43,12 +88,10 @@ const progressMetadata = (progress: ContentiaProgress): ContentiaMetadata => ({
 });
 
 /** Emits no metadata; immediately resolves to the value. */
-export const succeed = <A>(value: A): ContentiaTask<A> =>
-  attachAsyncIterator(Channel.end(value)) as unknown as ContentiaTask<A>;
+export const succeed = <A>(value: A): ContentiaTask<A> => fromChannel(Channel.end(value));
 
 /** Fails fatally without yielding a value. */
-export const fail = (error: ContentiaError): ContentiaTask<never> =>
-  attachAsyncIterator(Channel.fail(error)) as unknown as ContentiaTask<never>;
+export const fail = (error: ContentiaError): ContentiaTask<never> => fromChannel(Channel.fail(error));
 
 /** Lift an Effect producing a value (and optional recoverable errors) into a ContentiaTask. */
 export const fromEffect = <A, R = never>(
@@ -92,7 +135,7 @@ export const make = <A, R = never>(
   options?: { readonly capacity?: number },
 ): ContentiaTask<A, R> => {
   const capacity = options?.capacity ?? 16;
-  return attachAsyncIterator(
+  return fromChannel(
     Channel.fromTransform<
       ContentiaMetadataChunk,
       ContentiaError | Cause.Done<A>,
@@ -129,7 +172,7 @@ export const make = <A, R = never>(
         return Queue.takeAll(queue) as never;
       })
     ),
-  ) as unknown as ContentiaTask<A, R>;
+  );
 };
 
 /**
@@ -258,28 +301,28 @@ export const drainWithValue = <A, R>(
 export const map = <A, B, R>(
   self: ContentiaTask<A, R>,
   f: (a: A) => B,
-): ContentiaTask<B, R> => attachAsyncIterator(Channel.mapDone(self, f)) as unknown as ContentiaTask<B, R>;
+): ContentiaTask<B, R> => fromChannel(Channel.mapDone(self, f));
 
 /** Run a side-effect for every recoverable error. Returns the same task shape. */
 export const tapRecoverableErrors = <A, R, R2 = never>(
   self: ContentiaTask<A, R>,
   f: (error: ContentiaError) => Effect.Effect<void, never, R2>,
 ): ContentiaTask<A, R | R2> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.tap(self, (chunk: ContentiaMetadataChunk) =>
       Effect.gen(function*() {
         for (const el of chunk) if (el._tag === recoverableErrorTag) yield* f(el.error);
       })),
-  ) as unknown as ContentiaTask<A, R | R2>;
+  );
 
 /** Run a side-effect for every progress event. Returns the same task shape. */
 export const tapProgress = <A, R, R2 = never>(
   self: ContentiaTask<A, R>,
   f: (progress: ContentiaProgress) => Effect.Effect<void, never, R2>,
 ): ContentiaTask<A, R | R2> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.tap(self, (chunk: ContentiaMetadataChunk) =>
       Effect.gen(function*() {
         for (const el of chunk) if (el._tag === progressTag) yield* f(el.progress);
       })),
-  ) as unknown as ContentiaTask<A, R | R2>;
+  );

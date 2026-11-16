@@ -18,7 +18,6 @@ where the folder layout is predictable and you don't need a separate editor-faci
 
 ```ts
 import { ConventionCatalogProvider } from 'contentia/catalog-convention';
-import { runTask } from 'contentia/compat';
 import { jsonSerializer } from 'contentia/serializers/json';
 import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
@@ -31,15 +30,13 @@ const storage = new FileSystemStorageRepository(
 const catalog = new ConventionCatalogProvider({ storage });
 
 // No settings file needed — defaults are synthesized on first read.
-const postsSettings = await runTask(catalog.getDocumentCollectionSettings('posts'));
+const postsSettings = await catalog.getDocumentCollectionSettings('posts');
 
 // Persist a customized setting; subsequent reads pick it up from storage.
-await runTask(
-  catalog.putDocumentCollectionSettings('posts', {
-    ...postsSettings,
-    name: 'Blog Posts',
-  }),
-);
+await catalog.putDocumentCollectionSettings('posts', {
+  ...postsSettings,
+  name: 'Blog Posts',
+});
 ```
 
 ### Constructor options

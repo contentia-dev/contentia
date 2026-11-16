@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectStream, runTask } from '../../../../shared/core/compat.js';
 import { NotImplementedError } from '../../../../shared/core/index.js';
 import { SyncToken } from '../../../storage/index.js';
 
@@ -13,20 +12,20 @@ const bareRepo = (): DocumentsRepository => Object.create(DocumentsRepository.pr
 
 describe('DocumentsRepository change-signal defaults', () => {
   it('getSyncToken fails with NotImplementedError by default', async () => {
-    await expect(runTask(bareRepo().getSyncToken())).rejects.toMatchObject({
+    await expect(bareRepo().getSyncToken().run()).rejects.toMatchObject({
       code: NotImplementedError.CODE,
     });
   });
 
   it('getSyncToken with a folder scope also fails with NotImplementedError', async () => {
-    await expect(runTask(bareRepo().getSyncToken({ folder: 'posts' }))).rejects.toMatchObject({
+    await expect(bareRepo().getSyncToken({ folder: 'posts' }).run()).rejects.toMatchObject({
       code: NotImplementedError.CODE,
     });
   });
 
   it('listChanges fails with NotImplementedError by default', async () => {
     await expect(
-      collectStream(bareRepo().listChanges({ since: SyncToken.make('0') })),
+      bareRepo().listChanges({ since: SyncToken.make('0') }).collect(),
     ).rejects.toMatchObject({ code: NotImplementedError.CODE });
   });
 });

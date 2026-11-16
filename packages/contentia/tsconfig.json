@@ -121,9 +121,6 @@
       "contentia/core": [
         "./src/shared/core/index.ts"
       ],
-      "contentia/compat": [
-        "./src/shared/core/compat.ts"
-      ],
       "contentia/crypto": [
         "./src/shared/crypto/index.ts"
       ],

@@ -20,7 +20,6 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createFsStorage, createRepositories } from '@contentia/vite-plugin';
-import { runTask } from 'contentia/compat';
 import type { DocumentsRepository } from 'contentia/documents';
 import { InMemoryDocumentsRepository } from 'contentia/documents/testing';
 
@@ -62,9 +61,9 @@ async function write(
   content: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await runTask(documents.updateDocument({ key, content }));
+    await documents.updateDocument({ key, content });
   } catch {
-    await runTask(documents.createDocument({ key, content, language: 'en' }));
+    await documents.createDocument({ key, type: 'published', status: 'published', content, language: 'en' });
   }
 }
 
@@ -176,7 +175,7 @@ describe.each(PROFILES)('$name', ({ create, expectedTier }) => {
     const fake = createFakeLoaderContext({ collection: 'posts' });
     await sync(documents, fake);
 
-    await runTask(documents.deleteDocument('posts/b'));
+    await documents.deleteDocument('posts/b');
     fake.resetTraffic();
     await sync(documents, fake);
 

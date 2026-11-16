@@ -28,15 +28,13 @@ import { InProcessLockManager } from 'contentia/locks/in-process';
 
 const locks = new InProcessLockManager();
 
-const lock = await runTask(
-  locks.acquireLock('posts/hello-world', { id: 'user-1', name: 'Alice' }),
-);
+const lock = await locks.acquireLock('posts/hello-world', { id: 'user-1', name: 'Alice' });
 // lock.token is a bearer capability: whoever holds it can refresh, release, or
 // (once write preconditions are enforced) write through it via `ifLockHeldBy`.
 
-await runTask(locks.refreshLock('posts/hello-world', lock.token, { id: 'user-1', name: 'Alice' }));
+await locks.refreshLock('posts/hello-world', lock.token, { id: 'user-1', name: 'Alice' });
 
-await runTask(locks.releaseLock('posts/hello-world', lock.token));
+await locks.releaseLock('posts/hello-world', lock.token);
 ```
 
 A `DocumentsRepository` implementation typically composes an `InProcessLockManager` internally and

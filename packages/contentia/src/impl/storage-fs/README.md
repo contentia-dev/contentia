@@ -16,7 +16,6 @@ change notifications (`subscribeChanges`, via `fs.watch`).
 ## Usage
 
 ```ts
-import { runTask } from 'contentia/compat';
 import { jsonSerializer } from 'contentia/serializers/json';
 import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
@@ -26,7 +25,7 @@ const repo = new FileSystemStorageRepository(
   'json', // defaultFileExtension
 );
 
-const post = await runTask(repo.getObject('posts/hello-world'));
+const post = await repo.getObject('posts/hello-world');
 ```
 
 ### Constructor parameters

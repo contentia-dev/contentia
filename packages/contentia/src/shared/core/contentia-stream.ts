@@ -12,9 +12,9 @@ import type { ContentiaError } from 'contentia/core';
 
 import * as Element from './contentia-element.js';
 import type { ContentiaElement } from './contentia-element.js';
-import { attachAsyncIterator } from './contentia-iterator.js';
+import { defineMember, iterateItems } from './contentia-iterator.js';
 import type { ContentiaMetadataEmit } from './contentia-task.js';
-import type { ContentiaDone, ContentiaProgress } from './contentia-types.js';
+import type { ContentiaDone, ContentiaProgress, RunOptions } from './contentia-types.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,12 +33,59 @@ export type ContentiaChunk<A> = Arr.NonEmptyReadonlyArray<ContentiaElement<A>>;
  *
  * Fatal errors are `ContentiaError` raised through the Channel's OutErr; they
  * terminate the stream without emitting a done value.
+ *
+ * Without Effect, iterate the items with `for await (const item of stream)`, or load them all with
+ * `await stream.collect()`. A stream is lazy: nothing happens until it is iterated or collected,
+ * and each pass runs it again.
  */
 export interface ContentiaStream<A, D extends ContentiaDone = ContentiaDone, R = never>
-  extends
-    Channel.Channel<ContentiaChunk<A>, ContentiaError, D, unknown, unknown, unknown, R>,
-    AsyncIterable<ContentiaChunk<A>, D>
-{}
+  extends Channel.Channel<ContentiaChunk<A>, ContentiaError, D, unknown, unknown, unknown, R>, AsyncIterable<A, D>
+{
+  /**
+   * Run the stream to the end and resolve with every item plus the done value; rejects with the
+   * fatal `ContentiaError`. Pass `onProgress` to receive progress events and recoverable warnings
+   * as the stream runs.
+   *
+   * This holds the whole result in memory. For large listings, iterate with `for await` instead.
+   */
+  collect(options?: RunOptions): Promise<{ readonly items: ReadonlyArray<A>, readonly done: D }>;
+}
+
+/**
+ * Give a Channel the ContentiaStream members: `collect` and the async iterator over its items.
+ * Every constructor and combinator in this module returns through here.
+ *
+ * Effect's own Channel functions return plain Channels without these members. If you build a
+ * stream with them, pass the result through `fromChannel` before handing it to code that iterates
+ * or collects it.
+ */
+export const fromChannel = <A, D extends ContentiaDone, R = never>(
+  channel: Channel.Channel<ContentiaChunk<A>, ContentiaError, D, unknown, unknown, unknown, R>,
+): ContentiaStream<A, D, R> => {
+  const stream = channel as ContentiaStream<A, D, R>;
+  if (Object.hasOwn(stream, 'collect')) return stream;
+  defineMember(stream, 'collect', (options?: RunOptions) => collectWithOptions(stream, options));
+  defineMember(stream, Symbol.asyncIterator, () => iterateItems(stream));
+  return stream;
+};
+
+const collectWithOptions = async <A, D extends ContentiaDone, R>(
+  self: ContentiaStream<A, D, R>,
+  options: RunOptions | undefined,
+): Promise<{ readonly items: ReadonlyArray<A>, readonly done: D }> => {
+  const onProgress = options?.onProgress;
+  const items: A[] = [];
+  const drained = drainWithDone(self, chunk => {
+    for (const el of chunk) {
+      if (Element.isData(el)) items.push(el.value);
+      else onProgress?.(el);
+    }
+    return Effect.void;
+  });
+  // A stream with unfilled service requirements (R != never) rejects here; see `iterateChunks`.
+  const done = await Effect.runPromise(drained as Effect.Effect<D, ContentiaError>);
+  return { items, done };
+};
 
 // ---------------------------------------------------------------------------
 // Constructors
@@ -46,11 +93,11 @@ export interface ContentiaStream<A, D extends ContentiaDone = ContentiaDone, R =
 
 /** Emits no data, ends immediately with the done value. */
 export const empty = <D extends ContentiaDone>(done: D): ContentiaStream<never, D> =>
-  attachAsyncIterator(Channel.end(done) as never);
+  fromChannel(Channel.end(done) as never);
 
 /** Emits one data element then ends with the done value. */
 export const succeed = <A, D extends ContentiaDone>(value: A, done: D): ContentiaStream<A, D> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.concat(
       Channel.succeed([Element.data(value)] as ContentiaChunk<A>),
       Channel.end(done),
@@ -66,7 +113,7 @@ export const succeedMany = <A, D extends ContentiaDone>(
   done: D,
 ): ContentiaStream<A, D> => {
   if (values.length === 0) return empty(done);
-  return attachAsyncIterator(
+  return fromChannel(
     Channel.concat(
       Channel.succeed(values.map(Element.data) as unknown as ContentiaChunk<A>),
       Channel.end(done),
@@ -75,8 +122,7 @@ export const succeedMany = <A, D extends ContentiaDone>(
 };
 
 /** Fails immediately with a fatal ContentiaError, never emitting a done value. */
-export const fail = (error: ContentiaError): ContentiaStream<never, never> =>
-  attachAsyncIterator(Channel.fail(error) as never);
+export const fail = (error: ContentiaError): ContentiaStream<never, never> => fromChannel(Channel.fail(error) as never);
 
 /**
  * Lift an Effect producing a single value, optional warnings, and a done value
@@ -126,7 +172,7 @@ export const make = <A, D extends ContentiaDone, R = never>(
   options?: { readonly capacity?: number },
 ): ContentiaStream<A, D, R> => {
   const capacity = options?.capacity ?? 16;
-  return attachAsyncIterator(
+  return fromChannel(
     Channel.fromTransform<
       ContentiaChunk<A>,
       ContentiaError | Cause.Done<D>,
@@ -360,20 +406,24 @@ export const tapRecoverableErrors = <A, D extends ContentiaDone, R, R2 = never>(
   self: ContentiaStream<A, D, R>,
   f: (error: ContentiaError) => Effect.Effect<void, never, R2>,
 ): ContentiaStream<A, D, R | R2> =>
-  Channel.tap(self, (chunk: ContentiaChunk<A>) =>
-    Effect.gen(function*() {
-      for (const el of chunk) if (Element.isRecoverableError(el)) yield* f(el.error);
-    })) as ContentiaStream<A, D, R | R2>;
+  fromChannel(
+    Channel.tap(self, (chunk: ContentiaChunk<A>) =>
+      Effect.gen(function*() {
+        for (const el of chunk) if (Element.isRecoverableError(el)) yield* f(el.error);
+      })),
+  );
 
 /** Run a side-effect for every progress event. Returns the same stream shape. */
 export const tapProgress = <A, D extends ContentiaDone, R, R2 = never>(
   self: ContentiaStream<A, D, R>,
   f: (progress: ContentiaProgress) => Effect.Effect<void, never, R2>,
 ): ContentiaStream<A, D, R | R2> =>
-  Channel.tap(self, (chunk: ContentiaChunk<A>) =>
-    Effect.gen(function*() {
-      for (const el of chunk) if (Element.isProgress(el)) yield* f(el.progress);
-    })) as ContentiaStream<A, D, R | R2>;
+  fromChannel(
+    Channel.tap(self, (chunk: ContentiaChunk<A>) =>
+      Effect.gen(function*() {
+        for (const el of chunk) if (Element.isProgress(el)) yield* f(el.progress);
+      })),
+  );
 
 // ---------------------------------------------------------------------------
 // Combinators
@@ -387,7 +437,7 @@ export const mapData = <A, D extends ContentiaDone, R, B>(
   self: ContentiaStream<A, D, R>,
   f: (a: A) => B,
 ): ContentiaStream<B, D, R> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.map(self, (chunk: ContentiaChunk<A>): ContentiaChunk<B> => {
       const out: ContentiaElement<B>[] = new Array(chunk.length);
       for (let i = 0; i < chunk.length; i++) {
@@ -406,7 +456,7 @@ export const mapElements = <A, D extends ContentiaDone, R, B>(
   self: ContentiaStream<A, D, R>,
   f: (element: ContentiaElement<A>) => ContentiaElement<B>,
 ): ContentiaStream<B, D, R> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.map(self, (chunk: ContentiaChunk<A>): ContentiaChunk<B> => {
       const out: ContentiaElement<B>[] = new Array(chunk.length);
       for (let i = 0; i < chunk.length; i++) out[i] = f(chunk[i]!);
@@ -422,7 +472,7 @@ export const filter = <A, D extends ContentiaDone, R>(
   self: ContentiaStream<A, D, R>,
   predicate: (a: A) => boolean,
 ): ContentiaStream<A, D, R> =>
-  attachAsyncIterator(
+  fromChannel(
     Channel.filterArray(self, (el): el is ContentiaElement<A> => {
       if (Element.isData(el)) return predicate(el.value);
       return true;
@@ -433,4 +483,4 @@ export const filter = <A, D extends ContentiaDone, R>(
 export const mapDone = <A, D1 extends ContentiaDone, D2 extends ContentiaDone, R>(
   self: ContentiaStream<A, D1, R>,
   f: (done: D1) => D2,
-): ContentiaStream<A, D2, R> => attachAsyncIterator(Channel.mapDone(self, f) as never);
+): ContentiaStream<A, D2, R> => fromChannel(Channel.mapDone(self, f) as never);

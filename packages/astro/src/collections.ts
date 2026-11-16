@@ -19,7 +19,6 @@
  */
 
 import type { CatalogProvider, DocumentCollectionSettings } from 'contentia/catalog';
-import { runTask } from 'contentia/compat';
 import { BadRequestError } from 'contentia/core/errors';
 
 import { type DocumentSelectOptions, documentsLoader } from './documents-loader.js';
@@ -142,7 +141,7 @@ async function documentCollectionNames(
   catalog: CatalogProvider,
   options: ContentiaCollectionsOptions,
 ): Promise<string[]> {
-  const { collections } = await runTask(catalog.getCatalog());
+  const { collections } = await catalog.getCatalog();
   const all = Object.entries(collections ?? {})
     .filter((pair): pair is [string, DocumentCollectionSettings] => pair[1].type === 'document')
     .map(([name]) => name);
@@ -167,7 +166,7 @@ async function deriveSchema(
 ): Promise<ZodTypeLike | undefined> {
   if (z === undefined) return undefined;
   try {
-    const jsonSchema = await runTask(catalog.getCollectionSchema(collection));
+    const jsonSchema = await catalog.getCollectionSchema(collection);
     return jsonSchemaToZod(stripBodyField(jsonSchema, bodyField), z);
   } catch {
     return undefined;

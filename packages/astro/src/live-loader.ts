@@ -13,7 +13,6 @@
 
 import type { LiveLoader } from 'astro/loaders';
 import type { CatalogProvider } from 'contentia/catalog';
-import { collectStream, runTask } from 'contentia/compat';
 import { BadRequestError, ContentiaError, InternalError, NotFoundError, ValidationError } from 'contentia/core/errors';
 import type { DocumentsRepository } from 'contentia/documents';
 
@@ -198,8 +197,8 @@ export function liveDocumentsLoader(
       try {
         const type = filter.type ?? options.select?.type ?? 'published';
         const record = type === 'published'
-          ? await runTask(options.documents.getDocument(key))
-          : await runTask(options.documents.getUnpublished(key));
+          ? await options.documents.getDocument(key)
+          : await options.documents.getUnpublished(key);
 
         // A caller previewing one status should not silently get another.
         if (filter.status !== undefined && (record as { status?: string }).status !== filter.status) {
@@ -248,13 +247,13 @@ async function collectRecords(
   type: 'published' | 'unpublished',
 ): Promise<{ items: Array<{ key: string, content: Record<string, unknown>, updatedAt?: string }> }> {
   const folder = filter.folder ? `${collection}/${filter.folder}` : collection;
-  const { items } = await collectStream(documents.listRecords({
+  const { items } = await documents.listRecords({
     folder,
     depth: filter.depth ?? DEFAULT_DEPTH,
     type,
     pagination: filter.pagination ?? { perPage: DEFAULT_PER_PAGE },
     ...(filter.statuses !== undefined ? { statuses: filter.statuses } : {}),
-  }));
+  }).collect();
 
   const records: Array<{ key: string, content: Record<string, unknown>, updatedAt?: string }> = [];
   for (const item of items) {
@@ -304,7 +303,7 @@ function createValidator(
     let pending = schemas.get(collection);
     if (pending !== undefined) return pending;
 
-    pending = runTask(options.catalog.getCollectionSchema(collection))
+    pending = options.catalog.getCollectionSchema(collection).run()
       .then(schema => jsonSchemaToZod(stripBodyField(schema, bodyField), options.z) as unknown as ParseCapable)
       .catch((error: unknown) => {
         // A failed read is not cached: a catalog that was briefly unreachable

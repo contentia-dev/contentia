@@ -122,44 +122,50 @@ peers). See [`src/server/README.md`](./src/server/README.md).
 Full docs, architecture notes, and deployment guides live in the
 [contentia repository](https://github.com/contentia-dev/contentia).
 
-## Compat helpers — Promise-friendly entry points
+## Running tasks without Effect
 
-`contentia/compat` exports two Promise-friendly wrappers for non-Effect consumers:
-
-- **`runTask(task, options?)`** — runs a `ContentiaTask` and resolves with its value.
-- **`collectStream(stream, options?)`** — drains a `ContentiaStream` and resolves with
-  `{ items, done }`.
-
-Both accept an optional `onProgress` callback that is called for every `ContentiaMetadata` event —
-both `Progress` and `RecoverableError` — as the task/stream runs.
+Repository methods return a `ContentiaTask` (one result) or a `ContentiaStream` (many). Neither
+needs Effect:
 
 ```ts
-import { collectStream, runTask } from 'contentia/compat';
+// A task is awaitable
+const post = await repo.getObject('posts/hello');
 
-// Task — receive progress events without importing Effect
-const result = await runTask(myTask, {
+// A stream is async-iterable: items arrive one at a time
+for await (const atom of repo.listAtoms('posts', { depth: 1, pagination: {} })) {
+  console.log(atom.key);
+}
+
+// ...or load them all at once
+const { items, done } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+```
+
+`task.run(options)` and `stream.collect(options)` take an optional `onProgress` callback, called for
+every `ContentiaMetadata` event — both `Progress` and `RecoverableError` — as the task or stream
+runs:
+
+```ts
+const result = await myTask.run({
   onProgress(meta) {
     if (meta._tag === 'Progress') console.log(meta.progress.message);
     if (meta._tag === 'RecoverableError') console.warn(meta.error);
   },
 });
 
-// Stream — metadata fires live; data is still collected into items
-const { items, done } = await collectStream(myStream, {
+const { items, done } = await myStream.collect({
   onProgress(meta) {
     if (meta._tag === 'Progress') updateProgressBar(meta.progress);
   },
 });
 ```
 
-Omitting `options` (or `onProgress`) uses a data-only fast path. Note that when `onProgress` is
-omitted, **`RecoverableError` and `Progress` events are silently discarded** — callers that need to
-surface warnings or non-fatal errors must supply the callback.
+Without `onProgress` (including a plain `await` or `for await`), **`RecoverableError` and `Progress`
+events are silently discarded**. Callers that need to surface warnings must pass the callback to
+`run` or `collect`.
 
-`runTask` without `onProgress` drains metadata chunks through the Effect channel (queue allocations
-and Effect pulls still occur) but does not allocate metadata arrays or fire any callback.
-`collectStream` without `onProgress` performs a data-only drain: no metadata arrays are allocated
-and no callback is fired, though channel overhead still applies.
+Tasks and streams are lazy, like Drizzle queries: nothing runs until you `await`, iterate, or
+collect, and each time runs it again. A stream is not awaitable: `await repo.listAtoms(...)` does
+nothing, so use `for await` or `.collect()`.
 
 ## License
 

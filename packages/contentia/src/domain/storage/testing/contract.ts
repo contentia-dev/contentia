@@ -1,4 +1,3 @@
-import { collectStream, runTask } from 'contentia/compat';
 import { ContentiaStream } from 'contentia/core';
 import type { Atom, AtomSummary, Folder, StorageObject } from 'contentia/storage';
 import type { StorageRepository } from 'contentia/storage';
@@ -19,7 +18,7 @@ export type StorageContractCapability =
  *
  * - `'warning'` — the stream completes with `done.total === 0` and no items,
  *   plus a recoverable `NotFoundError` the caller can inspect (surfaced via
- *   `collectStream`'s `recoverableErrors`).
+ *   `ContentiaStream.runCollect`'s `recoverableErrors`, or `collect({ onProgress })`).
  * - `'silent'` — the stream completes with `done.total === 0` and no items,
  *   with no error at all; indistinguishable from an existing-but-empty folder.
  *
@@ -81,7 +80,7 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
 
     // --- getCapabilities ---
     it('getCapabilities: returns a Capabilities value', async () => {
-      const caps = await runTask(repo.getCapabilities());
+      const caps = await repo.getCapabilities();
       expect(caps).toBeDefined();
       expect(typeof caps.compatibilityDate).toBe('string');
       expect(caps.fileExtensions).toBeDefined();
@@ -92,14 +91,12 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
     itOrSkip('createObject')('createObject then getObject: returns matching metadata/content', async () => {
       const key = `contract-test/create-object-${Date.now()}`;
       const content = { hello: 'world', num: 42 };
-      const created: StorageObject = await runTask(
-        repo.createObject({ key, type: 'object', content }),
-      );
+      const created: StorageObject = await repo.createObject({ key, type: 'object', content });
       expect(created.type).toBe('object');
       expect(created.key).toBe(key);
       expect(created.content).toMatchObject(content);
 
-      const fetched: StorageObject = await runTask(repo.getObject(key));
+      const fetched: StorageObject = await repo.getObject(key);
       expect(fetched.key).toBe(key);
       expect(fetched.content).toMatchObject(content);
     });
@@ -110,10 +107,10 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const initialContent = { version: 1 };
       const updatedContent = { version: 2 };
 
-      await runTask(repo.createOrUpdateObject({ key, type: 'object', content: initialContent }));
-      await runTask(repo.createOrUpdateObject({ key, type: 'object', content: updatedContent }));
+      await repo.createOrUpdateObject({ key, type: 'object', content: initialContent });
+      await repo.createOrUpdateObject({ key, type: 'object', content: updatedContent });
 
-      const fetched: StorageObject = await runTask(repo.getObject(key));
+      const fetched: StorageObject = await repo.getObject(key);
       expect(fetched.content).toMatchObject(updatedContent);
     });
 
@@ -123,24 +120,22 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const initialContent = { status: 'initial' };
       const updatedContent = { status: 'updated' };
 
-      await runTask(repo.createObject({ key, type: 'object', content: initialContent }));
-      const updated: StorageObject = await runTask(
-        repo.updateObject({ key, content: updatedContent }),
-      );
+      await repo.createObject({ key, type: 'object', content: initialContent });
+      const updated: StorageObject = await repo.updateObject({ key, content: updatedContent });
       expect(updated.content).toMatchObject(updatedContent);
 
-      const fetched: StorageObject = await runTask(repo.getObject(key));
+      const fetched: StorageObject = await repo.getObject(key);
       expect(fetched.content).toMatchObject(updatedContent);
     });
 
     // --- createFolder then getFolder ---
     itOrSkip('createFolder')('createFolder then getFolder: returns the folder', async () => {
       const key = `contract-test/folder-${Date.now()}`;
-      const created: Folder = await runTask(repo.createFolder({ key, type: 'folder' }));
+      const created: Folder = await repo.createFolder({ key, type: 'folder' });
       expect(created.type).toBe('folder');
       expect(created.key).toBe(key);
 
-      const fetched: Folder = await runTask(repo.getFolder(key));
+      const fetched: Folder = await repo.getFolder(key);
       expect(fetched.key).toBe(key);
       expect(fetched.type).toBe('folder');
     });
@@ -151,12 +146,10 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const keys = [`${prefix}/a`, `${prefix}/b`, `${prefix}/c`];
 
       for (const key of keys) {
-        await runTask(repo.createObject({ key, type: 'object', content: { key } }));
+        await repo.createObject({ key, type: 'object', content: { key } });
       }
 
-      const { items } = await collectStream(
-        repo.listAtoms(prefix, { depth: 1, pagination: DEFAULT_PAGINATION }),
-      );
+      const { items } = await repo.listAtoms(prefix, { depth: 1, pagination: DEFAULT_PAGINATION }).collect();
       const returnedKeys = (items as Atom[]).map(a => a.key);
       for (const key of keys) {
         expect(returnedKeys).toContain(key);
@@ -170,7 +163,7 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const keys = Array.from({ length: totalItems }, (_, i) => `${prefix}/${String(i).padStart(2, '0')}`);
 
       for (const key of keys) {
-        await runTask(repo.createObject({ key, type: 'object', content: { key } }));
+        await repo.createObject({ key, type: 'object', content: { key } });
       }
 
       // Page 1 (limit 3): done.total must reflect full 7-item count, not 3
@@ -201,12 +194,10 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const keys = [`${prefix}/x`, `${prefix}/y`];
 
       for (const key of keys) {
-        await runTask(repo.createObject({ key, type: 'object', content: { label: key } }));
+        await repo.createObject({ key, type: 'object', content: { label: key } });
       }
 
-      const { items } = await collectStream(
-        repo.listAtomSummaries(prefix, { depth: 1, pagination: DEFAULT_PAGINATION }),
-      );
+      const { items } = await repo.listAtomSummaries(prefix, { depth: 1, pagination: DEFAULT_PAGINATION }).collect();
       const returnedKeys = (items as AtomSummary[]).map(s => s.key);
       for (const key of keys) {
         expect(returnedKeys).toContain(key);
@@ -219,9 +210,9 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const shallowKey = `${prefix}/a`;
       const deepKey = `${prefix}/sub/b`;
 
-      await runTask(repo.createObject({ key: shallowKey, type: 'object', content: { level: 1 } }));
-      await runTask(repo.createFolder({ key: `${prefix}/sub`, type: 'folder' }));
-      await runTask(repo.createObject({ key: deepKey, type: 'object', content: { level: 2 } }));
+      await repo.createObject({ key: shallowKey, type: 'object', content: { level: 1 } });
+      await repo.createFolder({ key: `${prefix}/sub`, type: 'folder' });
+      await repo.createObject({ key: deepKey, type: 'object', content: { level: 2 } });
 
       const collected = await ContentiaStream.runPromiseCollect(
         repo.listAtoms(prefix, { depth: 2, pagination: DEFAULT_PAGINATION }),
@@ -238,13 +229,11 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
       const shallowKey = `${prefix}/x`;
       const deepKey = `${prefix}/nested/y`;
 
-      await runTask(repo.createObject({ key: shallowKey, type: 'object', content: { level: 1 } }));
-      await runTask(repo.createFolder({ key: `${prefix}/nested`, type: 'folder' }));
-      await runTask(repo.createObject({ key: deepKey, type: 'object', content: { level: 2 } }));
+      await repo.createObject({ key: shallowKey, type: 'object', content: { level: 1 } });
+      await repo.createFolder({ key: `${prefix}/nested`, type: 'folder' });
+      await repo.createObject({ key: deepKey, type: 'object', content: { level: 2 } });
 
-      const { items } = await collectStream(
-        repo.listAtomSummaries(prefix, { depth: 2, pagination: DEFAULT_PAGINATION }),
-      );
+      const { items } = await repo.listAtomSummaries(prefix, { depth: 2, pagination: DEFAULT_PAGINATION }).collect();
       const returnedKeys = (items as AtomSummary[]).map(s => s.key);
       expect(returnedKeys).toContain(shallowKey);
       expect(returnedKeys).toContain(deepKey);
@@ -253,9 +242,9 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
     // --- getAtom for object ---
     itOrSkip('getAtom')('getAtom for object: returns an Atom', async () => {
       const key = `contract-test/get-atom-obj-${Date.now()}`;
-      await runTask(repo.createObject({ key, type: 'object', content: { atom: true } }));
+      await repo.createObject({ key, type: 'object', content: { atom: true } });
 
-      const atom: Atom = await runTask(repo.getAtom(key));
+      const atom: Atom = await repo.getAtom(key);
       expect(atom.key).toBe(key);
       expect(atom.type).toBe('object');
     });
@@ -263,9 +252,9 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
     // --- getAtom for folder ---
     itOrSkip('getAtom')('getAtom for folder: returns an Atom', async () => {
       const key = `contract-test/get-atom-folder-${Date.now()}`;
-      await runTask(repo.createFolder({ key, type: 'folder' }));
+      await repo.createFolder({ key, type: 'folder' });
 
-      const atom: Atom = await runTask(repo.getAtom(key));
+      const atom: Atom = await repo.getAtom(key);
       expect(atom.key).toBe(key);
       expect(atom.type).toBe('folder');
     });
@@ -274,10 +263,10 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
     itOrSkip('removeAtoms')('removeAtoms: removes keys and reports removed > 0', async () => {
       const key1 = `contract-test/remove-${Date.now()}-1`;
       const key2 = `contract-test/remove-${Date.now()}-2`;
-      await runTask(repo.createObject({ key: key1, type: 'object', content: {} }));
-      await runTask(repo.createObject({ key: key2, type: 'object', content: {} }));
+      await repo.createObject({ key: key1, type: 'object', content: {} });
+      await repo.createObject({ key: key2, type: 'object', content: {} });
 
-      const { done } = await collectStream(repo.removeAtoms([key1, key2]));
+      const { done } = await repo.removeAtoms([key1, key2]).collect();
       expect(done.removed).toBeGreaterThan(0);
     });
 
@@ -285,7 +274,7 @@ export function runStorageRepositoryContract(testCase: StorageContractCase): voi
     itOrSkip('removeAtoms')('removeAtoms: missing key completes with skipped > 0', async () => {
       const missingKey = `contract-test/does-not-exist-${Date.now()}`;
 
-      const { done } = await collectStream(repo.removeAtoms([missingKey]));
+      const { done } = await repo.removeAtoms([missingKey]).collect();
       expect(done.skipped).toBeGreaterThan(0);
     });
 

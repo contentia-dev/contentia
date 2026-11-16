@@ -6,7 +6,6 @@
  * every published document under `posts/` with no further configuration.
  */
 
-import { collectStream, runTask } from 'contentia/compat';
 import { NotFoundError } from 'contentia/core/errors';
 import type { DocumentsRepository } from 'contentia/documents';
 
@@ -166,8 +165,8 @@ export function createDocumentsSyncSource(
   const read = async (key: string): Promise<SourceRecord | undefined> => {
     try {
       const document = type === 'published'
-        ? await runTask(documents.getDocument(key))
-        : await runTask(documents.getUnpublished(key));
+        ? await documents.getDocument(key)
+        : await documents.getUnpublished(key);
       if (!matchesLanguage(document.language)) return undefined;
       return { key, content: document.content ?? {}, version: document.version };
     } catch (error) {
@@ -181,7 +180,7 @@ export function createDocumentsSyncSource(
 
   return {
     capabilities: async () => {
-      const caps = await runTask(documents.getCapabilities());
+      const caps = await documents.getCapabilities();
       return {
         changes: caps.changes.supported === true
           && caps.changes.syncToken === true
@@ -191,7 +190,7 @@ export function createDocumentsSyncSource(
     },
 
     listSummaries: async () => {
-      const { items } = await collectStream(documents.listRecordSummaries(listOptions));
+      const { items } = await documents.listRecordSummaries(listOptions).collect();
       return items
         .filter(item => item.type === summaryType)
         .filter(item => matchesLanguage((item as { language: string }).language))
@@ -199,7 +198,7 @@ export function createDocumentsSyncSource(
     },
 
     listRecords: async () => {
-      const { items } = await collectStream(documents.listRecords(listOptions));
+      const { items } = await documents.listRecords(listOptions).collect();
       const records: SourceRecord[] = [];
       for (const item of items) {
         if (item.type !== type) continue;
@@ -213,14 +212,12 @@ export function createDocumentsSyncSource(
     getRecord: read,
 
     getSyncToken: async () => {
-      const token = await runTask(documents.getSyncToken({ folder }));
+      const token = await documents.getSyncToken({ folder });
       return String(token);
     },
 
     listChanges: async token => {
-      const { items, done } = await collectStream(
-        documents.listChanges({ since: token as never, folder }),
-      );
+      const { items, done } = await documents.listChanges({ since: token as never, folder }).collect();
       const changes: KeyChange[] = items.map(item => ({ key: item.key, deleted: item.deleted }));
       return { changes, syncToken: String(done.syncToken) };
     },
@@ -302,7 +299,7 @@ async function describesFields(
   collection: string,
 ): Promise<JSONSchema7 | undefined> {
   try {
-    const schema = await runTask(catalog.getCollectionSchema(collection));
+    const schema = await catalog.getCollectionSchema(collection);
     const properties = schema.properties ?? {};
     return Object.keys(properties).length > 0 ? schema : undefined;
   } catch {

@@ -119,14 +119,15 @@ API reference: [`ContentiaTask`](./api/contentia/core/namespaces/ContentiaTask/)
 
 A design rule: `contentia` is built on Effect internally, but must be usable by consumers who do not
 use Effect. Repository methods therefore return
-[ContentiaTask / ContentiaStream](#contentiatask--contentiastream) (Effect-based, for Effect
-consumers) while `contentia/compat` exposes Promise-friendly wrappers for everyone else:
+[ContentiaTask / ContentiaStream](#contentiatask--contentiastream), which are Effect channels and
+plain JavaScript at the same time:
 
-- **`runTask(task, options?)`** runs a `ContentiaTask` and resolves with its value.
-- **`collectStream(stream, options?)`** drains a `ContentiaStream` and resolves with its items and
-  done value.
+- **A task is awaitable.** `await task` runs it and resolves with its value; `task.run(options?)`
+  does the same and takes options such as `onProgress`.
+- **A stream is async-iterable.** `for await (const item of stream)` yields its items one at a time;
+  `stream.collect(options?)` resolves with all of them plus the done value.
 
-Neither wrapper requires the caller to import Effect. This is intentional and load-bearing: new code
+None of this requires the caller to import Effect. This is intentional and load-bearing: new code
 must preserve it. Do not expose a raw `Effect` type across a public repository boundary, and do not
-force callers into an Effect runtime to use a repository — anything reachable via `ContentiaTask` /
-`ContentiaStream` must stay consumable through `contentia/compat`.
+force callers into an Effect runtime to use a repository — every `ContentiaTask` must stay awaitable
+and every `ContentiaStream` iterable.

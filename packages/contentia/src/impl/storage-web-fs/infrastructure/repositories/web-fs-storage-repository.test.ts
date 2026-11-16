@@ -1,4 +1,3 @@
-import { collectStream, runTask } from 'contentia/compat';
 import {
   type ContentiaError,
   ContentiaStream,
@@ -10,6 +9,7 @@ import {
   QuotaExceededError,
   StaleHandleError,
 } from 'contentia/core';
+import type { StorageFormat, StorageObjectContent, StorageSerializer } from 'contentia/storage';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -17,12 +17,12 @@ import type { WebFsFileHandle } from '../../domain/types/web-fs-handles.js';
 import { InMemoryPickedDirectoryHandle, InMemoryWebFsDirectoryHandle } from '../../testing.js';
 import { WebFsStorageRepository } from './web-fs-storage-repository.js';
 
-const jsonSerializer = {
-  format: 'json' as const,
-  async serializeDocumentFileContents(content: unknown): Promise<string> {
+const jsonSerializer: StorageSerializer<StorageFormat> = {
+  format: 'json' as StorageFormat,
+  async serializeDocumentFileContents(content: StorageObjectContent): Promise<string> {
     return JSON.stringify(content);
   },
-  async deserializeDocumentFileContents(raw: string): Promise<unknown> {
+  async deserializeDocumentFileContents(raw: string): Promise<StorageObjectContent> {
     return JSON.parse(raw);
   },
 };
@@ -41,18 +41,18 @@ describe('WebFsStorageRepository: namespace isolation', () => {
     const repoA = makeRepo(shared, 'app-a');
     const repoB = makeRepo(shared, 'app-b');
 
-    await runTask(repoA.createObject({ key: 'shared-key', type: 'object', content: { owner: 'a' } }));
-    await runTask(repoB.createObject({ key: 'shared-key', type: 'object', content: { owner: 'b' } }));
+    await repoA.createObject({ key: 'shared-key', type: 'object', content: { owner: 'a' } });
+    await repoB.createObject({ key: 'shared-key', type: 'object', content: { owner: 'b' } });
 
-    const fromA = await runTask(repoA.getObject('shared-key'));
-    const fromB = await runTask(repoB.getObject('shared-key'));
+    const fromA = await repoA.getObject('shared-key');
+    const fromB = await repoB.getObject('shared-key');
     expect(fromA.content).toMatchObject({ owner: 'a' });
     expect(fromB.content).toMatchObject({ owner: 'b' });
 
     // Deleting from one namespace must not remove the other namespace's object.
-    await runTask(repoA.removeAtoms(['shared-key']));
-    await expect(runTask(repoA.getObject('shared-key'))).rejects.toThrow();
-    const stillThere = await runTask(repoB.getObject('shared-key'));
+    await repoA.removeAtoms(['shared-key']).collect();
+    await expect(repoA.getObject('shared-key').run()).rejects.toThrow();
+    const stillThere = await repoB.getObject('shared-key');
     expect(stillThere.content).toMatchObject({ owner: 'b' });
   });
 });
@@ -60,9 +60,9 @@ describe('WebFsStorageRepository: namespace isolation', () => {
 describe('WebFsStorageRepository: real directory hierarchy', () => {
   it('an explicitly created empty folder exists and lists as empty — no .keep marker, no NotFound warning', async () => {
     const repo = makeRepo(new InMemoryWebFsDirectoryHandle());
-    await runTask(repo.createFolder({ key: 'articles/drafts', type: 'folder' }));
+    await repo.createFolder({ key: 'articles/drafts', type: 'folder' });
 
-    const folder = await runTask(repo.getFolder('articles/drafts'));
+    const folder = await repo.getFolder('articles/drafts');
     expect(folder.type).toBe('folder');
 
     const collected = await ContentiaStream.runPromiseCollect(
@@ -75,17 +75,17 @@ describe('WebFsStorageRepository: real directory hierarchy', () => {
 
   it('removeAtoms deletes an empty folder but refuses a folder with content', async () => {
     const repo = makeRepo(new InMemoryWebFsDirectoryHandle());
-    await runTask(repo.createFolder({ key: 'empty-dir', type: 'folder' }));
-    await runTask(repo.createObject({ key: 'full-dir/child', type: 'object', content: { keep: true } }));
+    await repo.createFolder({ key: 'empty-dir', type: 'folder' });
+    await repo.createObject({ key: 'full-dir/child', type: 'object', content: { keep: true } });
 
-    const emptyResult = await collectStream(repo.removeAtoms(['empty-dir']));
+    const emptyResult = await repo.removeAtoms(['empty-dir']).collect();
     expect(emptyResult.done.removed).toBe(1);
-    await expect(runTask(repo.getFolder('empty-dir'))).rejects.toThrow();
+    await expect(repo.getFolder('empty-dir').run()).rejects.toThrow();
 
     const fullResult = await ContentiaStream.runPromiseCollect(repo.removeAtoms(['full-dir']));
     expect(fullResult.done.skipped).toBe(1);
     expect(fullResult.recoverableErrors[0]).toBeInstanceOf(ForbiddenError);
-    const survivor = await runTask(repo.getObject('full-dir/child'));
+    const survivor = await repo.getObject('full-dir/child');
     expect(survivor.content).toMatchObject({ keep: true });
   });
 });
@@ -93,9 +93,9 @@ describe('WebFsStorageRepository: real directory hierarchy', () => {
 describe('WebFsStorageRepository: path traversal', () => {
   it('rejects keys with ".." segments as typed InvalidData on read and write', async () => {
     const repo = makeRepo(new InMemoryWebFsDirectoryHandle());
-    await expect(runTask(repo.getObject('../escape'))).rejects.toBeInstanceOf(InvalidData);
+    await expect(repo.getObject('../escape').run()).rejects.toBeInstanceOf(InvalidData);
     await expect(
-      runTask(repo.createObject({ key: 'a/../../escape', type: 'object', content: {} })),
+      repo.createObject({ key: 'a/../../escape', type: 'object', content: {} }).run(),
     ).rejects.toBeInstanceOf(InvalidData);
   });
 });
@@ -119,7 +119,7 @@ describe('WebFsStorageRepository: quota-exceeded mapping', () => {
     const repo = makeRepo(new QuotaExceededRoot(), '');
 
     await expect(
-      runTask(repo.createObject({ key: 'too-big', type: 'object', content: { big: 'x'.repeat(10) } })),
+      repo.createObject({ key: 'too-big', type: 'object', content: { big: 'x'.repeat(10) } }).run(),
     ).rejects.toBeInstanceOf(QuotaExceededError);
   });
 });
@@ -145,31 +145,31 @@ describe('WebFsStorageRepository: permission gate', () => {
   it("queryPermission 'prompt' fails typed with PermissionPromptRequiredError — the app re-prompts, never the repository", async () => {
     const root = new InMemoryPickedDirectoryHandle();
     root.permissionState = 'prompt';
-    await expectTypedRejection(runTask(makeRepo(root).getObject('anything')), PermissionPromptRequiredError);
+    await expectTypedRejection(makeRepo(root).getObject('anything').run(), PermissionPromptRequiredError);
   });
 
   it("queryPermission 'denied' fails typed with PermissionDeniedError", async () => {
     const root = new InMemoryPickedDirectoryHandle();
     root.permissionState = 'denied';
-    await expectTypedRejection(runTask(makeRepo(root).getObject('anything')), PermissionDeniedError);
+    await expectTypedRejection(makeRepo(root).getObject('anything').run(), PermissionDeniedError);
   });
 
   it('permission state is re-checked on every operation, never cached — a mid-session revocation is caught', async () => {
     const root = new InMemoryPickedDirectoryHandle();
     const repo = makeRepo(root);
-    await runTask(repo.createObject({ key: 'doc', type: 'object', content: { ok: true } }));
+    await repo.createObject({ key: 'doc', type: 'object', content: { ok: true } });
 
     root.permissionState = 'denied';
-    await expectTypedRejection(runTask(repo.getObject('doc')), PermissionDeniedError);
+    await expectTypedRejection(repo.getObject('doc').run(), PermissionDeniedError);
   });
 
   it('a granted handle whose directory no longer exists fails with StaleHandleError, not a misleading NotFound', async () => {
     const root = new InMemoryPickedDirectoryHandle();
     const repo = makeRepo(root);
-    await runTask(repo.createObject({ key: 'doc', type: 'object', content: { ok: true } }));
+    await repo.createObject({ key: 'doc', type: 'object', content: { ok: true } });
 
     root.disconnect();
-    await expectTypedRejection(runTask(repo.getObject('doc')), StaleHandleError);
+    await expectTypedRejection(repo.getObject('doc').run(), StaleHandleError);
   });
 
   it('a NotAllowedError DOMException mid-operation maps to PermissionDeniedError', async () => {
@@ -181,7 +181,7 @@ describe('WebFsStorageRepository: permission gate', () => {
     // namespace '' keeps writes at the root, so the failing override is hit directly.
     const repo = makeRepo(new RevokedMidWriteRoot(), '');
     await expectTypedRejection(
-      runTask(repo.createObject({ key: 'doc', type: 'object', content: {} })),
+      repo.createObject({ key: 'doc', type: 'object', content: {} }).run(),
       PermissionDeniedError,
     );
   });
@@ -195,7 +195,7 @@ describe('WebFsStorageRepository: permission gate', () => {
       serializerRegistry: { json: jsonSerializer },
       defaultExtension: 'json',
     });
-    const error = await runTask(repo.getObject('anything')).then(
+    const error = await repo.getObject('anything').run().then(
       () => {
         throw new Error('expected the operation to reject');
       },
@@ -214,20 +214,20 @@ describe('WebFsStorageRepository: permission gate', () => {
       defaultExtension: 'json',
     });
     expect(provider).not.toHaveBeenCalled();
-    await runTask(repo.createFolder({ key: 'articles', type: 'folder' }));
+    await repo.createFolder({ key: 'articles', type: 'folder' });
     expect(provider).toHaveBeenCalled();
   });
 
   it('a handle without queryPermission (origin-private style) is treated as granted', async () => {
     const repo = makeRepo(new InMemoryWebFsDirectoryHandle());
-    await runTask(repo.createObject({ key: 'doc', type: 'object', content: { ok: true } }));
-    const read = await runTask(repo.getObject('doc'));
+    await repo.createObject({ key: 'doc', type: 'object', content: { ok: true } });
+    const read = await repo.getObject('doc');
     expect(read.content).toMatchObject({ ok: true });
   });
 
   it("queryPermission receives the configured mode ('readwrite' by default, 'read' when set)", async () => {
     const defaultRoot = new InMemoryPickedDirectoryHandle();
-    await runTask(makeRepo(defaultRoot).createFolder({ key: 'a', type: 'folder' }));
+    await makeRepo(defaultRoot).createFolder({ key: 'a', type: 'folder' });
     expect(defaultRoot.permissionQueries[0]).toEqual({ mode: 'readwrite' });
 
     const readRoot = new InMemoryPickedDirectoryHandle();
@@ -237,7 +237,7 @@ describe('WebFsStorageRepository: permission gate', () => {
       serializerRegistry: { json: jsonSerializer },
       defaultExtension: 'json',
     });
-    await runTask(readRepo.getFolder('')).catch(() => undefined);
+    await readRepo.getFolder('').run().catch(() => undefined);
     expect(readRoot.permissionQueries[0]).toEqual({ mode: 'read' });
   });
 });
@@ -248,12 +248,12 @@ describe('WebFsStorageRepository: SSR safety', () => {
     // the same shape SSR runs in.
     const repo = new WebFsStorageRepository({ serializerRegistry: { json: jsonSerializer }, defaultExtension: 'json' });
     expect(repo).toBeInstanceOf(WebFsStorageRepository);
-    await expect(runTask(repo.getObject('anything'))).rejects.toBeInstanceOf(IllegalStateException);
+    await expect(repo.getObject('anything').run()).rejects.toBeInstanceOf(IllegalStateException);
   });
 
   it('getCapabilities works without ever needing a file system', async () => {
     const repo = new WebFsStorageRepository({ serializerRegistry: { json: jsonSerializer }, defaultExtension: 'json' });
-    const caps = await runTask(repo.getCapabilities());
+    const caps = await repo.getCapabilities();
     expect(caps.fileExtensions.supported).toBe(true);
   });
 });

@@ -301,7 +301,6 @@ describe('DrizzleDocumentsRepository', () => {
       const result = await resolveTask(
         repo.updateUnpublished({
           key: 'upd-draft',
-          type: 'unpublished',
           content: { v: 2 },
           language: 'en',
           status: 'pending_review',
@@ -318,7 +317,6 @@ describe('DrizzleDocumentsRepository', () => {
       const result = await resolveTask(
         repo.updateUnpublished({
           key: 'no-such-draft',
-          type: 'unpublished',
           content: { v: 1 },
           language: 'en',
           status: 'draft',
@@ -409,16 +407,14 @@ describe('DrizzleDocumentsRepository', () => {
 
       const docs: import('contentia/documents').Record[] = [];
       for await (
-        const chunk of repo.listRecords({
+        const item of repo.listRecords({
           type: 'published',
           folder: '',
           pagination: { offset: 0, limit: 100 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') docs.push(el.value);
-        }
+        docs.push(item);
       }
 
       expect(docs.length).toBeGreaterThanOrEqual(2);
@@ -431,23 +427,22 @@ describe('DrizzleDocumentsRepository', () => {
 
       const docs: import('contentia/documents').Record[] = [];
       for await (
-        const chunk of repo.listRecords({
+        const item of repo.listRecords({
           type: 'published',
           folder: '',
           pagination: { offset: 0, limit: 100 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') docs.push(el.value);
-        }
+        docs.push(item);
       }
 
       const doc = docs.find(d => d.key === 'pub-a');
       expect(doc).toBeDefined();
       expect(doc!.type).toBe('published');
-      expect(doc!.status).toBe('published');
-      expect((doc as import('contentia/documents').Document).language).toBe('en');
+      if (doc?.type !== 'published') throw new Error('expected a published record');
+      expect(doc.status).toBe('published');
+      expect(doc.language).toBe('en');
     });
 
     it('emits correct type, status, and language for unpublished records', async () => {
@@ -457,23 +452,22 @@ describe('DrizzleDocumentsRepository', () => {
 
       const docs: import('contentia/documents').Record[] = [];
       for await (
-        const chunk of repo.listRecords({
+        const item of repo.listRecords({
           type: 'unpublished',
           folder: '',
           pagination: { offset: 0, limit: 100 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') docs.push(el.value);
-        }
+        docs.push(item);
       }
 
       const doc = docs.find(d => d.key === 'draft-x');
       expect(doc).toBeDefined();
       expect(doc!.type).toBe('unpublished');
-      expect(doc!.status).toBe('draft');
-      expect((doc as import('contentia/documents').Unpublished).language).toBe('fr');
+      if (doc?.type !== 'unpublished') throw new Error('expected an unpublished record');
+      expect(doc.status).toBe('draft');
+      expect(doc.language).toBe('fr');
     });
 
     it('depth:1 at root returns only 1-segment keys (LCMS-422)', async () => {
@@ -551,16 +545,14 @@ describe('DrizzleDocumentsRepository', () => {
 
       const page2Docs: import('contentia/documents').Record[] = [];
       for await (
-        const chunk of repo.listRecords({
+        const item of repo.listRecords({
           type: 'published',
           folder: '',
           pagination: { page: 2, perPage: 2 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') page2Docs.push(el.value);
-        }
+        page2Docs.push(item);
       }
 
       expect(page2Docs.length).toBe(2);
@@ -634,23 +626,22 @@ describe('DrizzleDocumentsRepository', () => {
 
       const summaries: import('contentia/documents').RecordSummary[] = [];
       for await (
-        const chunk of repo.listRecordSummaries({
+        const item of repo.listRecordSummaries({
           type: 'published',
           folder: '',
           pagination: { offset: 0, limit: 100 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') summaries.push(el.value);
-        }
+        summaries.push(item);
       }
 
       const summary = summaries.find(s => s.key === 'sum-pub');
       expect(summary).toBeDefined();
       expect(summary!.type).toBe('published-summary');
-      expect(summary!.status).toBe('published');
-      expect((summary as import('contentia/documents').DocumentSummary).language).toBe('de');
+      if (summary?.type !== 'published-summary') throw new Error('expected a published summary');
+      expect(summary.status).toBe('published');
+      expect(summary.language).toBe('de');
     });
 
     it('emits unpublished-summary type, correct status and language for unpublished records', async () => {
@@ -666,23 +657,22 @@ describe('DrizzleDocumentsRepository', () => {
 
       const summaries: import('contentia/documents').RecordSummary[] = [];
       for await (
-        const chunk of repo.listRecordSummaries({
+        const item of repo.listRecordSummaries({
           type: 'unpublished',
           folder: '',
           pagination: { offset: 0, limit: 100 },
           depth: 10,
         })
       ) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') summaries.push(el.value);
-        }
+        summaries.push(item);
       }
 
       const summary = summaries.find(s => s.key === 'sum-draft');
       expect(summary).toBeDefined();
       expect(summary!.type).toBe('unpublished-summary');
-      expect(summary!.status).toBe('pending_review');
-      expect((summary as import('contentia/documents').UnpublishedSummary).language).toBe('nl');
+      if (summary?.type !== 'unpublished-summary') throw new Error('expected an unpublished summary');
+      expect(summary.status).toBe('pending_review');
+      expect(summary.language).toBe('nl');
     });
   });
 
@@ -721,10 +711,8 @@ describe('DrizzleDocumentsRepository', () => {
       );
 
       const summaries: import('contentia/documents').RevisionSummary[] = [];
-      for await (const chunk of repo.listRevisions('doc', { pagination: { offset: 0, limit: 100 } })) {
-        for (const el of chunk) {
-          if (el._tag === 'Data') summaries.push(el.value);
-        }
+      for await (const item of repo.listRevisions('doc', { pagination: { offset: 0, limit: 100 } })) {
+        summaries.push(item);
       }
 
       expect(summaries.length).toBe(2);
@@ -797,7 +785,9 @@ describe('DrizzleDocumentsRepository logger', () => {
     const debug = vi.fn();
     const repo = makeRepoWithLogger({ debug, error: vi.fn(), warn: vi.fn(), info: vi.fn() });
     await Effect.runPromise(
-      ContentiaTask.runValue(repo.createDocument({ key: 'posts/new', type: 'document', content: {}, language: 'en' })),
+      ContentiaTask.runValue(
+        repo.createDocument({ key: 'posts/new', type: 'published', status: 'published', content: {}, language: 'en' }),
+      ),
     );
     expect(debug).toHaveBeenCalledWith(expect.stringContaining('createDocument'));
     expect(debug).toHaveBeenCalledWith(expect.stringContaining('posts/new'));

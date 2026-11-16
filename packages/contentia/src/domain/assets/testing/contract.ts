@@ -1,6 +1,5 @@
 import type { Asset, AssetsRepository, Resource } from 'contentia/assets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { collectStream, runTask } from '../../../shared/core/compat.js';
 import { NotFoundError } from '../../../shared/core/index.js';
 
 export type AssetsContractCapability =
@@ -55,7 +54,7 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     const keyIn = (slug: string) => `${collectionFolder}/${slug}`;
 
     it('getCapabilities: returns a Capabilities value', async () => {
-      const caps = await runTask(repo.getCapabilities());
+      const caps = await repo.getCapabilities();
       expect(caps).toBeDefined();
       expect(typeof caps.compatibilityDate).toBe('string');
       expect(caps.pagination).toBeDefined();
@@ -66,13 +65,11 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- createAsset then getAsset ---
     itOrSkip('createAsset')('createAsset then getAsset: returns matching key + asset type', async () => {
       const key = keyIn(`create-${Date.now()}.png`);
-      const created: Asset = await runTask(
-        repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' }),
-      );
+      const created: Asset = await repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' });
       expect(created.key).toBe(key);
       expect(created.type).toBe('asset');
 
-      const fetched: Asset = await runTask(repo.getAsset(key));
+      const fetched: Asset = await repo.getAsset(key);
       expect(fetched.key).toBe(key);
       expect(fetched.type).toBe('asset');
     });
@@ -80,11 +77,9 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- updateAsset (metadata only) ---
     itOrSkip('updateAsset')('updateAsset: returns the asset (metadata change does not throw)', async () => {
       const key = keyIn(`update-${Date.now()}.png`);
-      await runTask(repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' }));
+      await repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const updated: Asset = await runTask(
-        repo.updateAsset({ key, customMetadata: { tag: 'v2' } }),
-      );
+      const updated: Asset = await repo.updateAsset({ key, customMetadata: { tag: 'v2' } });
       expect(updated.key).toBe(key);
       expect(updated.type).toBe('asset');
     });
@@ -92,10 +87,10 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- deleteAsset ---
     itOrSkip('deleteAsset')('deleteAsset: subsequent getAsset fails with NotFoundError', async () => {
       const key = keyIn(`delete-${Date.now()}.png`);
-      await runTask(repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' }));
-      await runTask(repo.deleteAsset(key));
+      await repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' });
+      await repo.deleteAsset(key);
 
-      await expect(runTask(repo.getAsset(key))).rejects.toMatchObject({ code: NotFoundError.CODE });
+      await expect(repo.getAsset(key).run()).rejects.toMatchObject({ code: NotFoundError.CODE });
     });
 
     // --- deleteAssets bulk ---
@@ -103,16 +98,16 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
       const stamp = Date.now();
       const k1 = keyIn(`bulk-${stamp}-1.png`);
       const k2 = keyIn(`bulk-${stamp}-2.png`);
-      await runTask(repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' }));
-      await runTask(repo.createAsset({ key: k2, content: PNG_BYTES, mimeType: 'image/png' }));
+      await repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' });
+      await repo.createAsset({ key: k2, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const { done } = await collectStream(repo.deleteAssets([k1, k2]));
+      const { done } = await repo.deleteAssets([k1, k2]).collect();
       expect(done.removed).toBeGreaterThan(0);
     });
 
     itOrSkip('deleteAssetsTracksSkipped')('deleteAssets: missing key reports skipped > 0', async () => {
       const missing = keyIn(`missing-${Date.now()}.png`);
-      const { done } = await collectStream(repo.deleteAssets([missing]));
+      const { done } = await repo.deleteAssets([missing]).collect();
       expect(done.skipped).toBeGreaterThan(0);
     });
 
@@ -122,12 +117,10 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
       const folder = `${collectionFolder}/list-${stamp}`;
       const keys = [`${folder}/a.png`, `${folder}/b.png`, `${folder}/c.png`];
       for (const key of keys) {
-        await runTask(repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' }));
+        await repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' });
       }
 
-      const { items } = await collectStream(
-        repo.listResources(folder, { depth: 1, pagination: DEFAULT_PAGINATION }),
-      );
+      const { items } = await repo.listResources(folder, { depth: 1, pagination: DEFAULT_PAGINATION }).collect();
       const returnedKeys = (items as Resource[]).map(r => r.key);
       for (const key of keys) {
         expect(returnedKeys).toContain(key);
@@ -137,9 +130,9 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- getResource ---
     itOrSkip('getResource')('getResource for an asset: returns at least one entry with matching key', async () => {
       const key = keyIn(`resource-${Date.now()}.png`);
-      await runTask(repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' }));
+      await repo.createAsset({ key, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const resources = await runTask(repo.getResource(key));
+      const resources = await repo.getResource(key);
       expect(Array.isArray(resources)).toBe(true);
       expect(resources.length).toBeGreaterThan(0);
       expect(resources.some(r => r.key === key)).toBe(true);
@@ -148,11 +141,11 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- createFolder / getFolder ---
     itOrSkip('createFolder')('createFolder then getFolder: returns the folder', async () => {
       const key = `${collectionFolder}/folder-${Date.now()}`;
-      const created = await runTask(repo.createFolder({ key, type: 'folder' }));
+      const created = await repo.createFolder({ key, type: 'folder' });
       expect(created.type).toBe('folder');
       expect(created.key).toBe(key);
 
-      const fetched = await runTask(repo.getFolder(key));
+      const fetched = await repo.getFolder(key);
       expect(fetched.key).toBe(key);
       expect(fetched.type).toBe('folder');
     });
@@ -160,20 +153,20 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- deleteFolder ---
     itOrSkip('deleteFolder')('deleteFolder: subsequent getFolder fails with NotFoundError', async () => {
       const key = `${collectionFolder}/folder-del-${Date.now()}`;
-      await runTask(repo.createFolder({ key, type: 'folder' }));
-      await runTask(repo.deleteFolder(key, true));
+      await repo.createFolder({ key, type: 'folder' });
+      await repo.deleteFolder(key, true);
 
-      await expect(runTask(repo.getFolder(key))).rejects.toMatchObject({ code: NotFoundError.CODE });
+      await expect(repo.getFolder(key).run()).rejects.toMatchObject({ code: NotFoundError.CODE });
     });
 
     // --- getUrls ---
     itOrSkip('getUrls')('getUrls: yields one entry per asset', async () => {
       const k1 = keyIn(`urls-${Date.now()}-1.png`);
       const k2 = keyIn(`urls-${Date.now()}-2.png`);
-      const a1 = await runTask(repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' }));
-      const a2 = await runTask(repo.createAsset({ key: k2, content: PNG_BYTES, mimeType: 'image/png' }));
+      const a1 = await repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' });
+      const a2 = await repo.createAsset({ key: k2, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const { items } = await collectStream(repo.getUrls([a1, a2]));
+      const { items } = await repo.getUrls([a1, a2]).collect();
       expect(items.length).toBeGreaterThan(0);
       expect(items.length).toBeLessThanOrEqual(2);
     });
@@ -181,18 +174,18 @@ export function runAssetsRepositoryContract(testCase: AssetsContractCase): void 
     // --- getMetadata ---
     itOrSkip('getMetadata')('getMetadata: yields one entry per asset', async () => {
       const k1 = keyIn(`meta-${Date.now()}-1.png`);
-      const a1 = await runTask(repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' }));
+      const a1 = await repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const { items } = await collectStream(repo.getMetadata([a1]));
+      const { items } = await repo.getMetadata([a1]).collect();
       expect(items.length).toBeGreaterThan(0);
     });
 
     // --- getVariations ---
     itOrSkip('getVariations')('getVariations: yields one entry per asset with a Record variations map', async () => {
       const k1 = keyIn(`var-${Date.now()}-1.png`);
-      const a1 = await runTask(repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' }));
+      const a1 = await repo.createAsset({ key: k1, content: PNG_BYTES, mimeType: 'image/png' });
 
-      const { items } = await collectStream(repo.getVariations([a1]));
+      const { items } = await repo.getVariations([a1]).collect();
       expect(items.length).toBeGreaterThanOrEqual(1);
       for (const item of items) {
         expect(item.key).toBeDefined();

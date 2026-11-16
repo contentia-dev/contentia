@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { collectStream, runTask } from '../../../shared/core/compat.js';
 import { InvalidData } from '../../../shared/core/index.js';
 
 import { runDocumentsRepositoryContract } from './contract.js';
@@ -17,41 +16,33 @@ runDocumentsRepositoryContract({
 describe('InMemoryDocumentsRepository change signals', () => {
   it('advertises versionTracking and changes capabilities', async () => {
     const repo = new InMemoryDocumentsRepository();
-    const caps = await runTask(repo.getCapabilities());
+    const caps = await repo.getCapabilities();
     expect(caps.versionTracking).toMatchObject({ supported: true });
     expect(caps.changes).toMatchObject({ supported: true, syncToken: true, changeFeed: true });
   });
 
   it('scopes the sync token to a folder: unrelated writes leave it unchanged', async () => {
     const repo = new InMemoryDocumentsRepository();
-    await runTask(
-      repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
-    const postsToken = await runTask(repo.getSyncToken({ folder: 'posts' }));
+    await repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' });
+    const postsToken = await repo.getSyncToken({ folder: 'posts' });
 
-    await runTask(
-      repo.createDocument({ key: 'pages/b', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
-    expect(await runTask(repo.getSyncToken({ folder: 'posts' }))).toBe(postsToken);
+    await repo.createDocument({ key: 'pages/b', type: 'published', status: 'published', content: {}, language: 'en' });
+    expect(await repo.getSyncToken({ folder: 'posts' })).toBe(postsToken);
 
-    await runTask(repo.updateDocument({ key: 'posts/a', content: { changed: true } }));
-    expect(await runTask(repo.getSyncToken({ folder: 'posts' }))).not.toBe(postsToken);
+    await repo.updateDocument({ key: 'posts/a', content: { changed: true } });
+    expect(await repo.getSyncToken({ folder: 'posts' })).not.toBe(postsToken);
   });
 
   it('listChanges collapses multiple writes to one entry per key and flags deletions', async () => {
     const repo = new InMemoryDocumentsRepository();
-    const since = await runTask(repo.getSyncToken());
+    const since = await repo.getSyncToken();
 
-    await runTask(
-      repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
-    const updated = await runTask(repo.updateDocument({ key: 'posts/a', content: { v: 2 } }));
-    await runTask(
-      repo.createDocument({ key: 'posts/b', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
-    await runTask(repo.deleteDocument('posts/b'));
+    await repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' });
+    const updated = await repo.updateDocument({ key: 'posts/a', content: { v: 2 } });
+    await repo.createDocument({ key: 'posts/b', type: 'published', status: 'published', content: {}, language: 'en' });
+    await repo.deleteDocument('posts/b');
 
-    const { items, done } = await collectStream(repo.listChanges({ since }));
+    const { items, done } = await repo.listChanges({ since }).collect();
     expect(items).toHaveLength(2);
 
     const a = items.find(c => c.key === 'posts/a');
@@ -62,45 +53,41 @@ describe('InMemoryDocumentsRepository change signals', () => {
     expect(b!.version).toBeUndefined();
 
     expect(done.total).toBe(2);
-    expect(done.syncToken).toBe(await runTask(repo.getSyncToken()));
+    expect(done.syncToken).toBe(await repo.getSyncToken());
   });
 
   it('listChanges honors the folder filter', async () => {
     const repo = new InMemoryDocumentsRepository();
-    const since = await runTask(repo.getSyncToken());
-    await runTask(
-      repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
-    await runTask(
-      repo.createDocument({ key: 'pages/b', type: 'published', status: 'published', content: {}, language: 'en' }),
-    );
+    const since = await repo.getSyncToken();
+    await repo.createDocument({ key: 'posts/a', type: 'published', status: 'published', content: {}, language: 'en' });
+    await repo.createDocument({ key: 'pages/b', type: 'published', status: 'published', content: {}, language: 'en' });
 
-    const { items } = await collectStream(repo.listChanges({ since, folder: 'pages' }));
+    const { items } = await repo.listChanges({ since, folder: 'pages' }).collect();
     expect(items.map(c => c.key)).toEqual(['pages/b']);
   });
 
   it('listChanges rejects an unrecognized sync token', async () => {
     const repo = new InMemoryDocumentsRepository();
     await expect(
-      collectStream(repo.listChanges({ since: 'not-a-token' as Parameters<typeof repo.listChanges>[0]['since'] })),
+      repo.listChanges({ since: 'not-a-token' as Parameters<typeof repo.listChanges>[0]['since'] }).collect(),
     ).rejects.toMatchObject({ code: InvalidData.CODE });
   });
 
   it('record summaries carry the same version as the full record', async () => {
     const repo = new InMemoryDocumentsRepository();
-    const created = await runTask(
-      repo.createDocument({
-        key: 'posts/a',
-        type: 'published',
-        status: 'published',
-        content: { title: 'A' },
-        language: 'en',
-      }),
-    );
+    const created = await repo.createDocument({
+      key: 'posts/a',
+      type: 'published',
+      status: 'published',
+      content: { title: 'A' },
+      language: 'en',
+    });
 
-    const { items } = await collectStream(
-      repo.listRecordSummaries({ folder: 'posts', depth: 1, pagination: { offset: 0, limit: 10 } }),
-    );
+    const { items } = await repo.listRecordSummaries({
+      folder: 'posts',
+      depth: 1,
+      pagination: { offset: 0, limit: 10 },
+    }).collect();
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ key: 'posts/a', version: created.version });
   });

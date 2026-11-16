@@ -44,10 +44,12 @@ Any serializer works with any storage adapter. Register one per file extension.
 
 ## Running tasks
 
-| Import             | Install              | What it does                                                                                                                                                                                                                                              |
-| ------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contentia/compat` | `pnpm add contentia` | [`runTask`](./api/contentia/compat/functions/runTask) and [`collectStream`](./api/contentia/compat/functions/collectStream): run tasks and streams as Promises, without importing Effect. Pass `onProgress` to receive progress and recoverable warnings. |
-| `contentia/core`   | `pnpm add contentia` | [`ContentiaTask`](./api/contentia/core/namespaces/ContentiaTask/), [`ContentiaStream`](./api/contentia/core/namespaces/ContentiaStream/), shared types, and errors, for code that uses Effect directly                                                    |
+Nothing to import: `await` a task (or call `task.run({ onProgress })`), and iterate a stream with
+`for await` or load it whole with `stream.collect()`. These work without Effect.
+
+| Import           | Install              | What it does                                                                                                                                                                                           |
+| ---------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `contentia/core` | `pnpm add contentia` | [`ContentiaTask`](./api/contentia/core/namespaces/ContentiaTask/), [`ContentiaStream`](./api/contentia/core/namespaces/ContentiaStream/), shared types, and errors, for code that uses Effect directly |
 
 ## Errors
 

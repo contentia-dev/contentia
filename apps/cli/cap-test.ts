@@ -176,8 +176,8 @@ console.log('  (probing storage repo directly…)');
 const sProbe = await Promise.race([
   (async () => {
     let count = 0;
-    for await (const chunk of storage.listAtomSummaries('posts', { depth: 1, pagination: { perPage: 10 } })) {
-      for (const el of chunk) if (el._tag === 'Data') count++;
+    for await (const _item of storage.listAtomSummaries('posts', { depth: 1, pagination: { perPage: 10 } })) {
+      count++;
     }
     return `${count} items`;
   })(),
@@ -195,8 +195,8 @@ const probe = await Promise.race([
       pagination: { perPage: 10 },
     });
     let count = 0;
-    for await (const chunk of stream) {
-      for (const el of chunk) if (el._tag === 'Data') count++;
+    for await (const _item of stream) {
+      count++;
     }
     return `${count} items`;
   })(),

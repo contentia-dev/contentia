@@ -62,9 +62,9 @@ and auth. A static `contentia:` import or a direct repository call both make tha
 explicit. The shim hides it.
 
 **3. The sanctioned path already works and needs no new mechanism.** A server component that calls
-`runTask(documents.getDocument('posts/hello'))` (via `contentia/compat`) or
-`yield* documents.getDocument(...)` (inside an Effect) has the exact same capability the shim would
-provide — with typed errors, tracing, and interruptibility — and the caller knows it is doing IO.
+`await documents.getDocument('posts/hello')` or `yield* documents.getDocument(...)` (inside an
+Effect) has the exact same capability the shim would provide — with typed errors, tracing, and
+interruptibility — and the caller knows it is doing IO.
 
 **4. Local mode (dev) solves the opposite problem.** The motivation for the shim was partly
 developer experience: seeing content update live during `vite
@@ -77,8 +77,8 @@ that use case either.
 
 - **`contentia:` stays build-time-only.** Neither `@contentia/vite-plugin` nor any companion package
   introduces an async-fetch variant of the `contentia:` import protocol.
-- **SSR consumers use repositories directly.** Documentation and examples show the `runTask` /
-  `collectStream` (compat) or `Effect.gen` patterns, not a `contentia:` import in SSR context.
+- **SSR consumers use repositories directly.** Documentation and examples show the Promise (`await`,
+  `for await`, `.collect()`) or `Effect.gen` patterns, not a `contentia:` import in SSR context.
 - **Local mode is the dev-experience answer.** `localApi: true` in the Vite plugin (plus an admin
   that targets it in dev) covers the dev-editing use case that a shim might otherwise be asked to
   solve. See [Vite → Local mode](../../guides/vite#local-mode).

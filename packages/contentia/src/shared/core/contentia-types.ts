@@ -37,6 +37,18 @@ export type ContentiaMetadata =
   | { readonly _tag: 'Progress', readonly progress: ContentiaProgress };
 
 /**
+ * Options for running a task or stream as a Promise: `task.run(options)` and
+ * `stream.collect(options)`.
+ */
+export interface RunOptions {
+  /**
+   * Called for every progress event and recoverable warning as the task or stream runs. Without
+   * it, both are dropped; the task or stream still resolves normally.
+   */
+  readonly onProgress?: (metadata: ContentiaMetadata) => void;
+}
+
+/**
  * Non-empty chunks (Effect chunks are non-empty by construction).
  */
 export type ContentiaMetadataChunk = Arr.NonEmptyReadonlyArray<ContentiaMetadata>;

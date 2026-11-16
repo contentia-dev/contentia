@@ -173,8 +173,8 @@ export class DecapCatalogProvider extends CatalogProvider {
             ? new NotFoundError(
               `Decap config object not found at storage key '${this.configKey}'. `
                 + `Seed it once before any content operation: `
-                + `await runTask(storage.createOrUpdateObject({ key: '${this.configKey}', `
-                + `content: { collections: [...], media_folder: '...', public_folder: '...' } }))`,
+                + `await storage.createOrUpdateObject({ key: '${this.configKey}', `
+                + `content: { collections: [...], media_folder: '...', public_folder: '...' } })`,
             )
             : err,
         );

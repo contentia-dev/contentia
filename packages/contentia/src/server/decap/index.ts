@@ -5,7 +5,6 @@
  */
 import { CatalogAssetsRepository } from 'contentia/assets-catalog';
 import { DecapCatalogProvider } from 'contentia/catalog-decap';
-import { runTask } from 'contentia/compat';
 import { CatalogDocumentsRepository } from 'contentia/documents-catalog';
 import { FileSystemStorageRepository } from 'contentia/storage-fs';
 import { jsonSerializer } from 'contentia/storage-serializers-json';
@@ -137,17 +136,15 @@ export function createEmbeddedContentia(options: EmbeddedContentiaOptions): Embe
   // to ensureReady() and fetch() await the same settled promise.
   const readyPromise: Promise<void> = (async () => {
     try {
-      await runTask(storage.getObject('config.yml'));
+      await storage.getObject('config.yml');
     } catch {
       try {
-        await runTask(
-          storage.createOrUpdateObject({
-            key: 'config.yml',
-            type: 'object',
-            content: decapConfig,
-            metadata: { extension: 'yml' },
-          }),
-        );
+        await storage.createOrUpdateObject({
+          key: 'config.yml',
+          type: 'object',
+          content: decapConfig,
+          metadata: { extension: 'yml' },
+        });
       } catch (err) {
         console.error('[createEmbeddedContentia] failed to seed config.yml:', err);
       }

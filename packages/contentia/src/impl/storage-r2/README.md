@@ -18,7 +18,6 @@ adapter that lets any S3-compatible store â€” including R2 via its S3 endpoint â
 ## Usage
 
 ```ts
-import { runTask } from 'contentia/compat';
 import { jsonSerializer } from 'contentia/serializers/json';
 import { R2StorageRepository } from 'contentia/storage/r2';
 
@@ -30,7 +29,7 @@ export default {
       'json', // defaultFileExtension
     );
 
-    const post = await runTask(repo.getObject('posts/hello-world'));
+    const post = await repo.getObject('posts/hello-world');
     return Response.json(post);
   },
 };

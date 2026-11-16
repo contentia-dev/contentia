@@ -21,7 +21,6 @@ suited to live editing.
 ## Usage
 
 ```ts
-import { runTask } from 'contentia/compat';
 import { GithubCdnStorageRepository } from 'contentia/storage-github-cdn';
 import { jsonSerializer } from 'contentia/storage-serializers-json';
 
@@ -32,7 +31,7 @@ const repo = new GithubCdnStorageRepository({
   serializerRegistry: { json: jsonSerializer },
 });
 
-const post = await runTask(repo.getObject('posts/hello-world'));
+const post = await repo.getObject('posts/hello-world');
 ```
 
 ### Constructor options (`GithubCdnStorageRepositoryOptions`)

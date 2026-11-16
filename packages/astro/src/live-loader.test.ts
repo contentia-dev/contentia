@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 // `astro:content` would hand a real project.
 import * as zod from 'astro/zod';
 import type { CatalogProvider } from 'contentia/catalog';
-import { runTask } from 'contentia/compat';
 import { ContentiaTask } from 'contentia/core';
 import { ContentiaError, ForbiddenError, NotFoundError, ValidationError } from 'contentia/core/errors';
 import { DocumentsRepository } from 'contentia/documents';
@@ -20,17 +19,20 @@ let documents: InMemoryDocumentsRepository;
 
 beforeEach(async () => {
   documents = new InMemoryDocumentsRepository();
-  await runTask(documents.createDocument({
+  await documents.createDocument({
     key: 'posts/hello',
+    type: 'published',
+    status: 'published',
     content: { title: 'Hello', body: '# Hello' },
     language: 'en',
-  }));
-  await runTask(documents.createUnpublished({
+  });
+  await documents.createUnpublished({
     key: 'posts/wip',
+    type: 'unpublished',
     content: { title: 'Work in progress', body: '# Draft' },
     language: 'en',
     status: 'draft',
-  }));
+  });
 });
 
 const loader = (overrides: Record<string, unknown> = {}) => liveDocumentsLoader({ documents, ...overrides } as never);
@@ -251,11 +253,13 @@ describe('validate', () => {
   };
 
   it('is off by default — an entry the catalog would reject still loads', async () => {
-    await runTask(documents.createDocument({
+    await documents.createDocument({
       key: 'posts/bad',
+      type: 'published',
+      status: 'published',
       content: { title: 42 },
       language: 'en',
-    }));
+    });
 
     const result = await loader().loadEntry({ filter: { id: 'bad' }, collection: 'posts' });
 
@@ -263,11 +267,13 @@ describe('validate', () => {
   });
 
   it('rejects an entry that does not match, as a ValidationError on the result', async () => {
-    await runTask(documents.createDocument({
+    await documents.createDocument({
       key: 'posts/bad',
+      type: 'published',
+      status: 'published',
       content: { title: 42 },
       language: 'en',
-    }));
+    });
 
     const result = await loader({ validate: { catalog: catalogWith(POSTS_SCHEMA), z } })
       .loadEntry({ filter: { id: 'bad' }, collection: 'posts' });
@@ -280,11 +286,13 @@ describe('validate', () => {
   });
 
   it('lets a matching entry through, coerced', async () => {
-    await runTask(documents.createDocument({
+    await documents.createDocument({
       key: 'posts/good',
+      type: 'published',
+      status: 'published',
       content: { title: 'Hi', publishedAt: '2026-01-01T00:00:00Z' },
       language: 'en',
-    }));
+    });
 
     const result = await loader({ validate: { catalog: catalogWith(POSTS_SCHEMA), z } })
       .loadEntry({ filter: { id: 'good' }, collection: 'posts' });
