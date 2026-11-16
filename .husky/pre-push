@@ -6,6 +6,10 @@ pnpm typecheck
 pnpm lint
 pnpm test -- --passWithNoTests
 
+# Block the push when a production dependency has a critical advisory.
+# `pnpm security` prints the full picture (all severities, dev deps, SAST).
+pnpm security:gate
+
 # Run CLI tarball smoke test when apps/cli/ is touched by this push. Uses the
 # three-dot diff against origin/develop to find changed paths; silently skips if
 # the remote ref isn't available (first push of a new branch before

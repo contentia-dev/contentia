@@ -14,6 +14,13 @@
   <img src="https://img.shields.io/badge/pnpm-10.4.1-orange" alt="pnpm">
   <a href="https://github.com/contentia-dev/contentia/network/dependencies"><img src="https://img.shields.io/librariesio/github/contentia-dev/contentia" alt="Dependencies"></a>
 </p>
+<p align="center">
+  <a href="https://scorecard.dev/viewer/?uri=github.com/contentia-dev/contentia"><img src="https://api.scorecard.dev/projects/github.com/contentia-dev/contentia/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://socket.dev/npm/package/contentia"><img src="https://socket.dev/api/badge/npm/package/contentia" alt="Socket supply-chain score"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=contentia-dev_contentia"><img src="https://sonarcloud.io/api/project_badges/measure?project=contentia-dev_contentia&amp;metric=security_rating" alt="Security Rating"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=contentia-dev_contentia"><img src="https://sonarcloud.io/api/project_badges/measure?project=contentia-dev_contentia&amp;metric=vulnerabilities" alt="Vulnerabilities"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=contentia-dev_contentia"><img src="https://sonarcloud.io/api/project_badges/measure?project=contentia-dev_contentia&amp;metric=alert_status" alt="Quality Gate"></a>
+</p>
 
 ---
 

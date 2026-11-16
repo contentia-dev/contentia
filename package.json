@@ -16,6 +16,8 @@
     "format:check": "dprint check",
     "version": "changeset version",
     "smoke:cli": "turbo run build --filter=@contentia/cli && node scripts/smoke-cli-tarball.mjs",
+    "security": "node scripts/security-report.mjs",
+    "security:gate": "pnpm audit --prod --audit-level=critical",
     "release": "changeset publish",
     "prepare": "husky"
   },
