@@ -1,0 +1,47 @@
+# OpenSSF Scorecard: grades the repo's supply-chain security (0-10) and
+# publishes the result to api.scorecard.dev, which serves the README badge.
+#
+# Owner-approved exception to the Actions freeze in AGENTS.md: the score can
+# only be published from this action. It is a report, not a check gate; local
+# gates stay in .husky/. `pnpm security` runs the same scan locally.
+#
+# scorecard-action refuses to publish unless this file keeps to its rules: no
+# top-level env/defaults, GitHub-hosted runner, and only these steps.
+name: Scorecard
+
+on:
+  push:
+    branches: [develop]
+  schedule:
+    - cron: '17 4 * * 1'
+  # Re-score when branch protection changes, since that moves the score.
+  branch_protection_rule:
+
+permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      # Upload the SARIF to the Security tab.
+      security-events: write
+      # OIDC token that proves to api.scorecard.dev the result came from here.
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run analysis
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload to code scanning
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: results.sarif
