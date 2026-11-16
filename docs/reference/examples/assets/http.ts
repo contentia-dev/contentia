@@ -1,17 +1,19 @@
 import type { HttpExample } from '../http-example.js';
+import { PIXEL_PNG } from '../sandbox-seed.js';
 
-/** A 1×1 PNG, base64-encoded: small enough to send as a JSON:API attribute. */
-const PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-
-/** The Assets API's example requests, keyed by operationId: the values its Try it windows start with. */
+/**
+ * The Assets API's example requests, keyed by operationId: the values its Try it windows start
+ * with. They read and change the sandbox's seeded `images/pixel.png` (`../sandbox-seed.ts`), and
+ * create what isn't in it.
+ */
 export const assetsHttp: Readonly<Record<string, HttpExample>> = {
   listResources: { query: { folder: 'images' } },
   createResource: {
     body: {
       data: {
         type: 'asset',
-        id: 'images/pixel.png',
-        attributes: { mimeType: 'image/png', filename: 'pixel.png', content: PIXEL_PNG },
+        id: 'images/logo.png',
+        attributes: { mimeType: 'image/png', filename: 'logo.png', content: PIXEL_PNG },
       },
     },
   },

@@ -188,7 +188,7 @@ function requestBody(): BodyInit | undefined {
 async function send() {
   if (sending.value) return;
   problem.value = '';
-  const missing = paramsIn('path').filter(param => !values[keyOf(param)]);
+  const missing = operation.params.filter(param => param.required && !values[keyOf(param)]);
   if (missing.length) {
     problem.value = `Fill in ${missing.map(param => param.name).join(' and ')} first.`;
     document.getElementById(inputId(missing[0]!))?.focus();
@@ -502,7 +502,7 @@ function clearSandbox() {
           Runs in your browser: Contentia answers from <code>sessionStorage</code>, and nothing leaves this tab.
         </p>
         <button type="button" class="rw-text-button" @click="clearSandbox">
-          {{ cleared ? 'Sandbox cleared' : 'Reset sandbox' }}
+          {{ cleared ? 'Sandbox reset' : 'Reset sandbox' }}
         </button>
       </footer>
     </form>

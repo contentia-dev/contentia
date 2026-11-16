@@ -18,9 +18,31 @@ export const NAMESPACE = 'contentia-docs-sandbox';
 
 let apis: Promise<Readonly<Record<string, SandboxApi>>> | undefined;
 
+/** Set once the tab's sandbox has its seed content, so a reload doesn't put back what was deleted. */
+const SEEDED = `${NAMESPACE}.seeded`;
+
+function clearStore(): void {
+  for (const key of Object.keys(sessionStorage)) {
+    if (key.startsWith(`${NAMESPACE}:`)) sessionStorage.removeItem(key);
+  }
+}
+
 function loadApis() {
   if (!apis) {
-    apis = import('./api-sandbox-apis').then(m => m.createSandboxApis());
+    apis = import('./api-sandbox-apis').then(async m => {
+      const built = m.createSandboxApis();
+      if (!sessionStorage.getItem(SEEDED)) {
+        try {
+          await m.seedSandbox(built);
+        } catch (error) {
+          // Half a seed would make the next attempt's requests conflict with the first half.
+          clearStore();
+          throw error;
+        }
+        sessionStorage.setItem(SEEDED, 'true');
+      }
+      return built;
+    });
     // A failed import (a flaky connection) shouldn't break the sandbox for the rest of the visit.
     apis.catch(() => (apis = undefined));
   }
@@ -45,11 +67,11 @@ const requestUrl = (input: RequestInfo | URL) => new URL(input instanceof Reques
 
 let installed = false;
 
-/** Delete everything the reader has stored in the sandbox. */
+/** Put the sandbox back the way it started: everything the reader did is undone, the seed redone. */
 export function resetSandbox(): void {
-  for (const key of Object.keys(sessionStorage)) {
-    if (key.startsWith(`${NAMESPACE}:`)) sessionStorage.removeItem(key);
-  }
+  clearStore();
+  sessionStorage.removeItem(SEEDED);
+  apis = undefined;
 }
 
 /** Route requests to the example server into the in-browser sandbox. Safe to call repeatedly. */

@@ -25,7 +25,12 @@ API servers over one
 [`WebStorageRepository`](../api/contentia/storage/web/classes/WebStorageRepository) on
 `sessionStorage`, with an open access policy. Nothing is sent over the network. The servers share
 one store, so a document you create through the Documents API also shows up in a Storage API
-listing. Your content stays in the tab until you close it or reset the sandbox from the window.
+listing. The store starts with some example content (a `posts` and an `images` collection, a
+published post with a revision, a draft, and an image), which the example requests read and change.
+Your changes stay in the tab until you close it or reset the sandbox from the window.
+
+The sandbox's store keeps no change feed, so `GET /sync-token` and `GET /changes` answer
+`501 Not Implemented` there, as they do on any backend without one; `GET /capabilities` says so.
 
 ## Access policy
 

@@ -1,9 +1,9 @@
 import { storage } from '../setup.js';
 
 await storage.createObject({
-  key: 'posts/hello-world',
+  key: 'pages/about',
   content: {
-    title: 'Hello world',
-    body: 'My first post.',
+    title: 'About',
+    body: 'About this site.',
   },
 });

@@ -1,18 +1,22 @@
 import type { HttpExample } from '../http-example.js';
 
-const hello = { title: 'Hello world', body: 'My first post.' };
-const draft = { title: 'Second post', body: 'Work in progress.' };
-
 /**
  * The Documents API's example requests, keyed by operationId: the values its Try it windows start
- * with. Run top to bottom, they publish `posts/hello-world`, draft `posts/second-post`, and work
- * with both.
+ * with. They read and change the sandbox's seed content (`../sandbox-seed.ts`): the published
+ * `posts/hello-world` with its revision `v1`, and the draft `posts/second-post`. The ones that
+ * create something use a key that isn't in it.
  */
 export const documentsHttp: Readonly<Record<string, HttpExample>> = {
   listRecords: { query: { 'filter[type]': 'all', 'filter[folder]': 'posts' } },
   listRecordSummaries: { query: { 'filter[type]': 'all', 'filter[folder]': 'posts' } },
   createPublished: {
-    body: { data: { type: 'published', id: 'posts/hello-world', attributes: { language: 'en', content: hello } } },
+    body: {
+      data: {
+        type: 'published',
+        id: 'posts/welcome',
+        attributes: { language: 'en', content: { title: 'Welcome', body: 'Thanks for stopping by.' } },
+      },
+    },
   },
   getPublished: { path: { key: 'posts/hello-world' } },
   updatePublished: {
@@ -34,8 +38,8 @@ export const documentsHttp: Readonly<Record<string, HttpExample>> = {
     body: {
       data: {
         type: 'unpublished',
-        id: 'posts/second-post',
-        attributes: { status: 'draft', language: 'en', content: draft },
+        id: 'posts/ideas',
+        attributes: { status: 'draft', language: 'en', content: { title: 'Ideas', body: 'Things to write about.' } },
       },
     },
   },
@@ -57,7 +61,7 @@ export const documentsHttp: Readonly<Record<string, HttpExample>> = {
       data: {
         type: 'revision',
         id: 'posts/hello-world',
-        attributes: { revision: 'v1', language: 'en', content: hello },
+        attributes: { revision: 'v2', language: 'en', content: { title: 'Hello world', body: 'My first post, v2.' } },
       },
     },
   },
