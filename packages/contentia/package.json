@@ -508,7 +508,6 @@
     "gray-matter": "catalog:",
     "js-yaml": "catalog:",
     "json-schema": "catalog:schema",
-    "minimatch": "catalog:",
     "trash": "catalog:"
   },
   "peerDependencies": {

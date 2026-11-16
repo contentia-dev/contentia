@@ -37,13 +37,14 @@ import {
   applyPagination,
   Capabilities,
   CompatibilityDate,
+  compileIgnoreList,
   defaultDetermineExtension,
   type DetermineExtension,
+  type IgnoreMatcher,
   naturalCompare,
   pathCombine,
   StorageRepository,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import { FileSystemDataSource } from '../datasources/filesystem-datasource.js';
 
@@ -80,7 +81,7 @@ const liftSerialize = <A>(p: Promise<A>): Effect.Effect<A, ContentiaError> =>
 const CHANGE_DEBOUNCE_MS = 50;
 
 export class FileSystemStorageRepository extends StorageRepository {
-  private excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
   private fileSystemDataSource: FileSystemDataSource;
 
   /** The single shared `fs.watch` handle, started lazily on first subscriber. */
@@ -115,9 +116,7 @@ export class FileSystemStorageRepository extends StorageRepository {
     }
     const availableExtensions = Object.keys(this.serializerRegistry);
     this.fileSystemDataSource = new FileSystemDataSource(availableExtensions, defaultFileExtension);
-    this.excludeFilter = this.ignoreList
-      .map(pattern => minimatch.makeRe(pattern, { dot: true, partial: true }))
-      .filter(x => x !== false);
+    this.isIgnored = compileIgnoreList(this.ignoreList);
   }
 
   /** Serialize StorageObjectContent to a string for storage on disk. */
@@ -473,9 +472,7 @@ export class FileSystemStorageRepository extends StorageRepository {
       }
       const availableExtensions = Object.keys(this.serializerRegistry);
       const filtered = dirSubs
-        .filter((dirSub: { path: string, type: string }) =>
-          this.excludeFilter.every(pattern => !pattern.test(dirSub.path))
-        )
+        .filter((dirSub: { path: string, type: string }) => !this.isIgnored(dirSub.path))
         .map((dirSub: { path: string, type: string }): AtomSummary => {
           let key = dirSub.path;
           if (dirSub.type === 'file') {
@@ -609,7 +606,7 @@ export class FileSystemStorageRepository extends StorageRepository {
     const relPath = rawRelPath.split(path.sep).join('/');
     if (relPath === '') return;
     // Drop ignoreList matches, reusing the same exclude filter as listings.
-    if (this.excludeFilter.some(pattern => pattern.test(relPath))) return;
+    if (this.isIgnored(relPath)) return;
     const key = this.keyFromRelPath(relPath);
     this.pendingChanges.set(key, relPath);
     this.scheduleFlush();

@@ -28,14 +28,15 @@ import {
   applyPagination,
   Capabilities,
   CompatibilityDate,
+  compileIgnoreList,
   defaultDetermineExtension,
   type DetermineExtension,
+  type IgnoreMatcher,
   naturalCompare,
   pathCombine,
   StorageRepository,
   unsupportedChanges,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import { R2DataSource } from '../datasources/r2-datasource.js';
 
@@ -50,7 +51,7 @@ const liftResult = <A>(p: Promise<ContentiaResult<A>>): Effect.Effect<A, Content
  * - File extensions are handled transparently
  */
 export class R2StorageRepository extends StorageRepository {
-  private excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
   private r2DataSource: R2DataSource;
 
   constructor(
@@ -70,9 +71,7 @@ export class R2StorageRepository extends StorageRepository {
     super();
     const availableExtensions = Object.keys(this.serializerRegistry);
     this.r2DataSource = new R2DataSource(bucket, availableExtensions, defaultFileExtension);
-    this.excludeFilter = this.ignoreList
-      .map(pattern => minimatch.makeRe(pattern, { dot: true, partial: true }))
-      .filter(x => x !== false);
+    this.isIgnored = compileIgnoreList(this.ignoreList);
   }
 
   private async serialize(ext: string, content: StorageObjectContent): Promise<string> {
@@ -398,7 +397,7 @@ export class R2StorageRepository extends StorageRepository {
       }
       const availableExtensions = Object.keys(this.serializerRegistry);
       const filtered = entries
-        .filter((entry: { key: string, type: string }) => this.excludeFilter.every(pattern => !pattern.test(entry.key)))
+        .filter((entry: { key: string, type: string }) => !this.isIgnored(entry.key))
         .map((entry: { key: string, type: string }): AtomSummary => {
           let key = entry.key;
           if (entry.type === 'file') {

@@ -73,6 +73,41 @@ abstract class StorageRepository {
 }
 ```
 
+## Ignore lists
+
+Storage repositories take an `ignoreList` of glob patterns and leave matching paths out of listings
+(and out of change notifications, where the backend has them). Patterns are matched against the path
+from the repository root, such as `posts/.keep`.
+
+- `*` matches any run of characters within one path segment, including none.
+- `?` matches exactly one character within one path segment.
+- `**` as a whole segment matches zero or more segments: `**/.keep` matches `.keep` and `a/b/.keep`,
+  and `drafts/**` matches `drafts` and everything under it. Inside a longer segment it acts as `*`.
+- `{a,b}` matches any of its comma-separated alternatives, as in `**/*.{tmp,bak}`.
+- `\` makes the next character literal: `\*.md` matches a file named `*.md`.
+
+Wildcards match dotfiles, and matching is case-sensitive. Leading, trailing, and repeated `/` are
+ignored, so `/drafts/` is the same pattern as `drafts`. Blank patterns and patterns starting with
+`#` are skipped.
+
+Character classes (`[abc]`), extglobs (`@(a|b)`), brace ranges (`{1..3}`), nested braces, and
+negation (`!pattern`) are not supported. A repository throws when it's constructed with a pattern
+that uses them, rather than matching it some other way. One pattern's `{a,b}` groups can expand to
+at most 256 patterns.
+
+Matching doesn't use regular expressions and takes at most O(pattern × path) steps, so no pattern
+can make it backtrack exponentially.
+
+To filter paths the same way in your own `StorageRepository`, use `compileIgnoreList`:
+
+```typescript
+import { compileIgnoreList } from 'contentia/storage';
+
+const isIgnored = compileIgnoreList(['**/.keep', '**/.DS_Store']);
+isIgnored('posts/.keep'); // true
+isIgnored('posts/hello.md'); // false
+```
+
 ## Implementations
 
 - `contentia/storage/r2` - Cloudflare R2

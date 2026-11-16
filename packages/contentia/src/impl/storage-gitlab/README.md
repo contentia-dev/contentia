@@ -85,8 +85,8 @@ new GitlabStorageRepository({
 
 ## Advanced options
 
-- **`ignoreList`** — glob patterns for files excluded from directory listings. When supplied,
-  overrides the built-in list entirely. Default:
+- **`ignoreList`** — [glob patterns](../../domain/storage/README.md#ignore-lists) for files excluded
+  from directory listings. When supplied, overrides the built-in list entirely. Default:
 
   ```
   **/.keep

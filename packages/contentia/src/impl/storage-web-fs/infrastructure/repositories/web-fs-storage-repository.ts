@@ -30,13 +30,14 @@ import {
   applyPagination,
   Capabilities,
   CompatibilityDate,
+  compileIgnoreList,
   defaultDetermineExtension,
   type DetermineExtension,
+  type IgnoreMatcher,
   naturalCompare,
   StorageRepository,
   unsupportedChanges,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import type {
   WebFsAccessMode,
@@ -176,7 +177,7 @@ const NO_DEFAULT_ROOT_MESSAGE = 'WebFsStorageRepository: no `root` option was pr
  * backing directory not being a secret store.
  */
 export class WebFsStorageRepository extends StorageRepository {
-  private readonly excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
   private readonly dataSource: WebFsDataSource;
   private readonly serializerRegistry: StorageSerializerRegistry;
   private readonly defaultFileExtension: string;
@@ -209,9 +210,7 @@ export class WebFsStorageRepository extends StorageRepository {
 
     const availableExtensions = Object.keys(this.serializerRegistry);
     this.dataSource = new WebFsDataSource(provider, namespace, availableExtensions, mode);
-    this.excludeFilter = ignoreList
-      .map(pattern => minimatch.makeRe(pattern, { dot: true, partial: true }))
-      .filter((x): x is minimatch.MMRegExp => x !== false);
+    this.isIgnored = compileIgnoreList(ignoreList);
   }
 
   /**
@@ -492,7 +491,7 @@ export class WebFsStorageRepository extends StorageRepository {
       }
       const availableExtensions = Object.keys(this.serializerRegistry);
       const filtered = entries
-        .filter((entry: { key: string, type: string }) => this.excludeFilter.every(pattern => !pattern.test(entry.key)))
+        .filter((entry: { key: string, type: string }) => !this.isIgnored(entry.key))
         .map((entry: { key: string, type: string }): AtomSummary => {
           let key = entry.key;
           if (entry.type === 'file') {

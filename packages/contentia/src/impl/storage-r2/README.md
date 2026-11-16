@@ -44,7 +44,7 @@ export default {
 | `bucket`               | 1st      | yes      | —                                                                                                | An `R2Bucket` (the Workers binding, or any object implementing the same `head`/`get`/`put`/`delete`/`list` methods).     |
 | `serializerRegistry`   | 2nd      | yes      | —                                                                                                | Maps file extension → `StorageSerializer`, same as every other `StorageRepository`.                                      |
 | `defaultFileExtension` | 3rd      | yes      | —                                                                                                | Extension used for newly created objects when no other extension is determined.                                          |
-| `ignoreList`           | 4th      | no       | `['**/.keep', '**/.DS_Store', '**/Thumbs.db', '**/desktop.ini', '**/.catalog', '**/.contentia']` | Glob patterns excluded from listings.                                                                                    |
+| `ignoreList`           | 4th      | no       | `['**/.keep', '**/.DS_Store', '**/Thumbs.db', '**/desktop.ini', '**/.catalog', '**/.contentia']` | [Glob patterns](../../domain/storage/README.md#ignore-lists) excluded from listings.                                     |
 | `determineExtension`   | 5th      | no       | `defaultDetermineExtension`                                                                      | Callback overriding how the on-write extension is chosen. Same contract as the other repositories' `determineExtension`. |
 
 ## Behaviour notes

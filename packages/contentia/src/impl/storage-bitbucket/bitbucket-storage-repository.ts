@@ -18,10 +18,12 @@ import {
   type Capabilities,
   collectAtomSummariesWithDepth,
   CompatibilityDate,
+  compileIgnoreList,
   defaultDetermineExtension,
   type DetermineExtension,
   type Folder,
   type FolderCreate,
+  type IgnoreMatcher,
   type ListAtomsDone,
   type ListAtomsOptions,
   pathCombine,
@@ -34,7 +36,6 @@ import {
   type StorageSerializerRegistry,
   unsupportedChanges,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import { BitbucketDataSource, type BitbucketDataSourceOptions } from './bitbucket-datasource.js';
 
@@ -75,7 +76,7 @@ export class BitbucketStorageRepository extends StorageRepository {
   private readonly serializerRegistry: StorageSerializerRegistry;
   private readonly defaultFileExtension: string;
   private readonly availableExtensions: readonly string[];
-  private readonly excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
   private readonly commitAuthor?: { readonly name: string, readonly email: string };
   private readonly determineExtension: DetermineExtension;
 
@@ -98,9 +99,7 @@ export class BitbucketStorageRepository extends StorageRepository {
     this.commitAuthor = commitAuthor;
     this.determineExtension = determineExtension;
     this.dataSource = new BitbucketDataSource(dataSourceOptions);
-    this.excludeFilter = ignoreList
-      .map(p => minimatch.makeRe(p, { dot: true, partial: true }))
-      .filter((re): re is minimatch.MMRegExp => re !== false);
+    this.isIgnored = compileIgnoreList(ignoreList);
   }
 
   private resolveExtension(key: string, metadata: StorageObject['metadata'] | undefined): string {
@@ -363,7 +362,7 @@ export class BitbucketStorageRepository extends StorageRepository {
   ): Effect.Effect<AtomSummary[], ContentiaError> {
     return Effect.gen({ self: this }, function*() {
       const listing = yield* liftResult(this.dataSource.listDirectory(folderKey));
-      const filtered = listing.filter(entry => this.excludeFilter.every(re => !re.test(entry.path)));
+      const filtered = listing.filter(entry => !this.isIgnored(entry.path));
       return filtered.map(entry => {
         let key = entry.path;
         if (entry.type === 'file') {

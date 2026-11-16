@@ -17,8 +17,10 @@ import {
   Capabilities,
   collectAtomSummariesWithDepth,
   CompatibilityDate,
+  compileIgnoreList,
   type Folder,
   type FolderCreate,
+  type IgnoreMatcher,
   type ListAtomsDone,
   type ListAtomsOptions,
   type RemoveAtomsDone,
@@ -30,7 +32,6 @@ import {
   type StorageSerializerRegistry,
   unsupportedChanges,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import { GithubCdnDataSource, type GithubCdnDataSourceOptions } from './github-cdn-datasource.js';
 
@@ -64,7 +65,7 @@ export class GithubCdnStorageRepository extends StorageRepository {
   private readonly dataSource: GithubCdnDataSource;
   private readonly serializerRegistry: StorageSerializerRegistry;
   private readonly availableExtensions: string[];
-  private readonly excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
 
   constructor(options: GithubCdnStorageRepositoryOptions) {
     super();
@@ -77,9 +78,7 @@ export class GithubCdnStorageRepository extends StorageRepository {
     this.serializerRegistry = serializerRegistry;
     this.availableExtensions = Object.keys(serializerRegistry);
     this.dataSource = new GithubCdnDataSource(dataSourceOptions);
-    this.excludeFilter = ignoreList
-      .map(p => minimatch.makeRe(p, { dot: true, partial: true }))
-      .filter((x): x is minimatch.MMRegExp => x !== false);
+    this.isIgnored = compileIgnoreList(ignoreList);
   }
 
   private stripExtension(p: string): string {
@@ -227,7 +226,7 @@ export class GithubCdnStorageRepository extends StorageRepository {
     return Effect.gen({ self: this }, function*() {
       const listing = yield* liftResult(this.dataSource.listDirectory(folderKey));
       const filtered = listing.filter(
-        entry => this.excludeFilter.every(re => !re.test(entry.path)),
+        entry => !this.isIgnored(entry.path),
       );
       const summaries: AtomSummary[] = filtered.map(entry => {
         let key = entry.path;

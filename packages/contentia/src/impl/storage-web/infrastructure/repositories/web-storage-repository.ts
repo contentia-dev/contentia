@@ -30,14 +30,15 @@ import {
   applyPagination,
   Capabilities,
   CompatibilityDate,
+  compileIgnoreList,
   defaultDetermineExtension,
   type DetermineExtension,
+  type IgnoreMatcher,
   naturalCompare,
   pathCombine,
   StorageRepository,
   unsupportedChanges,
 } from 'contentia/storage';
-import * as minimatch from 'minimatch';
 
 import { type WebStorageProvider } from '../datasources/web-storage-datasource.js';
 import { WebStorageDataSource } from '../datasources/web-storage-datasource.js';
@@ -125,7 +126,7 @@ const NO_STORAGE_MESSAGE = 'WebStorageRepository: no `storage` option was provid
  * not being a secret store.
  */
 export class WebStorageRepository extends StorageRepository {
-  private readonly excludeFilter: minimatch.MMRegExp[];
+  private readonly isIgnored: IgnoreMatcher;
   private readonly dataSource: WebStorageDataSource;
   private readonly serializerRegistry: StorageSerializerRegistry;
   private readonly defaultFileExtension: string;
@@ -153,9 +154,7 @@ export class WebStorageRepository extends StorageRepository {
 
     const availableExtensions = Object.keys(this.serializerRegistry);
     this.dataSource = new WebStorageDataSource(provider, namespace, availableExtensions);
-    this.excludeFilter = ignoreList
-      .map(pattern => minimatch.makeRe(pattern, { dot: true, partial: true }))
-      .filter((x): x is minimatch.MMRegExp => x !== false);
+    this.isIgnored = compileIgnoreList(ignoreList);
   }
 
   /**
@@ -432,7 +431,7 @@ export class WebStorageRepository extends StorageRepository {
       }
       const availableExtensions = Object.keys(this.serializerRegistry);
       const filtered = entries
-        .filter((entry: { key: string, type: string }) => this.excludeFilter.every(pattern => !pattern.test(entry.key)))
+        .filter((entry: { key: string, type: string }) => !this.isIgnored(entry.key))
         .map((entry: { key: string, type: string }): AtomSummary => {
           let key = entry.key;
           if (entry.type === 'file') {
