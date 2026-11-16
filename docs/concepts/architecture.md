@@ -1,4 +1,14 @@
+<script setup>
+import LayerRings from '../.vitepress/theme/home/LayerRings.vue'
+</script>
+
 # Architecture
+
+## Contentia is the transport, you provide the domain
+
+The reason to use Contentia is that you don't want to model your domain around your CMS or storage
+implementation. The goal of Contentia is to get you 90% there. Contentia attempts to not hide any
+details from you, or to be opinionated about how you model your data and data retrieval.
 
 ## Why it is layered
 
@@ -21,6 +31,8 @@ contracts. The application owns the content shape.
 
 Each conceptual layer adds assumptions on top of that foundation:
 
+<LayerRings />
+
 1. **Core storage** — objects, folders, keys, and arbitrary content.
 2. **Documents and assets** — content with document or binary-asset behavior.
 3. **Repository contracts** — abstract interfaces and the protocol for accessing those resources.
@@ -37,23 +49,10 @@ not use those concepts can expose a constant `published` status; language defaul
 valid BCP 47 tag for undetermined language.
 
 Common data sources have implementations you can pick and compose like a banquet. You can use one,
-extend one for your infrastructure, or implement a contract directly. The reason to use Contentia is
-that you don't want to model your domain around your CMS. The goal is to get you 90% there; you will
-most likely implement or extend a repository to make the last part fit your infrastructure. See
+extend one for your infrastructure, or implement a contract directly. You will most likely implement
+or extend a repository to make the last part fit your infrastructure. See
 [Repositories](./repositories.md) for composition and implementation guidance and
 [Adapters](../adapters/) for the available implementations.
-
-## Layers
-
-```mermaid
-flowchart TD
-  api["API Layer<br/><small>storage-api, documents-api, assets-api, catalog-api</small>"]
-  domain["Domain Layer<br/><small>storage, documents, assets, catalog</small>"]
-  implementation["Implementation Layer<br/><small>storage-r2, storage-fs, documents-drizzle, assets-r2</small>"]
-  shared["Shared Layer<br/><small>core, crypto, sanitizer, i18n, json-api</small>"]
-
-  api --> domain --> implementation --> shared
-```
 
 ## Principles
 
@@ -63,6 +62,11 @@ flowchart TD
 - **Shared packages** have no internal dependencies
 
 ## Patterns
+
+Contentia's core sits on top of [Effect.ts](https://effect.website/). It provides the primitives
+that Contentia uses, along with some custom primitives like
+[`ContentiaTask`](../reference/api/contentia/core/namespaces/ContentiaTask/) and
+[`ContentiaStream`](../reference/api/contentia/core/namespaces/ContentiaStream/).
 
 ### Repository Pattern
 
@@ -98,19 +102,21 @@ class R2StorageRepository extends StorageRepository {
 ### Result Streams
 
 Repository methods return either `ContentiaTask<T>` (single result) or `ContentiaStream<T, D>`
-(multiple results with a typed done value). Both are Effect-based; use the `contentia/compat`
-helpers to consume them without importing Effect directly.
+(multiple results with a typed done value). Both are Effect-based, but neither needs Effect at the
+call site: a task is awaitable, and a stream is async-iterable.
 
 ```typescript
-import { collectStream, runTask } from 'contentia/compat';
-
 // Single result
-const object = await runTask(repo.getObject('posts/hello'));
+const object = await repo.getObject('posts/hello');
 
-// Stream of results
-const { items, done } = await collectStream(
-  repo.listAtoms('posts/', { depth: 1, pagination: { offset: 0, limit: 100 } }),
-);
+// Stream of results, one at a time
+const options = { depth: 1, pagination: { offset: 0, limit: 100 } };
+for await (const atom of repo.listAtoms('posts/', options)) {
+  console.log(atom.key);
+}
+
+// ...or all at once
+const { items, done } = await repo.listAtoms('posts/', options).collect();
 console.log(items); // Atom[]
 ```
 
@@ -131,5 +137,8 @@ const result = StorageObjectSchema['~standard'].validate(unknownPayload);
 // StorageRepository.createObject accepts StorageObjectCreate (key + content + optional metadata)
 // and does not perform schema validation on the content field.
 const parsed = PostSchema.parse(rawContent); // validate first
-await runTask(repo.createObject({ key: 'posts/hello', content: parsed }));
+await repo.createObject({
+  key: 'posts/hello',
+  content: parsed,
+});
 ```

@@ -69,8 +69,7 @@ Nothing to import: `await` a task (or call `task.run({ onProgress })`), and iter
 | `contentia/locks/in-process`   | `pnpm add contentia`                           | [`InProcessLockManager`](./api/contentia/locks/in-process/classes/InProcessLockManager): advisory document locks for a single server process                                                                                                                                                                                                                                    |
 | `contentia/server/mcp`         | `pnpm add contentia @modelcontextprotocol/sdk` | The [MCP server](../guides/mcp): exposes the API to AI agents with two tools, `read_api_spec` and `api_request`. The MCP SDK is an optional peer                                                                                                                                                                                                                                |
 
-See [API Server](../guides/api-server) and [Authentication](../guides/auth) for how these fit
-together.
+See [API Server](../guides/api-server) for how these fit together.
 
 ## Uploads
 

@@ -1,94 +1,159 @@
 ---
 layout: home
-
-hero:
-  name: Contentia
-  text: One content API, any backend.
-  tagline: Define your content once and serve it as a JSON:API to your editors, sites and agents. The storage behind it is a configuration choice. MIT licensed.
-  image:
-    light: /contentia-mark.svg
-    dark: /contentia-mark-dark.svg
-    alt: ''
-  actions:
-    - theme: brand
-      text: Get started
-      link: /guides/getting-started
-    - theme: alt
-      text: Adapters
-      link: /adapters/
-    - theme: alt
-      text: GitHub
-      link: https://github.com/contentia-dev/contentia
-
-features:
-  - title: You provide the domain, Contentia is the transport
-    details: Model your content the way your application needs it. Contentia handles pagination, batching, streaming, discovery and warnings without hiding the details.
-  - title: Swap the backend, keep the code
-    details: Filesystem, R2, S3, WebDAV, SQL through Drizzle, GitHub, the browser. Every adapter implements the same repository contracts, so changing storage is configuration.
-  - title: Built for editors and agents alike
-    details: One JSON:API with an OpenAPI description, consumed by your own UI, an admin such as Decap CMS, build-time Vite and Astro integrations, and an MCP server with a single request tool.
+title: Contentia
+titleTemplate: One content API, any backend
 ---
 
-## Why Contentia
+<script setup>
+import BackendMarquee from './.vitepress/theme/home/BackendMarquee.vue'
+import BackendSwitch from './.vitepress/theme/home/BackendSwitch.vue'
+import HomeHero from './.vitepress/theme/home/HomeHero.vue'
+import SetupDiagrams from './.vitepress/theme/home/SetupDiagrams.vue'
 
-### Contentia is the transport, you provide the domain
+// Kept here, not as attributes: Markdown only treats a component tag as HTML when the whole opening
+// tag sits on one line, so a multi-line <HomeHero ...> gets reflowed as a paragraph by the formatter.
+const hero = {
+  title: 'One content API.',
+  accent: 'Any backend.',
+  tagline: 'Contentia is a unified API for content delivery and content management. Whether you want to prevent vendor lock-in, combine all your different datasources into one API or you want a stable foundation, Contentia is your pick.',
+  install: 'pnpm add contentia',
+  actions: [
+    { text: 'Get started', link: '/guides/getting-started', theme: 'brand' },
+    { text: 'GitHub', link: 'https://github.com/contentia-dev/contentia' },
+  ],
+  runtimes: ['Node', 'Bun', 'Deno', 'Cloudflare Workers', 'Browser'],
+}
+</script>
 
-The reason to use Contentia is that you don't want to model your domain around your CMS or storage
-implementation. The goal of Contentia is to get you 90% there. Contentia attempts to not hide any
-details from you, or to be opinionated about how you model your data and data retrieval. You can
-read more about the architecture of Contentia [here](./concepts/architecture).
+<HomeHero v-bind="hero">
 
-### Built for AI
+<BackendSwitch file="content.ts">
 
-Contentia is also extremely useful as a homogeneous data access layer in the age of LLMs. Contentia
-provides a built-in MCP server which it feeds with the OpenAPI spec of the JSON:API. It only has one
-'request' tool.
+::: code-group
 
-### Bring your own admin UI
+```ts{2,4} [Filesystem]
+import { jsonSerializer as json } from 'contentia/serializers/json';
+import { FileSystemStorageRepository } from 'contentia/storage/fs';
 
-Contentia is the content API, not a CMS: it has no admin UI of its own. Point your own UI, or an
-existing admin that speaks JSON:API, at the API. Collections can come from a convention, a persisted
-catalog, or a Decap CMS `config.yml`.
+const repo = new FileSystemStorageRepository('./content', { json }, 'json');
 
-### What Contentia offers
+// the same calls on every backend
+await repo.createOrUpdateObject({
+  key: 'posts/hello',
+  content: { title: 'Hello' },
+});
 
-<table>
-  <tr><th colspan="2">Out of the box</th></tr>
-  <tr><td>40+ official adapters</td><td>Real-time updates</td></tr>
-  <tr><td>Pagination and filtering</td><td>Batch operations</td></tr>
-  <tr><td>Streaming listings</td><td>Change feeds and sync tokens</td></tr>
-  <tr><td>Capability discovery</td><td>Any file format</td></tr>
-  <tr><td>Drafts and publishing</td><td>Revision history</td></tr>
-  <tr><td>Linked assets and image variants</td><td>Conflict detection and locks</td></tr>
-  <tr><td>OAuth2, passkeys and 2FA</td><td>Upload sanitization</td></tr>
-  <tr><td>Astro and Vite integrations</td><td>API server from one config file</td></tr>
-</table>
+const { items } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+// [{ key: 'posts/hello', type: 'object', … }]
+```
 
-<!--@include: ./.vitepress/adapters/logos.md-->
+```ts{2,3,5,7,8,17-19} [Cloudflare R2]
+import { jsonSerializer as json } from 'contentia/serializers/json';
+import { env } from 'cloudflare:workers';
+import { R2StorageRepository } from 'contentia/storage/r2';
 
-Contentia's core sits on top of [Effect.ts](https://effect.website/). It provides the primitives
-that Contentia uses, along with some custom primitives like
-[`ContentiaTask`](./reference/api/contentia/core/namespaces/ContentiaTask/) and
-[`ContentiaStream`](./reference/api/contentia/core/namespaces/ContentiaStream/).
+const repo = new R2StorageRepository(env.CONTENT, { json }, 'json');
 
-## Architecture Overview
+export default {
+  async fetch() {
+    // the same calls on every backend
+    await repo.createOrUpdateObject({
+      key: 'posts/hello',
+      content: { title: 'Hello' },
+    });
 
-| Layer          | Packages                                             |
-| -------------- | ---------------------------------------------------- |
-| API            | storage-api, documents-api, assets-api, catalog-api  |
-| Domain         | storage, documents, assets, catalog                  |
-| Implementation | storage-r2, storage-fs, documents-drizzle, assets-r2 |
-| Shared         | core, auth, crypto, sanitizer, i18n, json-api        |
+    const { items } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+    // [{ key: 'posts/hello', type: 'object', … }]
+    return Response.json(items);
+  },
+};
+```
 
-Each layer depends only on the layers below it.
+```ts{2,3,5-12} [GitHub]
+import { jsonSerializer as json } from 'contentia/serializers/json';
+import { Octokit } from '@octokit/rest';
+import { GithubStorageRepository } from 'contentia/storage/github';
 
-## Getting Help
+const repo = new GithubStorageRepository({
+  owner: 'acme',
+  repo: 'content',
+  branch: 'main',
+  octokit: new Octokit({ auth: process.env.GITHUB_TOKEN }),
+  serializerRegistry: { json },
+  defaultFileExtension: 'json',
+});
 
-- **GitHub Issues** — For bugs and feature requests
-- **GitHub Discussions** — For questions and discussions
-- **Contributing** — See
-  [CONTRIBUTING.md](https://github.com/contentia-dev/contentia/blob/develop/CONTRIBUTING.md)
+// the same calls on every backend
+await repo.createOrUpdateObject({
+  key: 'posts/hello',
+  content: { title: 'Hello' },
+});
 
-## License
+const { items } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+// [{ key: 'posts/hello', type: 'object', … }]
+```
 
-Contentia is [MIT licensed](https://github.com/contentia-dev/contentia/blob/develop/LICENSE).
+```ts{2,4-11} [WebDAV]
+import { jsonSerializer as json } from 'contentia/serializers/json';
+import { WebDavStorageRepository } from 'contentia/storage/webdav';
+
+const repo = new WebDavStorageRepository(
+  {
+    baseUrl: 'https://dav.example.com/content',
+    auth: { username: 'alice', password: process.env.DAV_PASSWORD },
+  },
+  { json },
+  'json',
+);
+
+// the same calls on every backend
+await repo.createOrUpdateObject({
+  key: 'posts/hello',
+  content: { title: 'Hello' },
+});
+
+const { items } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+// [{ key: 'posts/hello', type: 'object', … }]
+```
+
+```ts{2,4-7} [Web Storage]
+import { jsonSerializer as json } from 'contentia/serializers/json';
+import { WebStorageRepository } from 'contentia/storage/web';
+
+const repo = new WebStorageRepository({
+  serializerRegistry: { json },
+  defaultExtension: 'json',
+});
+
+// the same calls on every backend
+await repo.createOrUpdateObject({
+  key: 'posts/hello',
+  content: { title: 'Hello' },
+});
+
+const { items } = await repo.listAtoms('posts', { depth: 1, pagination: {} }).collect();
+// [{ key: 'posts/hello', type: 'object', … }]
+```
+
+:::
+
+</BackendSwitch>
+
+</HomeHero>
+
+<BackendMarquee />
+
+## How it fits
+
+Contentia uses an advanced 2 way communication system which allows capability sharing between
+backends. Which is how Git, databases, and external API services are able to share a single
+interface while keeping their individual advantages like revisions, real-time updates, locking,
+streaming, pagination, batching, etc.
+
+<SetupDiagrams />
+
+## Next
+
+- **[Get started](/guides/getting-started)**: read, write and serve content in a few lines.
+- **[History](/history)**: where Contentia comes from.
+- **[Adapters](/adapters/)**: every backend, with its options.

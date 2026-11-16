@@ -1,6 +1,7 @@
 import { type Theme, useRoute } from 'vitepress';
-import { nextTick, onMounted, watch } from 'vue';
+import { type App, nextTick, onMounted, watch } from 'vue';
 
+import FrameworkTabs from './FrameworkTabs.vue';
 import { Ink } from './ink';
 import './custom.css';
 
@@ -9,6 +10,10 @@ const renderMermaid = () => nextTick(() => import('./mermaid').then(m => m.rende
 
 export default {
   extends: Ink,
+  enhanceApp({ app }: { app: App }) {
+    // Rendered on top of every run of `::: fw` containers by framework-container.ts.
+    app.component('FrameworkTabs', FrameworkTabs);
+  },
   setup() {
     const route = useRoute();
     onMounted(() => {

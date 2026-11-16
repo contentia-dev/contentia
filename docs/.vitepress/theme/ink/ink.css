@@ -84,6 +84,13 @@
   letter-spacing: -0.02em;
 }
 
+/* An h2 separates sections with a rule; a page that opens with one has nothing above to separate. */
+.vp-doc > div > h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .VPHero .tagline {
   color: var(--vp-c-text-2);
 }

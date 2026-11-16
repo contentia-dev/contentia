@@ -57,3 +57,17 @@ html:not(.dark) img.adapter-icon-dark {
   text-align: center;
   border: 0;
 }
+
+/* Navbar: the nav is short enough that the theme toggle and GitHub link fit from tablet width up,
+   so show them directly instead of folding them into VitePress's "…" menu below 1280px. */
+@media (min-width: 768px) {
+  .VPNavBar .content-body .VPNavBarAppearance,
+  .VPNavBar .content-body .VPNavBarSocialLinks {
+    display: flex;
+    align-items: center;
+  }
+
+  .VPNavBar .content-body .VPNavBarExtra {
+    display: none;
+  }
+}

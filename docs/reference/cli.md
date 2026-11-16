@@ -33,14 +33,15 @@ contentia local migrate -s ./a -d ./b  # copy all content from one storage backe
 contentia local list-backends          # show the storage backends migrate can use
 ```
 
-| Command               | What it does                                                                            |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| `serve`               | Run the Contentia API from a config file (see [Server Config](../guides/server-config)) |
-| `hash-password`       | Print the bcrypt hash of a password for `auth.login.users`                              |
-| `local serve`         | Start a local-file JSON:API storage server for development                              |
-| `local generate`      | Generate a typed TypeScript module from the CMS config file                             |
-| `local migrate`       | Copy every folder and object from one storage backend to another                        |
-| `local list-backends` | List every storage backend `migrate` can use and its package version                    |
+| Command               | What it does                                                                       |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `serve`               | Run the Contentia API from a config file (see [Server Config](./server-config))    |
+| `hash-password`       | Print the bcrypt hash of a password for `auth.login.users`                         |
+| `local serve`         | Start a local-file JSON:API storage server for development                         |
+| `local mcp`           | Expose a storage backend, or a remote Contentia API, to AI agents over MCP (stdio) |
+| `local generate`      | Generate a typed TypeScript module from the CMS config file                        |
+| `local migrate`       | Copy every folder and object from one storage backend to another                   |
+| `local list-backends` | List every storage backend `migrate` can use and its package version               |
 
 Every command accepts `--help` for its full flag reference, e.g. `contentia local migrate --help`.
 

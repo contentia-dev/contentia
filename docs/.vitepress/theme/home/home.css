@@ -1,0 +1,6 @@
+/* Shared by the homepage components. Light and dark cuts of a logo: show the one for the theme.
+   (Unscoped on purpose: Vue's `:global(.dark) .x` compiles to a bare `.dark`.) */
+.dark .ctia-light,
+html:not(.dark) .ctia-dark {
+  display: none;
+}

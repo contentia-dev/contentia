@@ -136,7 +136,6 @@ async function fetchDoc(ref, path) {
 // Orientation docs to always surface first, if present.
 const ORIENTATION = [
   'docs/index.md',
-  'docs/guides/index.md',
   'docs/guides/getting-started.md',
   'docs/concepts/index.md',
   'docs/reference/index.md',

@@ -89,9 +89,8 @@ command, including the packages that now live in separate repositories.
   version**
 - [Getting Started](./docs/guides/getting-started.md)
 - [Architecture](./docs/concepts/architecture.md)
-- [API Reference](./docs/reference/json-api/index.md)
-- [API Server](./docs/guides/api-server.md) and [Authentication](./docs/guides/auth.md)
-- [Deployment](./docs/guides/api-server.md#deploying-a-filesystem-backed-server)
+- [HTTP API](./docs/reference/json-api/index.md)
+- [API Server](./docs/guides/api-server.md): mounting, authentication, and the login server
 - [Imports](./docs/reference/imports.md)
 
 ## Contributing

@@ -4,7 +4,7 @@
 write. The config picks the storage backend, how callers authenticate, and what each of them may do.
 
 Need something the config can't express, like a custom `authorize` policy or extra routes? Build the
-server in code with [`contentiaApi`](./api-server) instead.
+server in code with [`contentiaApi`](../guides/api-server) instead.
 
 ## Quick start
 

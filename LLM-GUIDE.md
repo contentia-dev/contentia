@@ -86,54 +86,45 @@ app.all('/api/*', c => contentia.fetch(c.req.raw));
 > or first-boot handler):
 >
 > ```ts
-> import { runTask } from 'contentia/compat';
->
-> await runTask(
->   storage.createOrUpdateObject({
->     key: 'config', // must match the `configKey` you passed to DecapCatalogProvider
->     content: {
->       collections: [
->         {
->           name: 'posts',
->           label: 'Posts',
->           folder: 'posts',
->           create: true,
->           fields: [{ name: 'title', widget: 'string' }, { name: 'body', widget: 'markdown' }],
->         },
->       ],
->       media_folder: 'uploads',
->       public_folder: '/uploads',
->     },
->   }),
-> );
+> await storage.createOrUpdateObject({
+>   key: 'config', // must match the `configKey` you passed to DecapCatalogProvider
+>   content: {
+>     collections: [
+>       {
+>         name: 'posts',
+>         label: 'Posts',
+>         folder: 'posts',
+>         create: true,
+>         fields: [{ name: 'title', widget: 'string' }, { name: 'body', widget: 'markdown' }],
+>       },
+>     ],
+>     media_folder: 'uploads',
+>     public_folder: '/uploads',
+>   },
+> });
 > ```
 >
-> See
-> [docs/guides/api-server.md → "Seeding the Decap config"](./docs/guides/api-server.md#seeding-the-decap-config)
-> for the serializer requirements.
+> See gotcha 13 in section 4 for the serializer requirements.
 
 ### b) Render content server-side in a framework page (Next/SvelteKit/Astro/Nuxt/Remix/etc.)
 
 ```ts
-import { collectStream, runTask } from 'contentia/compat';
 import { NotFoundError } from 'contentia/core';
 // Export the `documents` repo you built in task (a) and import it directly —
 // `contentiaApi(...)` returns only { fetch, authenticateRequest }, so SSR reads use the repo.
 import { documents } from '~/server/contentia';
 
 // List published posts in a folder:
-const { items } = await collectStream(
-  documents.listRecordSummaries({
-    folder: 'posts',
-    depth: 1,
-    pagination: { page: 1, perPage: 100 }, // or { offset: 0, limit: 100 } — both styles work
-    type: 'published',
-  }),
-);
+const { items } = await documents.listRecordSummaries({
+  folder: 'posts',
+  depth: 1,
+  pagination: { page: 1, perPage: 100 }, // or { offset: 0, limit: 100 } — both styles work
+  type: 'published',
+}).collect();
 
 // Read one published document by key:
 try {
-  const doc = await runTask(documents.getDocument('posts/hello-world'));
+  const doc = await documents.getDocument('posts/hello-world');
   const { title, body } = doc.content as { title?: string, body?: string };
 } catch (err) {
   if (err instanceof NotFoundError) {
@@ -229,7 +220,7 @@ const contentia = contentiaApi({
 
 For a full self-contained login server (email/password, passkey, TOTP) use the
 `contentiaOauth2(...)` PKCE server from `contentia/server/oauth2` — see
-[docs/guides/auth.md → "Production login with contentiaOauth2"](./docs/guides/auth.md#production-login-with-contentiaoauth2).
+[docs/guides/api-server.md → "Add the login server"](./docs/guides/api-server.md#add-the-login-server).
 
 ---
 
@@ -302,8 +293,8 @@ token.
 These are the things that consistently bite first-time integrators:
 
 1. **The HTTP API requires auth on every endpoint except `/health`.**
-   - Server-side render reads must call the repos directly (via `contentia/compat`'s `runTask` /
-     `collectStream`), NOT through `contentia.fetch(internalRequest)`.
+   - Server-side render reads must call the repos directly (`await documents.getDocument(key)`,
+     `for await` or `.collect()` on listings), NOT through `contentia.fetch(internalRequest)`.
 
 2. **Express/Fastify/Koa: do NOT mount `express.json()` / Fastify body parsers / `koa-bodyparser` in
    front of `/api/*`.**
@@ -394,13 +385,11 @@ These are the things that consistently bite first-time integrators:
     On an empty storage directory the key does not exist, and every call to `documents.*` or
     `assets.*` throws `"Decap config object not found at storage key 'config'"`. Seed it once:
     ```ts
-    import { runTask } from 'contentia/compat';
-    await runTask(storage.createOrUpdateObject({ key: 'config', content: yourDecapConfig }));
+    await storage.createOrUpdateObject({ key: 'config', content: yourDecapConfig });
     ```
     The serializer registry must support structured data — `markdownSerializer`, `yamlSerializer`,
     or `jsonSerializer` all work; `rawSerializer` silently drops the `collections` field. See the
-    callout in task (a) above and
-    [docs/guides/api-server.md → "Seeding the Decap config"](./docs/guides/api-server.md#seeding-the-decap-config).
+    callout in task (a) above.
 
 14. **`CatalogDocumentsRepository` injects a `language` field into every stored content object.**
     The implementation co-locates the document language with its content in storage so reads can
@@ -423,12 +412,12 @@ These are the things that consistently bite first-time integrators:
 - **Minimal Node example** → [docs/guides/api-server.md](./docs/guides/api-server.md)
   (`contentiaApi` over `FileSystemStorageRepository`, served with `@hono/node-server`)
 - **Minimal edge example** →
-  [docs/guides/api-server.md → "Running it"](./docs/guides/api-server.md#running-it)
+  [docs/guides/api-server.md → "Mount the API"](./docs/guides/api-server.md#mount-the-api)
   (`R2StorageRepository` on Cloudflare Workers) and task 2c above
 - **No server code at all** → `contentia serve --config` runs the API from one config file; see
-  [docs/guides/server-config.md](./docs/guides/server-config.md)
+  [docs/reference/server-config.md](./docs/reference/server-config.md)
 - **Astro** → `@contentia/astro` (Content Layer loaders, dev JSON:API, live collections, Zod schema)
-- **AI assistant in the editor** → mount `contentia/server/ai` (section 2f)
+- **AI agents** → mount `contentia/server/mcp`, or run `contentia local mcp` (section 2f)
 - **Inline wiring code** → sections 2a (Node) and 2c (Workers/R2) above have copy-paste-ready code
 
 ---

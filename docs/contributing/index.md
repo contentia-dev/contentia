@@ -1,7 +1,8 @@
 # Contributing
 
 Notes for people working _on_ Contentia rather than _with_ it. If you're building an app that uses
-Contentia, see the [Guides](../guides/) instead — this section is for changes to this repo.
+Contentia, see [Getting Started](../guides/getting-started) instead — this section is for changes to
+this repo.
 
 ## Orientation
 
