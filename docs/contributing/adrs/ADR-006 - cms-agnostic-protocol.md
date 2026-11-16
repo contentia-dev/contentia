@@ -12,6 +12,12 @@ status: accepted
 > Renumbered from ADR-003 when moved out of the public docs site (2026-08-04): the docs tree and
 > this vault had independent ADR-003s. A mirror of this decision, written from the Decap side, lives
 > in the decap-cms repo as `docs/architecture/two-seam-model.md`.
+>
+> Amended 2026-11-14: the Decap adapter moved from the decap-cms fork into this repo as
+> `@contentia/decap`, a port of the fork's Laika backend. The decision is unchanged: the adapter is
+> its own package, outside the protocol, and Decap's opinions stay in it. For example, the backend's
+> `assets_folder` setting maps Decap's `media_folder` onto asset keys, so no repository had to learn
+> about Decap's media folders.
 
 ## Context
 
@@ -32,10 +38,10 @@ Content flows through two seams, and each seam has a strict owner:
 
 ```
 source domain          contentia protocol           CMS adapter              user
-(git, DynamoDB,   <->  (repositories: atoms,  <->  (contentia-decap-       <->  (interacts with
- Cognito, R2, ...)      folders, keys, meta-        backend: opinion-        their ORIGINAL
-                        data, summaries;            ated field/shape         domain model)
-                        content = opaque JSON)      expectations)
+(git, DynamoDB,   <->  (repositories: atoms,  <->  (@contentia/decap:      <->  (interacts with
+ Cognito, R2, ...)      folders, keys, meta-        opinionated field/       their ORIGINAL
+                        data, summaries;            shape expectations)      domain model)
+                        content = opaque JSON)
 ```
 
 **Seam 1: source domain to protocol.** The protocol is the whole `contentia` bounded context: the
@@ -47,9 +53,9 @@ model are wrong, and this ADR is the place to point them: Contentia wraps their 
 replace it. A database is just a storage repository with no folders where the IDs are keys.
 
 **Seam 2: protocol to CMS.** Each CMS gets its own adapter that makes the opinionated choices about
-which fields and conventions it expects. For Decap that adapter is a Decap backend in the decap-cms
-fork, outside this repo. Another CMS frontend would get its own adapter with its own (probably
-different) opinions.
+which fields and conventions it expects. For Decap that adapter is the Decap backend
+`@contentia/decap`, a package of its own outside the protocol. Another CMS frontend would get its
+own adapter with its own (probably different) opinions.
 
 ## Consequences
 

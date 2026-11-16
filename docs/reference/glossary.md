@@ -66,10 +66,11 @@ one is plugged in. See [Adapters](../adapters/) for the full list.
 ## CMS integration
 
 The CMS-specific layer built on repositories. It owns every opinionated choice its CMS needs (entry
-shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is a Decap backend
-that talks to the Contentia API, and it lives with the CMS, not in Contentia. CMS features never
-move from a CMS integration into the protocol; swapping one CMS's integration for another's is a
-migration by design. ADR-006 predates this term and calls it an "adapter".
+shapes, slugs, workflow states, deploy previews, commit messages). For Decap this is
+[`@contentia/decap`](../guides/decap), a Decap backend that talks to the Contentia API from its own
+package, outside the protocol. CMS features never move from a CMS integration into the protocol;
+swapping one CMS's integration for another's is a migration by design. ADR-006 predates this term
+and calls it an "adapter".
 
 ## version
 

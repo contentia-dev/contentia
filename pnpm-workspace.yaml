@@ -2,6 +2,7 @@ packages:
   - "packages/contentia"
   - "packages/vite-plugin"
   - "packages/astro"
+  - "packages/decap"
   - "docs"
   - "apps/cli"
   - "apps/vscode"
@@ -38,6 +39,10 @@ catalogs:
     "uuid": "^14.0.3"
     "ws": "^8.23.0"
     "yaml": "^2.9.1"
+
+  # The Decap CMS distribution @contentia/decap is built against (a peer there; dev-only here).
+  decap:
+    "@laikacms/decap-cms": "^4.2.0"
 
   docs:
     "mermaid": "^12.3.0"

@@ -1,0 +1,3539 @@
+/**
+ * Tests for contentia-backend.ts
+ *
+ * Strategy: We test the pure utility functions (normalizeKey, contentToRawString,
+ * DedupeCache) extracted via createContentiaBackend, and the backend methods that
+ * can be exercised by injecting mock DocumentsRepository / AssetsRepository
+ * implementations.
+ *
+ * Decap's lib/util is fully mocked to keep these tests hermetic: the mock factory
+ * below stays a static factory — no `importOriginal` call — and provides
+ * hand-written equivalents for every exported name the source code uses.
+ * Real error names (API_ERROR / ACCESS_TOKEN_ERROR) and the v4 Cursor shape
+ * are used so assertions match what the real module produces at runtime.
+ *
+ * lib/backend is mocked with the same content constructors the real module
+ * has: its published build uses extensionless ESM imports, which load under a
+ * bundler but not under plain Node.
+ *
+ * lib/auth and ui-default remain fully mocked as well: they pull in the
+ * full UI dependency graph and access the DOM at module load time.
+ * We do NOT test the authentication flow because that requires a running server.
+ */
+
+import type { CmsMediaPage } from '@laikacms/decap-cms/lib/util';
+import { type ContentiaError, ContentiaStream, ContentiaTask, InternalError, NotFoundError } from 'contentia/core';
+import type { ListChangesDone } from 'contentia/documents';
+import { type ChangeSummary, SyncToken } from 'contentia/storage';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// ---------------------------------------------------------------------------
+// Mock browser-only deps BEFORE any import that transitively loads them.
+// ---------------------------------------------------------------------------
+
+vi.mock('@laikacms/decap-cms/lib/backend', () => ({
+  rawContent: (raw: string) => ({ kind: 'raw', raw }),
+  parsedContent: (data: Record<string, unknown>) => ({ kind: 'parsed', data }),
+}));
+
+// vi.mock factories are hoisted before module evaluation; use vi.hoisted to
+// share Cursor/symbol between the factory and test bodies.
+const { Cursor, CURSOR_COMPATIBILITY_SYMBOL, API_ERROR, ACCESS_TOKEN_ERROR } = vi.hoisted(() => {
+  // Matches the v4 Cursor exactly: data/meta are plain Record objects, actions a native Set.
+  // knownMetaKeys mirrors the real package's filterUnknownMetaKeys allowlist.
+  const knownMetaKeys = new Set([
+    'index',
+    'page',
+    'count',
+    'pageSize',
+    'pageCount',
+    'extension',
+    'folder',
+    'depth',
+  ]);
+
+  class Cursor {
+    store: { actions: Set<string>, data: Record<string, unknown>, meta: Record<string, unknown> };
+    constructor(arg: { actions?: string[], data?: Record<string, unknown>, meta?: Record<string, unknown> } = {}) {
+      this.store = {
+        actions: new Set(arg.actions ?? []),
+        data: { ...arg.data },
+        meta: Object.fromEntries(Object.entries({ ...arg.meta }).filter(([k]) => knownMetaKeys.has(k))),
+      };
+    }
+    static create(arg?: { actions?: string[], data?: Record<string, unknown>, meta?: Record<string, unknown> }) {
+      return new Cursor(arg);
+    }
+    get actions() {
+      return this.store.actions;
+    }
+    get data() {
+      return this.store.data;
+    }
+    get meta() {
+      return this.store.meta;
+    }
+    hasAction(a: string) {
+      return this.store.actions.has(a);
+    }
+  }
+
+  const CURSOR_COMPATIBILITY_SYMBOL = Symbol('cursor_compat');
+  const API_ERROR = 'API_ERROR';
+  const ACCESS_TOKEN_ERROR = 'ACCESS_TOKEN_ERROR';
+
+  return { Cursor, CURSOR_COMPATIBILITY_SYMBOL, API_ERROR, ACCESS_TOKEN_ERROR };
+});
+
+vi.mock('@laikacms/decap-cms/lib/util', () => ({
+  AccessTokenError: class AccessTokenError extends Error {
+    constructor(msg: string) {
+      super(msg);
+      this.name = ACCESS_TOKEN_ERROR;
+    }
+  },
+  APIError: class APIError extends Error {
+    status: number;
+    api: string;
+    constructor(msg: string, status = 500, api = '') {
+      super(msg);
+      this.name = API_ERROR;
+      this.status = status;
+      this.api = api;
+    }
+  },
+  unsentRequest: {
+    fetchWithTimeout: vi.fn(),
+  },
+  Cursor,
+  CURSOR_COMPATIBILITY_SYMBOL,
+}));
+
+vi.mock('@laikacms/decap-cms/lib/auth', () => ({
+  PkceAuthenticator: class PkceAuthenticator {
+    completeAuth = vi.fn();
+    authenticate = vi.fn();
+  },
+}));
+
+vi.mock('@laikacms/decap-cms/ui-default', () => ({
+  AuthenticationPage: () => null,
+  Icon: () => null,
+}));
+
+vi.mock('contentia/documents/jsonapi-proxy', () => ({
+  DocumentsJsonApiProxyRepository: class MockDocumentsJsonApiProxyRepository {},
+}));
+
+vi.mock('contentia/assets/jsonapi-proxy', () => ({
+  AssetsJsonApiProxyRepository: class MockAssetsJsonApiProxyRepository {},
+}));
+
+// ---------------------------------------------------------------------------
+// Minimal helpers to build ContentiaTask / ContentiaStream values for mocks
+// ---------------------------------------------------------------------------
+
+function succeed<T>(value: T): ContentiaTask.ContentiaTask<T> {
+  return ContentiaTask.succeed(value);
+}
+
+function fail(error: any): ContentiaTask.ContentiaTask<never> {
+  return ContentiaTask.fail(new NotFoundError(error?.message ?? String(error)));
+}
+
+function failWith(
+  ErrorClass: new(message: string) => ContentiaError,
+  message: string,
+): ContentiaTask.ContentiaTask<never> {
+  return ContentiaTask.fail(new ErrorClass(message));
+}
+
+function empty<T>(): ContentiaStream.ContentiaStream<T, object> {
+  return ContentiaStream.empty({});
+}
+
+// ---------------------------------------------------------------------------
+// Minimal mock factory for DocumentsRepository
+// ---------------------------------------------------------------------------
+
+/** Capabilities of a repository that tracks nothing optional. */
+const MINIMAL_CAPABILITIES = {
+  compatibilityDate: '2026-07-16',
+  pagination: { supported: false, description: '' },
+  versionTracking: { supported: false, description: '' },
+  changes: { supported: false, description: '' },
+};
+
+function makeMockDocumentsRepository() {
+  return {
+    getCapabilities: vi.fn(() => succeed(MINIMAL_CAPABILITIES)),
+    getSyncToken: vi.fn(),
+    listChanges: vi.fn(),
+    listRecords: vi.fn(),
+    listRecordSummaries: vi.fn(),
+    getDocument: vi.fn(),
+    createDocument: vi.fn(),
+    updateDocument: vi.fn(),
+    deleteDocument: vi.fn(),
+    unpublish: vi.fn(),
+    getUnpublished: vi.fn(),
+    createUnpublished: vi.fn(),
+    updateUnpublished: vi.fn(),
+    deleteUnpublished: vi.fn(),
+    publish: vi.fn(),
+    getRevision: vi.fn(),
+    createRevision: vi.fn(),
+    listRevisions: vi.fn(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Minimal mock factory for AssetsRepository
+// ---------------------------------------------------------------------------
+
+function makeMockAssetsRepository() {
+  return {
+    listResources: vi.fn(),
+    getAsset: vi.fn(),
+    createAsset: vi.fn(),
+    deleteAsset: vi.fn(),
+    getUrls: vi.fn(),
+    getMetadata: vi.fn(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Shared config-like object
+// ---------------------------------------------------------------------------
+
+function makeConfig(overrides: Record<string, unknown> = {}) {
+  return {
+    media_folder: 'assets/uploads',
+    backend: {
+      name: 'contentia',
+      base_url: 'https://api.example.com',
+      api_root: '',
+    },
+    collections: [],
+    ...overrides,
+  } as any;
+}
+
+// ---------------------------------------------------------------------------
+// Import createContentiaBackend (after mocks are in place)
+// ---------------------------------------------------------------------------
+
+import { unsentRequest } from '@laikacms/decap-cms/lib/util';
+import createContentiaBackend from './contentia-backend.js';
+
+// ---------------------------------------------------------------------------
+// Suite: createContentiaBackend factory
+// ---------------------------------------------------------------------------
+
+describe('createContentiaBackend()', () => {
+  it('returns a constructor function', () => {
+    const ContentiaBackend = createContentiaBackend();
+    expect(typeof ContentiaBackend).toBe('function');
+  });
+
+  it('constructed instance is not a git backend', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    expect(backend.isGitBackend()).toBe(false);
+  });
+
+  it('constructed instance exposes authComponent', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    const comp = backend.authComponent();
+    expect(comp).toBeDefined();
+  });
+
+  // Pins that config.backend.dev_token swaps the PKCE auth component for
+  // the dev-only auto-login one. See the README's Config table for the operator-
+  // facing warning that this must never be set in production.
+  it('authComponent() returns PKCEAuthenticationPage when dev_token is unset', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    const comp = backend.authComponent();
+    expect(comp.name).toBe('PKCEAuthenticationPage');
+  });
+
+  it('authComponent() returns the dev auth component when dev_token is set', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_root: '',
+          dev_token: 'dev-secret-token',
+        },
+      }),
+    ) as any;
+
+    const comp = backend.authComponent();
+
+    expect(comp.name).not.toBe('PKCEAuthenticationPage');
+    // The dev wrapper closes over devToken and forwards it to DevAuthenticationPage
+    // as a prop — rendering it returns a React element carrying that token.
+    const element = comp({ onLogin: vi.fn() }) as { props: { devToken?: string } };
+    expect(element.props.devToken).toBe('dev-secret-token');
+  });
+
+  it('getToken() throws synchronously when not authenticated', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    // getToken() throws synchronously before returning a promise when tokenPromise is unset
+    expect(() => backend.getToken()).toThrow();
+  });
+
+  it('getDocumentsRepo() throws when not authenticated', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    expect(() => backend.getDocumentsRepo()).toThrow();
+  });
+
+  it('getAssetsRepo() throws when not authenticated', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    expect(() => backend.getAssetsRepo()).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns a BackendEntry when the document exists', async () => {
+    const doc = { key: 'articles/hello', content: { title: 'Hello' }, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    const entry = await backend.getEntry('articles/hello');
+
+    expect(entry).toMatchObject({
+      file: { path: 'articles/hello', id: 'articles/hello' },
+      content: { kind: 'parsed', data: { title: 'Hello' } },
+    });
+  });
+
+  it('strips .json extension from the key before querying', async () => {
+    const doc = { key: 'articles/test', content: { title: 'Test' }, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    await backend.getEntry('articles/test.json');
+
+    expect(mockDocRepo.getDocument).toHaveBeenCalledWith('articles/test');
+  });
+
+  it('strips .md extension from the key before querying', async () => {
+    const doc = { key: 'articles/test', content: 'raw markdown', type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    await backend.getEntry('articles/test.md');
+
+    expect(mockDocRepo.getDocument).toHaveBeenCalledWith('articles/test');
+  });
+
+  it('falls back to unpublished when published document not found', async () => {
+    const unpubDoc = { key: 'articles/draft', content: { title: 'Draft' }, type: 'unpublished' };
+    mockDocRepo.getDocument.mockReturnValue(
+      fail({ code: 'NOT_FOUND', message: 'Not found' }),
+    );
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpubDoc));
+
+    const entry = await backend.getEntry('articles/draft');
+
+    expect(entry.file.path).toBe('articles/draft');
+  });
+
+  it('throws when both published and unpublished lookups fail', async () => {
+    mockDocRepo.getDocument.mockReturnValue(
+      fail({ code: 'NOT_FOUND', message: 'Not found' }),
+    );
+    mockDocRepo.getUnpublished.mockReturnValue(
+      fail({ code: 'NOT_FOUND', message: 'Not found either' }),
+    );
+
+    await expect(backend.getEntry('articles/missing')).rejects.toThrow();
+  });
+
+  // -------------------------------------------------------------------------
+  // `useWorkflow` gates the getUnpublished fallback probe
+  // -------------------------------------------------------------------------
+
+  it('(useWorkflow=true, default) still falls back to getUnpublished when published lookup misses', async () => {
+    const unpubDoc = { key: 'articles/draft', content: { title: 'Draft' }, type: 'unpublished' };
+    mockDocRepo.getDocument.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'Not found' }));
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpubDoc));
+
+    const entry = await backend.getEntry('articles/draft', true);
+
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledWith('articles/draft');
+    expect(entry.file.path).toBe('articles/draft');
+  });
+
+  it('(useWorkflow=false) does NOT call getUnpublished when published lookup misses, and rejects', async () => {
+    mockDocRepo.getDocument.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'Not found' }));
+
+    await expect(backend.getEntry('articles/no-workflow', false)).rejects.toThrow();
+
+    expect(mockDocRepo.getUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('(useWorkflow=false) does not console.error on a plain not_found miss (still the expected slug-collision probe)', async () => {
+    mockDocRepo.getDocument.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'Not found' }));
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(backend.getEntry('articles/no-workflow', false)).rejects.toThrow();
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(mockDocRepo.getUnpublished).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('(useWorkflow=false) skips getUnpublished even when it would have succeeded', async () => {
+    const unpubDoc = { key: 'articles/would-hit', content: { title: 'Draft' }, type: 'unpublished' };
+    mockDocRepo.getDocument.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'Not found' }));
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpubDoc));
+
+    await expect(backend.getEntry('articles/would-hit', false)).rejects.toThrow();
+
+    expect(mockDocRepo.getUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('(useWorkflow=false) never touches getUnpublished when the published document is found', async () => {
+    const doc = { key: 'articles/hit', content: { title: 'Hit' }, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    const entry = await backend.getEntry('articles/hit', false);
+
+    expect(entry.file.path).toBe('articles/hit');
+    expect(mockDocRepo.getUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('does not console.error when both lookups miss with not_found (expected slug-collision probe)', async () => {
+    mockDocRepo.getDocument.mockReturnValue(fail({ message: 'Not found' }));
+    mockDocRepo.getUnpublished.mockReturnValue(fail({ message: 'Not found either' }));
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(backend.getEntry('articles/missing')).rejects.toThrow();
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('logs console.error exactly once for a non-not_found failure', async () => {
+    mockDocRepo.getDocument.mockReturnValue(failWith(InternalError, 'boom'));
+    mockDocRepo.getUnpublished.mockReturnValue(fail({ message: 'Not found' }));
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(backend.getEntry('articles/broken')).rejects.toThrow();
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('returns cached result on second call without hitting the repo again', async () => {
+    const doc = { key: 'articles/cached', content: { title: 'Cached' }, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    await backend.getEntry('articles/cached');
+    await backend.getEntry('articles/cached');
+
+    // getDocument should only have been called once (second is served from cache)
+    expect(mockDocRepo.getDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands document content over structured, by reference', async () => {
+    const content = { foo: 'bar' };
+    const doc = { key: 'articles/obj', content, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    const entry = await backend.getEntry('articles/obj');
+
+    // The whole point of the parsed variant: no stringify/parse round trip.
+    expect(entry.content).toEqual({ kind: 'parsed', data: content });
+    expect((entry.content as { data: unknown }).data).toBe(content);
+  });
+
+  it('carries text content as raw, for the collection format to parse', async () => {
+    const raw = '# Markdown content\n\nHello world.';
+    const doc = { key: 'articles/raw', content: raw, type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    const entry = await backend.getEntry('articles/raw');
+
+    expect(entry.content).toEqual({ kind: 'raw', raw });
+  });
+
+  it('falls back to JSON text for content that has no field shape', async () => {
+    const doc = { key: 'articles/list', content: [1, 2, 3], type: 'published' };
+    mockDocRepo.getDocument.mockReturnValue(succeed(doc));
+
+    const entry = await backend.getEntry('articles/list');
+
+    expect(entry.content).toEqual({ kind: 'raw', raw: '[1,2,3]' });
+  });
+
+  it('logs a recoverableError emitted by the repo via console.warn while still returning the entry', async () => {
+    const Effect = await import('effect/Effect');
+    const doc = { key: 'articles/warned', content: { title: 'Warned' }, type: 'published' };
+    // Build a ContentiaTask that emits a recoverableError mid-stream then resolves.
+    // Mirrors what an R2-proxy readback fallback would produce: the operation
+    // succeeds with a synthesised value AND a warning.
+    const taskWithWarning = ContentiaTask.make<typeof doc>(emit =>
+      Effect.gen(function*() {
+        yield* emit.recoverableError(new NotFoundError('readback fell back to synthesis'));
+        return doc;
+      })
+    );
+    mockDocRepo.getDocument.mockReturnValue(taskWithWarning);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const entry = await backend.getEntry('articles/warned');
+      expect(entry).toMatchObject({ file: { path: 'articles/warned' } });
+      expect(warnSpy).toHaveBeenCalled();
+      const message = warnSpy.mock.calls.map(call => call[0]).join('\n');
+      expect(message).toContain('readback fell back to synthesis');
+      expect(message).toContain('not_found');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('routes recoverableErrors to a custom onWarning handler when configured', async () => {
+    const Effect = await import('effect/Effect');
+    const doc = { key: 'articles/onwarning', content: { title: 'OW' }, type: 'published' };
+
+    const observed: NotFoundError[] = [];
+    const localMockRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => localMockRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+      onWarning: (e: any) => {
+        observed.push(e);
+      },
+    });
+    const localBackend = new ContentiaBackend(makeConfig()) as any;
+    localBackend.documentsRepository = localMockRepo;
+    localBackend.tokenPromise = () => Promise.resolve('fake-token');
+
+    const taskWithWarning = ContentiaTask.make<typeof doc>(emit =>
+      Effect.gen(function*() {
+        yield* emit.recoverableError(new NotFoundError('readback fell back to synthesis'));
+        return doc;
+      })
+    );
+    localMockRepo.getDocument.mockReturnValue(taskWithWarning);
+
+    // Spy on console.warn too — the custom handler should preempt it.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const entry = await localBackend.getEntry('articles/onwarning');
+      expect(entry).toMatchObject({ file: { path: 'articles/onwarning' } });
+      expect(observed).toHaveLength(1);
+      expect(observed[0]).toBeInstanceOf(NotFoundError);
+      expect(observed[0]?.message).toContain('readback fell back to synthesis');
+      // The custom handler took over; console.warn should NOT have been
+      // called for the recoverable warning.
+      const warnFromRecoverable = warnSpy.mock.calls.some(call => String(call[0]).includes('readback fell back'));
+      expect(warnFromRecoverable).toBe(false);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: entriesByFolder
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.entriesByFolder()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns an array of ImplementationEntry for published records', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany([
+      { key: 'articles/a', content: { title: 'A' }, type: 'published' },
+      { key: 'articles/b', content: { title: 'B' }, type: 'published' },
+    ] as any[], {}));
+
+    const entries = await backend.entriesByFolder('articles', 'json', 1);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].file.path).toBe('articles/a');
+    expect(entries[1].file.path).toBe('articles/b');
+  });
+
+  it('skips records that are not published', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany([
+      { key: 'articles/pub', content: { title: 'Pub' }, type: 'published' },
+      { key: 'articles/draft', content: { title: 'Draft' }, type: 'unpublished' },
+    ] as any[], {}));
+
+    const entries = await backend.entriesByFolder('articles', 'json', 1);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.path).toBe('articles/pub');
+  });
+
+  it('returns empty array when generator yields no records', async () => {
+    mockDocRepo.listRecords.mockReturnValue(empty());
+
+    const entries = await backend.entriesByFolder('articles', 'json', 1);
+
+    expect(entries).toHaveLength(0);
+  });
+
+  it('skips failed results and continues processing successful ones', async () => {
+    // ContentiaStream recoverable errors are surfaced as RecoverableError elements;
+    // the backend's loop skips them and continues with Data elements.
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany([
+      { key: 'articles/ok', content: { title: 'OK' }, type: 'published' },
+    ] as any[], {}));
+
+    const entries = await backend.entriesByFolder('articles', 'json', 1);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.path).toBe('articles/ok');
+  });
+
+  it('returns first page (20) when collection has 110 entries; cursor stores all 110 for traversal', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      key: `articles/entry-${i}`,
+      content: { title: `Entry ${i}` },
+      type: 'published' as const,
+    }));
+    const page2 = Array.from({ length: 10 }, (_, i) => ({
+      key: `articles/entry-${100 + i}`,
+      content: { title: `Entry ${100 + i}` },
+      type: 'published' as const,
+    }));
+
+    mockDocRepo.listRecords
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page1 as any[], {}))
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page2 as any[], {}));
+
+    const entries = await backend.entriesByFolder('articles', 'json', 1);
+
+    // entriesByFolder now returns only the first UI page (20 entries)
+    expect(entries).toHaveLength(20);
+    expect(entries[0].file.path).toBe('articles/entry-0');
+    expect(entries[19].file.path).toBe('articles/entry-19');
+    // Both repo batches were fetched to build the full list
+    expect(mockDocRepo.listRecords).toHaveBeenCalledTimes(2);
+    expect(mockDocRepo.listRecords).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ pagination: { limit: 100, offset: 0 } }),
+    );
+    expect(mockDocRepo.listRecords).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ pagination: { limit: 100, offset: 100 } }),
+    );
+    // Cursor is attached and has 'next' action because there are more pages
+    const cursor = (entries as any)[CURSOR_COMPATIBILITY_SYMBOL];
+    expect(cursor).toBeDefined();
+    expect(cursor.actions.has('next')).toBe(true);
+    expect(cursor.actions.has('prev')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: traverseCursor
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.traverseCursor()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  function makeEntries(count: number) {
+    return Array.from({ length: count }, (_, i) => ({
+      key: `posts/entry-${i}`,
+      content: { title: `Post ${i}` },
+      type: 'published' as const,
+    }));
+  }
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it("'next' advances to page 2 and returns the correct slice of entries", async () => {
+    // Seed 25 entries so there are 2 pages (20 + 5)
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(25) as any[], {}));
+    await backend.entriesByFolder('posts', 'json', 1); // populates allEntriesCache
+
+    const page1Cursor = new Cursor({
+      actions: ['next', 'last'],
+      meta: { page: 1, pageSize: 20, pageCount: 2, count: 25 },
+      data: { folder: 'posts' },
+    });
+
+    const result = await backend.traverseCursor(page1Cursor, 'next');
+
+    expect(result.entries).toHaveLength(5); // entries 20-24
+    expect(result.entries[0].file.path).toBe('posts/entry-20');
+    expect(result.entries[4].file.path).toBe('posts/entry-24');
+  });
+
+  it('returned cursor reflects the new page position', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(25) as any[], {}));
+    await backend.entriesByFolder('posts', 'json', 1);
+
+    const page1Cursor = new Cursor({
+      actions: ['next', 'last'],
+      meta: { page: 1, pageSize: 20, pageCount: 2, count: 25 },
+      data: { folder: 'posts' },
+    });
+
+    const result = await backend.traverseCursor(page1Cursor, 'next');
+
+    // New cursor should be on page 2 with no 'next' (last page)
+    expect(result.cursor.meta.page).toBe(2);
+    expect(result.cursor.actions.has('prev')).toBe(true);
+    expect(result.cursor.actions.has('next')).toBe(false);
+  });
+
+  it('throws a typed error when cursor carries no folder', async () => {
+    const emptyCursor = new Cursor({ data: {}, meta: {} });
+
+    await expect(backend.traverseCursor(emptyCursor, 'next')).rejects.toThrow(
+      'traverseCursor: cursor carries no folder',
+    );
+  });
+
+  it("'first' resets to page 1 regardless of current position", async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(45) as any[], {}));
+    await backend.entriesByFolder('posts', 'json', 1);
+
+    const page3Cursor = new Cursor({
+      actions: ['prev', 'first'],
+      meta: { page: 3, pageSize: 20, pageCount: 3, count: 45 },
+      data: { folder: 'posts' },
+    });
+
+    const result = await backend.traverseCursor(page3Cursor, 'first');
+
+    expect(result.entries).toHaveLength(20);
+    expect(result.entries[0].file.path).toBe('posts/entry-0');
+    expect(result.cursor.meta.page).toBe(1);
+    expect(result.cursor.actions.has('next')).toBe(true);
+    expect(result.cursor.actions.has('prev')).toBe(false);
+  });
+
+  it("'prev' goes back one page from page 3", async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(45) as any[], {}));
+    await backend.entriesByFolder('posts', 'json', 1);
+
+    const page3Cursor = new Cursor({
+      actions: ['prev', 'first'],
+      meta: { page: 3, pageSize: 20, pageCount: 3, count: 45 },
+      data: { folder: 'posts' },
+    });
+
+    const result = await backend.traverseCursor(page3Cursor, 'prev');
+
+    expect(result.entries).toHaveLength(20);
+    expect(result.entries[0].file.path).toBe('posts/entry-20');
+    expect(result.cursor.meta.page).toBe(2);
+    expect(result.cursor.actions.has('prev')).toBe(true);
+    expect(result.cursor.actions.has('next')).toBe(true);
+  });
+
+  it("'last' jumps to the final page regardless of current position", async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(45) as any[], {}));
+    await backend.entriesByFolder('posts', 'json', 1);
+
+    const page1Cursor = new Cursor({
+      actions: ['next', 'last'],
+      meta: { page: 1, pageSize: 20, pageCount: 3, count: 45 },
+      data: { folder: 'posts' },
+    });
+
+    const result = await backend.traverseCursor(page1Cursor, 'last');
+
+    expect(result.entries).toHaveLength(5); // entries 40-44
+    expect(result.entries[0].file.path).toBe('posts/entry-40');
+    expect(result.cursor.meta.page).toBe(3);
+    expect(result.cursor.actions.has('prev')).toBe(true);
+    expect(result.cursor.actions.has('next')).toBe(false);
+  });
+
+  it('round-trip: cursor built by entriesByFolder round-trips through traverseCursor', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany(makeEntries(25) as any[], {}));
+    const page1Entries = await backend.entriesByFolder('posts', 'json', 1);
+
+    const page1Cursor = (page1Entries as any)[CURSOR_COMPATIBILITY_SYMBOL];
+
+    expect(page1Cursor).toBeDefined();
+    expect(page1Cursor.data['folder']).toBe('posts');
+    expect(page1Cursor.meta['page']).toBe(1);
+
+    const result = await backend.traverseCursor(page1Cursor, 'next');
+    expect(result.entries).toHaveLength(5);
+    expect(result.cursor.meta['page']).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: deleteFiles
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.deleteFiles()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('calls deleteDocument with the normalised key', async () => {
+    mockDocRepo.deleteDocument.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['articles/bye.json'], 'Delete bye');
+
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledWith('articles/bye');
+  });
+
+  it('strips file extension before deleting', async () => {
+    mockDocRepo.deleteDocument.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['pages/home.md'], 'Delete home');
+
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledWith('pages/home');
+  });
+
+  it('tries deleteUnpublished when deleteDocument fails', async () => {
+    mockDocRepo.deleteDocument.mockImplementation(() => fail({ message: 'Not found' }));
+    mockDocRepo.deleteUnpublished.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['articles/ghost.json'], 'Delete ghost');
+
+    expect(mockDocRepo.deleteUnpublished).toHaveBeenCalledWith('articles/ghost');
+  });
+
+  it('handles multiple paths', async () => {
+    // Use mockImplementation so each call gets a fresh generator
+    mockDocRepo.deleteDocument.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['articles/a.json', 'articles/b.yaml'], 'Delete multiple');
+
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledTimes(2);
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledWith('articles/a');
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledWith('articles/b');
+  });
+
+  it('routes public_folder-prefixed paths to the assets repository', async () => {
+    mockAssetsRepo.deleteAsset.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['assets/uploads/logo.svg'], 'Delete media');
+
+    expect(mockAssetsRepo.deleteAsset).toHaveBeenCalledWith('assets/uploads/logo.svg');
+    expect(mockDocRepo.deleteDocument).not.toHaveBeenCalled();
+    expect(mockDocRepo.deleteUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('deletes the bare file name from an assets store rooted at the media folder', async () => {
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const flat: any = new ContentiaBackend(
+      makeConfig({ backend: { ...makeConfig().backend, assets_folder: '' } }),
+    );
+    flat.assetsRepository = mockAssetsRepo;
+    flat.tokenPromise = () => Promise.resolve('fake-token');
+    mockAssetsRepo.deleteAsset.mockImplementation(() => succeed(undefined));
+
+    await flat.deleteFiles(['assets/uploads/logo.svg'], 'Delete media');
+
+    expect(mockAssetsRepo.deleteAsset).toHaveBeenCalledWith('logo.svg');
+  });
+
+  it('splits mixed batches between documents and assets repositories', async () => {
+    mockDocRepo.deleteDocument.mockImplementation(() => succeed(undefined));
+    mockAssetsRepo.deleteAsset.mockImplementation(() => succeed(undefined));
+
+    await backend.deleteFiles(['articles/a.json', 'assets/uploads/photo.jpg'], 'Delete mixed');
+
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledTimes(1);
+    expect(mockDocRepo.deleteDocument).toHaveBeenCalledWith('articles/a');
+    expect(mockAssetsRepo.deleteAsset).toHaveBeenCalledTimes(1);
+    expect(mockAssetsRepo.deleteAsset).toHaveBeenCalledWith('assets/uploads/photo.jpg');
+  });
+
+  it('throws when a media delete fails instead of reporting silent success', async () => {
+    mockAssetsRepo.deleteAsset.mockImplementation(() => fail({ message: 'R2 says no' }));
+
+    await expect(
+      backend.deleteFiles(['assets/uploads/gone.png'], 'Delete media'),
+    ).rejects.toThrow(/Failed to delete media assets\/uploads\/gone\.png/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: unpublishEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.unpublishEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('calls the native unpublish transition instead of deleting the document', async () => {
+    mockDocRepo.unpublish.mockImplementation(() =>
+      succeed({ type: 'unpublished', status: 'draft', key: 'articles/bye', language: 'und', content: { title: 'Bye' } })
+    );
+
+    await backend.unpublishEntry(['articles/bye.json'], 'draft', 'Unpublish bye');
+
+    expect(mockDocRepo.unpublish).toHaveBeenCalledWith('articles/bye', 'draft');
+    expect(mockDocRepo.deleteDocument).not.toHaveBeenCalled();
+    expect(mockDocRepo.deleteUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('strips the file extension before calling unpublish', async () => {
+    mockDocRepo.unpublish.mockImplementation(() =>
+      succeed({ type: 'unpublished', status: 'draft', key: 'pages/home', language: 'und', content: {} })
+    );
+
+    await backend.unpublishEntry(['pages/home.md'], 'draft', 'Unpublish home');
+
+    expect(mockDocRepo.unpublish).toHaveBeenCalledWith('pages/home', 'draft');
+  });
+
+  it('handles multiple paths (i18n data files)', async () => {
+    mockDocRepo.unpublish.mockImplementation(() =>
+      succeed({ type: 'unpublished', status: 'draft', key: 'articles/a', language: 'und', content: {} })
+    );
+
+    await backend.unpublishEntry(['articles/a.en.json', 'articles/a.nl.json'], 'draft', 'Unpublish multi');
+
+    expect(mockDocRepo.unpublish).toHaveBeenCalledTimes(2);
+    expect(mockDocRepo.unpublish).toHaveBeenCalledWith('articles/a.en', 'draft');
+    expect(mockDocRepo.unpublish).toHaveBeenCalledWith('articles/a.nl', 'draft');
+  });
+
+  it('throws instead of silently succeeding when the transition fails', async () => {
+    mockDocRepo.unpublish.mockImplementation(() => fail({ message: 'Not found' }));
+
+    await expect(
+      backend.unpublishEntry(['articles/ghost.json'], 'draft', 'Unpublish ghost'),
+    ).rejects.toThrow(/Failed to unpublish entry articles\/ghost/);
+  });
+
+  it('pinning: entry content survives unpublish and is retrievable via getUnpublished', async () => {
+    // The whole point: unpublish must not be equivalent to
+    // delete. After unpublishEntry() resolves, the same key must still be
+    // readable from unpublished storage with its content and a demoted
+    // (non-published) status — not gone entirely.
+    const preservedContent = { title: 'Still here', body: 'Not deleted' };
+    mockDocRepo.unpublish.mockImplementation(() =>
+      succeed({
+        type: 'unpublished',
+        status: 'draft',
+        key: 'articles/keep-me',
+        language: 'und',
+        content: preservedContent,
+      })
+    );
+    mockDocRepo.getUnpublished.mockImplementation(() =>
+      succeed({
+        type: 'unpublished',
+        status: 'draft',
+        key: 'articles/keep-me',
+        language: 'und',
+        content: preservedContent,
+      })
+    );
+
+    await backend.unpublishEntry(['articles/keep-me.json'], 'draft', 'Unpublish keep-me');
+
+    // deleteDocument/deleteUnpublished were never invoked: no delete happened.
+    expect(mockDocRepo.deleteDocument).not.toHaveBeenCalled();
+    expect(mockDocRepo.deleteUnpublished).not.toHaveBeenCalled();
+
+    const unpublished = await mockDocRepo.getUnpublished('articles/keep-me');
+    expect(unpublished.status).not.toBe('published');
+    expect(unpublished.content).toEqual(preservedContent);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: logout
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.logout()', () => {
+  it('clears tokenPromise and repositories after logout', async () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    backend.tokenPromise = () => Promise.resolve('fake-token');
+    backend.documentsRepository = {};
+    backend.assetsRepository = {};
+
+    await backend.logout();
+
+    expect(backend.tokenPromise).toBeUndefined();
+    expect(backend.documentsRepository).toBeUndefined();
+    expect(backend.assetsRepository).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: allEntriesByFolder (pathRegex filtering)
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.allEntriesByFolder()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns all entries when no pathRegex provided', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany([
+      { key: 'articles/a', content: {}, type: 'published' },
+      { key: 'articles/b', content: {}, type: 'published' },
+    ] as any[], {}));
+
+    const entries = await backend.allEntriesByFolder('articles', 'json', 1);
+    expect(entries).toHaveLength(2);
+  });
+
+  it('filters entries by pathRegex when provided', async () => {
+    mockDocRepo.listRecords.mockReturnValue(ContentiaStream.succeedMany([
+      { key: 'articles/alpha', content: {}, type: 'published' },
+      { key: 'articles/beta', content: {}, type: 'published' },
+    ] as any[], {}));
+
+    const entries = await backend.allEntriesByFolder('articles', 'json', 1, /alpha/);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.path).toBe('articles/alpha');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getDeployPreview
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getDeployPreview()', () => {
+  it('always returns null', async () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig());
+    const result = await backend.getDeployPreview('articles', 'hello');
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: status()
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.status()', () => {
+  it('returns api.status=false when fetch throws a network error', async () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error')) as any;
+
+    const result = await backend.status();
+
+    expect(result.api.status).toBe(false);
+    expect(result.auth.status).toBe(false);
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns api.status=false when fetch returns non-ok', async () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false }) as any;
+
+    const result = await backend.status();
+
+    expect(result.api.status).toBe(false);
+
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns api.status=true when fetch returns ok', async () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true }) as any;
+
+    const result = await backend.status();
+
+    expect(result.api.status).toBe(true);
+
+    globalThis.fetch = originalFetch;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: entriesByFiles
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.entriesByFiles()', () => {
+  it('fetches each file and returns entries', async () => {
+    const mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+
+    const doc1 = { key: 'articles/one', content: { title: 'One' }, type: 'published' };
+    const doc2 = { key: 'articles/two', content: { title: 'Two' }, type: 'published' };
+    mockDocRepo.getDocument
+      .mockReturnValueOnce(succeed(doc1))
+      .mockReturnValueOnce(succeed(doc2));
+
+    const files = [
+      { path: 'articles/one', id: 'articles/one' },
+      { path: 'articles/two', id: 'articles/two' },
+    ];
+
+    const entries = await backend.entriesByFiles(files);
+
+    expect(entries).toHaveLength(2);
+    expect(entries[0].file.path).toBe('articles/one');
+    expect(entries[1].file.path).toBe('articles/two');
+  });
+
+  it('skips files that fail to fetch', async () => {
+    const mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+
+    const doc = { key: 'articles/ok', content: { title: 'OK' }, type: 'published' };
+
+    // Use mockImplementation based on which key is requested
+    mockDocRepo.getDocument.mockImplementation((key: string) => {
+      if (key === 'articles/missing') return fail({ code: 'NOT_FOUND', message: 'Gone' });
+      return succeed(doc);
+    });
+    mockDocRepo.getUnpublished.mockImplementation(() => fail({ code: 'NOT_FOUND', message: 'Not unpublished either' }));
+
+    const files = [
+      { path: 'articles/missing', id: 'articles/missing' },
+      { path: 'articles/ok', id: 'articles/ok' },
+    ];
+
+    const entries = await backend.entriesByFiles(files);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].file.path).toBe('articles/ok');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: persistEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.persistEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('persists a JSON entry as a parsed object (not a double-serialised string)', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'Hello', language: 'en' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'articles/hello.json', raw }], assets: [] },
+      { newEntry: true, useWorkflow: false },
+    );
+
+    expect(mockDocRepo.createDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ content: { title: 'Hello', language: 'en' } }),
+    );
+  });
+
+  // the documents API 400s on non-object `content`, and
+  // `parseJsonEntryContent` only produces an object for JSON-format
+  // collections. Markdown/frontmatter (Decap's default when no `format:` is
+  // set) and YAML must now fail fast client-side with an actionable error
+  // instead of reaching the server as a raw string.
+  it('throws a clear client-side error for a markdown/frontmatter entry instead of 400ing at the server', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const raw = '---\ntitle: My Post\n---\n\nBody text here.';
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'posts/my-post.md', raw }], assets: [] },
+        { newEntry: true, useWorkflow: false, collectionName: 'posts' },
+      ),
+    ).rejects.toThrow(/only supports JSON-format collections.*`format: json`.*`posts`/s);
+
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  // This exact error string is documented in the package README, so
+  // integrators can search for it. Pin the literal text (not just a regex
+  // shape) so a future refactor can't silently reword or drop it without
+  // this test and the docs going out of sync.
+  it('pins the exact fail-fast error message text for a non-JSON collection', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const raw = '---\ntitle: My Post\n---\n\nBody text here.';
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'posts/my-post.md', raw }], assets: [] },
+        { newEntry: true, useWorkflow: false, collectionName: 'posts' },
+      ),
+    ).rejects.toThrow(
+      'The Contentia backend currently only supports JSON-format collections; set `format: json` on collection `posts`.',
+    );
+  });
+
+  it('throws a clear client-side error for a YAML entry instead of 400ing at the server', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const raw = 'title: My Config\nvalue: 42\n';
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'config/settings.yaml', raw }], assets: [] },
+        { newEntry: true, useWorkflow: false, collectionName: 'config' },
+      ),
+    ).rejects.toThrow(/only supports JSON-format collections/);
+
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  it('uses "und" as the language when content has no language field', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'No language field' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'articles/no-lang.json', raw }], assets: [] },
+      { newEntry: true, useWorkflow: false },
+    );
+
+    expect(mockDocRepo.createDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ language: 'und' }),
+    );
+  });
+
+  it('calls updateDocument when newEntry:false, useWorkflow:false', async () => {
+    mockDocRepo.updateDocument.mockReturnValue(succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'Updated Title', language: 'en' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'articles/existing.json', raw }], assets: [] },
+      { newEntry: false, useWorkflow: false },
+    );
+
+    expect(mockDocRepo.updateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'articles/existing',
+        content: { title: 'Updated Title', language: 'en' },
+      }),
+    );
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  // on update, Decap's core takes `dataFile.path` straight
+  // from the entry it fetched back via getEntry(), and this backend's own
+  // getEntry sets `path` to the storage-repo record key — which is stored
+  // WITHOUT an extension (see normalizeKey). So a real UPDATE PATCH for a
+  // JSON-format entry arrives here with an extension-less path (unlike the
+  // synthetic 'articles/existing.json' case above), and the old
+  // `/\.json$/.test(dataFile.path)` check silently failed, sending
+  // `content` as a raw stringified-JSON string instead of an object.
+  it('persists an existing JSON entry as a parsed object even when dataFile.path has no extension', async () => {
+    mockDocRepo.updateDocument.mockReturnValue(succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'Updated Title', body: 'BODYINT', tags: [], language: 'en' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'articles/existing', raw }], assets: [] },
+      { newEntry: false, useWorkflow: false },
+    );
+
+    expect(mockDocRepo.updateDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'articles/existing',
+        content: { title: 'Updated Title', body: 'BODYINT', tags: [], language: 'en' },
+      }),
+    );
+    const call = mockDocRepo.updateDocument.mock.calls[0][0];
+    expect(typeof call.content).not.toBe('string');
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  it('calls createUnpublished when newEntry:true, useWorkflow:true, status:draft', async () => {
+    mockDocRepo.createUnpublished.mockReturnValue(succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'Draft Post', language: 'en' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'articles/new-draft.json', raw }], assets: [] },
+      { newEntry: true, useWorkflow: true, status: 'draft' },
+    );
+
+    expect(mockDocRepo.createUnpublished).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'unpublished',
+        status: 'draft',
+        key: 'articles/new-draft',
+        content: { title: 'Draft Post', language: 'en' },
+      }),
+    );
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  it('calls updateUnpublished when newEntry:false, useWorkflow:true, status:draft', async () => {
+    mockDocRepo.updateUnpublished.mockReturnValue(succeed(undefined));
+
+    const raw = JSON.stringify({ title: 'Updated Draft', language: 'en' });
+    await backend.persistEntry(
+      { dataFiles: [{ path: 'posts/existing-draft.json', raw }], assets: [] },
+      { newEntry: false, useWorkflow: true, status: 'draft' },
+    );
+
+    expect(mockDocRepo.updateUnpublished).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'posts/existing-draft',
+        content: { title: 'Updated Draft', language: 'en' },
+        status: 'draft',
+      }),
+    );
+    expect(mockDocRepo.createUnpublished).not.toHaveBeenCalled();
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  // the same client-side guard must apply to the unpublished
+  // (draft/workflow) persist path, not just the published create/update path
+  // — `createUnpublished`/`updateUnpublished` reject non-object content too.
+  it('throws a clear client-side error for a markdown draft entry (useWorkflow:true)', async () => {
+    mockDocRepo.createUnpublished.mockReturnValue(succeed(undefined));
+
+    const raw = '---\ntitle: Draft Post\n---\n\nBody.';
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'posts/new-draft.md', raw }], assets: [] },
+        { newEntry: true, useWorkflow: true, status: 'draft', collectionName: 'posts' },
+      ),
+    ).rejects.toThrow(/only supports JSON-format collections/);
+
+    expect(mockDocRepo.createUnpublished).not.toHaveBeenCalled();
+  });
+
+  // README.md promises the format check fails fast "before any
+  // request reaches the server". persistMedia is a real network upload, so
+  // it must never run for a collection that is about to fail the
+  // format:json check — otherwise a markdown/frontmatter entry with an
+  // image/file field orphans an uploaded asset server-side even though the
+  // entry save itself fails.
+  it('never calls persistMedia for a non-JSON-format collection, even with assets attached', async () => {
+    const mockPersistMedia = vi.spyOn(backend, 'persistMedia').mockResolvedValue({
+      id: 'asset-1',
+      name: 'image.jpg',
+      url: 'http://example.com/image.jpg',
+    } as any);
+
+    const raw = '---\ntitle: My Post\n---\n\nBody text here.';
+    const asset = { path: 'uploads/image.jpg', fileObj: new File(['a'], 'image.jpg', { type: 'image/jpeg' }) } as any;
+
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'posts/my-post.md', raw }], assets: [asset] },
+        { newEntry: true, useWorkflow: false, collectionName: 'posts' },
+      ),
+    ).rejects.toThrow(/only supports JSON-format collections/);
+
+    expect(mockPersistMedia).not.toHaveBeenCalled();
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+
+  it('uploads each asset via persistMedia before writing the document', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    const mockPersistMedia = vi.spyOn(backend, 'persistMedia').mockResolvedValue({
+      id: 'asset-1',
+      name: 'image.jpg',
+      url: 'http://example.com/image.jpg',
+    } as any);
+
+    const asset1 = { path: 'uploads/image.jpg', fileObj: new File(['a'], 'image.jpg', { type: 'image/jpeg' }) } as any;
+    const asset2 = { path: 'uploads/doc.pdf', fileObj: new File(['b'], 'doc.pdf', { type: 'application/pdf' }) } as any;
+
+    await backend.persistEntry(
+      {
+        dataFiles: [{ path: 'articles/hello.json', raw: JSON.stringify({ title: 'Hello' }) }],
+        assets: [asset1, asset2],
+      },
+      { newEntry: true, useWorkflow: false },
+    );
+
+    expect(mockPersistMedia).toHaveBeenCalledTimes(2);
+    expect(mockPersistMedia).toHaveBeenCalledWith(asset1, expect.anything());
+    expect(mockPersistMedia).toHaveBeenCalledWith(asset2, expect.anything());
+    expect(mockDocRepo.createDocument).toHaveBeenCalledOnce();
+  });
+
+  it('throws and does not write document when persistMedia fails on first asset', async () => {
+    mockDocRepo.createDocument.mockImplementation(() => succeed(undefined));
+
+    vi.spyOn(backend, 'persistMedia').mockRejectedValue(new Error('upload failed'));
+
+    const asset = { path: 'uploads/image.jpg', fileObj: new File(['a'], 'image.jpg', { type: 'image/jpeg' }) } as any;
+
+    await expect(
+      backend.persistEntry(
+        { dataFiles: [{ path: 'articles/hello.json', raw: JSON.stringify({ title: 'Hello' }) }], assets: [asset] },
+        { newEntry: true, useWorkflow: false },
+      ),
+    ).rejects.toThrow('upload failed');
+
+    expect(mockDocRepo.createDocument).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: unpublishedEntries
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.unpublishedEntries()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig({
+      collections: [{ name: 'articles' }, { name: 'pages' }],
+    }));
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns keys for all unpublished records across collections', async () => {
+    mockDocRepo.listRecords
+      .mockReturnValueOnce(ContentiaStream.succeedMany([
+        {
+          key: 'articles/draft-one',
+          content: { title: 'Draft One' },
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ] as any[], {}))
+      .mockReturnValueOnce(ContentiaStream.succeedMany([
+        {
+          key: 'pages/draft-page',
+          content: { title: 'Draft Page' },
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-02T00:00:00Z',
+        },
+      ] as any[], {}));
+
+    const keys = await backend.unpublishedEntries();
+
+    expect(keys).toContain('articles/draft-one');
+    expect(keys).toContain('pages/draft-page');
+    expect(keys).toHaveLength(2);
+  });
+
+  it('returns empty array when no unpublished records exist', async () => {
+    mockDocRepo.listRecords.mockReturnValue(empty());
+
+    const keys = await backend.unpublishedEntries();
+
+    expect(keys).toEqual([]);
+  });
+
+  it('skips RecoverableError elements and continues with remaining valid records', async () => {
+    // Use ContentiaStream.make to emit a recoverable error then a valid Data element.
+    const { ContentiaStream: LS, NotFoundError: NFE } = await import('contentia/core');
+    const Effect = await import('effect/Effect');
+    const mixedStream = LS.make<
+      { key: string, content: object, type: string, status: string, updatedAt: string },
+      object
+    >(emit =>
+      Effect.gen(function*() {
+        yield* emit.recoverableError(new NFE('simulated repo warning'));
+        yield* emit.data({
+          key: 'articles/ok',
+          content: { title: 'OK' },
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-01T00:00:00Z',
+        });
+        return {};
+      })
+    );
+    mockDocRepo.listRecords
+      .mockReturnValueOnce(mixedStream)
+      .mockReturnValueOnce(empty());
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const keys = await backend.unpublishedEntries();
+      expect(keys).toContain('articles/ok');
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('returns cached result on second call without hitting the repo again', async () => {
+    mockDocRepo.listRecords
+      .mockReturnValue(ContentiaStream.succeedMany([
+        {
+          key: 'articles/cached',
+          content: {},
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ] as any[], {}));
+
+    await backend.unpublishedEntries();
+    await backend.unpublishedEntries();
+
+    // listRecords is called once per collection per call; with caching the second
+    // unpublishedEntries() call should NOT re-invoke listRecords at all.
+    // We have 2 collections → first call = 2 invocations; second call = 0.
+    expect(mockDocRepo.listRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('populates unpublishedEntryCache so a subsequent unpublishedEntry() call skips the repo', async () => {
+    mockDocRepo.listRecords
+      .mockReturnValueOnce(ContentiaStream.succeedMany([
+        {
+          key: 'articles/pre-cached',
+          content: { title: 'Pre' },
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ] as any[], {}))
+      .mockReturnValueOnce(empty());
+
+    await backend.unpublishedEntries();
+
+    // Now calling unpublishedEntry with the same key should be served from cache
+    const entry = await backend.unpublishedEntry({ id: 'articles/pre-cached' });
+
+    expect(entry.collection).toBe('articles');
+    expect(entry.slug).toBe('pre-cached');
+    // getUnpublished should NOT have been called (cache hit)
+    expect(mockDocRepo.getUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('returns all 110 entries when collection has more than 100 unpublished records (pagination loop)', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      key: `articles/draft-${i}`,
+      content: { title: `Draft ${i}` },
+      type: 'unpublished' as const,
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    }));
+    const page2 = Array.from({ length: 10 }, (_, i) => ({
+      key: `articles/draft-${100 + i}`,
+      content: { title: `Draft ${100 + i}` },
+      type: 'unpublished' as const,
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    }));
+
+    mockDocRepo.listRecords
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page1 as any[], {}))
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page2 as any[], {}))
+      // second collection (pages) returns empty
+      .mockReturnValueOnce(ContentiaStream.succeedMany([] as any[], {}));
+
+    const keys = await backend.unpublishedEntries();
+
+    expect(keys).toHaveLength(110);
+    expect(keys[0]).toBe('articles/draft-0');
+    expect(keys[99]).toBe('articles/draft-99');
+    expect(keys[100]).toBe('articles/draft-100');
+    expect(keys[109]).toBe('articles/draft-109');
+    expect(mockDocRepo.listRecords).toHaveBeenCalledTimes(3);
+    expect(mockDocRepo.listRecords).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ pagination: { limit: 100, offset: 0 } }),
+    );
+    expect(mockDocRepo.listRecords).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ pagination: { limit: 100, offset: 100 } }),
+    );
+    expect(mockDocRepo.listRecords).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ pagination: { limit: 100, offset: 0 } }),
+    );
+  });
+
+  it('routes RecoverableErrors to a custom onWarning handler instead of console.warn', async () => {
+    const { ContentiaStream: LS, NotFoundError: NFE } = await import('contentia/core');
+    const Effect = await import('effect/Effect');
+
+    const observed: unknown[] = [];
+    const localMockRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => localMockRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+      onWarning: (e: unknown) => {
+        observed.push(e);
+      },
+    });
+    const localBackend = new ContentiaBackend(makeConfig({ collections: [{ name: 'articles' }] })) as any;
+    (localBackend as any).documentsRepository = localMockRepo;
+    (localBackend as any).tokenPromise = () => Promise.resolve('fake-token');
+
+    const mixedStream = LS.make<
+      { key: string, content: object, type: string, status: string, updatedAt: string },
+      object
+    >(emit =>
+      Effect.gen(function*() {
+        yield* emit.recoverableError(new NFE('simulated repo warning'));
+        yield* emit.data({
+          key: 'articles/ok',
+          content: { title: 'OK' },
+          type: 'unpublished',
+          status: 'draft',
+          updatedAt: '2024-01-01T00:00:00Z',
+        });
+        return {};
+      })
+    );
+    localMockRepo.listRecords.mockReturnValueOnce(mixedStream as any);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const keys = await localBackend.unpublishedEntries();
+      expect(keys).toContain('articles/ok');
+      expect(observed).toHaveLength(1);
+      expect(observed[0]).toBeInstanceOf(NFE);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: unpublishedEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.unpublishedEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns correct shape when fetched by id', async () => {
+    const unpub = {
+      key: 'articles/my-draft',
+      content: { title: 'My Draft' },
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    const entry = await backend.unpublishedEntry({ id: 'articles/my-draft' });
+
+    expect(entry).toMatchObject({
+      collection: 'articles',
+      slug: 'my-draft',
+      status: 'draft',
+      diffs: [],
+    });
+    expect(typeof entry.updatedAt).toBe('string');
+  });
+
+  it('returns correct shape when fetched by collection + slug', async () => {
+    const unpub = {
+      key: 'posts/hello-world',
+      content: 'raw md',
+      type: 'unpublished',
+      status: 'inReview',
+      updatedAt: '2024-02-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    const entry = await backend.unpublishedEntry({ collection: 'posts', slug: 'hello-world' });
+
+    expect(entry.collection).toBe('posts');
+    expect(entry.slug).toBe('hello-world');
+    expect(entry.status).toBe('inReview');
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledWith('posts/hello-world');
+  });
+
+  it('strips file extensions from id before querying', async () => {
+    const unpub = {
+      key: 'articles/no-ext',
+      content: {},
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    await backend.unpublishedEntry({ id: 'articles/no-ext.json' });
+
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledWith('articles/no-ext');
+  });
+
+  it('returns cached result on second call without hitting the repo again', async () => {
+    const unpub = {
+      key: 'articles/dup',
+      content: {},
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    await backend.unpublishedEntry({ id: 'articles/dup' });
+    await backend.unpublishedEntry({ id: 'articles/dup' });
+
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when neither id nor collection+slug provided', async () => {
+    await expect(backend.unpublishedEntry({})).rejects.toThrow();
+  });
+
+  it('throws APIError when repo returns not-found', async () => {
+    mockDocRepo.getUnpublished.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'not here' }));
+
+    await expect(backend.unpublishedEntry({ id: 'articles/missing' })).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: unpublishedEntryDataFile
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.unpublishedEntryDataFile()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns stringified content for an object payload', async () => {
+    const unpub = {
+      key: 'articles/data-entry',
+      content: { title: 'Data' },
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    const result = await backend.unpublishedEntryDataFile(
+      'articles',
+      'data-entry',
+      'articles/data-entry',
+      'articles/data-entry',
+    );
+
+    expect(result).toBe(JSON.stringify({ title: 'Data' }));
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledWith('articles/data-entry');
+  });
+
+  it('returns raw string content as-is', async () => {
+    const raw = '---\ntitle: Raw\n---\n\nBody.';
+    const unpub = {
+      key: 'posts/raw',
+      content: raw,
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    const result = await backend.unpublishedEntryDataFile('posts', 'raw', 'posts/raw', 'posts/raw');
+
+    expect(result).toBe(raw);
+  });
+
+  it('prefers id over path when building the key', async () => {
+    const unpub = {
+      key: 'articles/by-id',
+      content: {},
+      type: 'unpublished',
+      status: 'draft',
+      updatedAt: '2024-01-01T00:00:00Z',
+    };
+    mockDocRepo.getUnpublished.mockReturnValue(succeed(unpub));
+
+    await backend.unpublishedEntryDataFile('articles', 'other', 'articles/other', 'articles/by-id');
+
+    expect(mockDocRepo.getUnpublished).toHaveBeenCalledWith('articles/by-id');
+  });
+
+  it('throws when repo returns error', async () => {
+    mockDocRepo.getUnpublished.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'gone' }));
+
+    await expect(
+      backend.unpublishedEntryDataFile('articles', 'gone', 'articles/gone', 'articles/gone'),
+    ).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: updateUnpublishedEntryStatus
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.updateUnpublishedEntryStatus()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('calls repo.updateUnpublished with normalised key and new status', async () => {
+    mockDocRepo.updateUnpublished.mockReturnValue(succeed(undefined));
+
+    await backend.updateUnpublishedEntryStatus('articles', 'my-post', 'inReview');
+
+    expect(mockDocRepo.updateUnpublished).toHaveBeenCalledWith({
+      key: 'articles/my-post',
+      status: 'inReview',
+    });
+  });
+
+  it('strips file extension from slug before building key', async () => {
+    mockDocRepo.updateUnpublished.mockReturnValue(succeed(undefined));
+
+    await backend.updateUnpublishedEntryStatus('articles', 'my-post.json', 'ready');
+
+    expect(mockDocRepo.updateUnpublished).toHaveBeenCalledWith({
+      key: 'articles/my-post',
+      status: 'ready',
+    });
+  });
+
+  it('throws APIError when repo returns error', async () => {
+    mockDocRepo.updateUnpublished.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'not found' }));
+
+    await expect(
+      backend.updateUnpublishedEntryStatus('articles', 'missing', 'inReview'),
+    ).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: deleteUnpublishedEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.deleteUnpublishedEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('calls repo.deleteUnpublished with the normalised key', async () => {
+    mockDocRepo.deleteUnpublished.mockReturnValue(succeed(undefined));
+
+    await backend.deleteUnpublishedEntry('articles', 'my-draft');
+
+    expect(mockDocRepo.deleteUnpublished).toHaveBeenCalledWith('articles/my-draft');
+  });
+
+  it('strips file extension from slug before calling deleteUnpublished', async () => {
+    mockDocRepo.deleteUnpublished.mockReturnValue(succeed(undefined));
+
+    await backend.deleteUnpublishedEntry('articles', 'my-draft.md');
+
+    expect(mockDocRepo.deleteUnpublished).toHaveBeenCalledWith('articles/my-draft');
+  });
+
+  it('throws APIError when repo returns error', async () => {
+    mockDocRepo.deleteUnpublished.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'not found' }));
+
+    await expect(backend.deleteUnpublishedEntry('articles', 'missing')).rejects.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: publishUnpublishedEntry
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.publishUnpublishedEntry()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockDocRepo = makeMockDocumentsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).documentsRepository = mockDocRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('calls repo.publish with the normalised key', async () => {
+    mockDocRepo.publish.mockReturnValue(succeed(undefined));
+
+    await backend.publishUnpublishedEntry('articles', 'my-draft');
+
+    expect(mockDocRepo.publish).toHaveBeenCalledWith('articles/my-draft');
+  });
+
+  it('strips file extension from slug before publishing', async () => {
+    mockDocRepo.publish.mockReturnValue(succeed(undefined));
+
+    await backend.publishUnpublishedEntry('posts', 'hello-world.json');
+
+    expect(mockDocRepo.publish).toHaveBeenCalledWith('posts/hello-world');
+  });
+
+  it('throws APIError when repo.publish fails', async () => {
+    mockDocRepo.publish.mockReturnValue(fail({ code: 'NOT_FOUND', message: 'Entry not found' }));
+
+    await expect(backend.publishUnpublishedEntry('articles', 'bad-key')).rejects.toThrow();
+  });
+
+  it('resolves without error on success', async () => {
+    mockDocRepo.publish.mockReturnValue(succeed(undefined));
+
+    await expect(backend.publishUnpublishedEntry('articles', 'ok')).resolves.toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getMedia
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getMedia()', () => {
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns mapped ImplementationMediaFile array from listResources', async () => {
+    const asset = { key: 'assets/uploads/logo.svg', type: 'asset', content: { size: 1234 } };
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([asset as any], { total: 1 }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/logo.svg' }] as any, { total: 1 }),
+    );
+
+    const media = await backend.getMedia('assets/uploads');
+
+    expect(media).toHaveLength(1);
+    expect(media[0]).toMatchObject({
+      id: 'assets/uploads/logo.svg',
+      name: 'logo.svg',
+      size: 1234,
+      path: 'assets/uploads/logo.svg',
+      displayURL: 'https://cdn.example.com/logo.svg',
+      url: 'https://cdn.example.com/logo.svg',
+    });
+  });
+
+  it('returns empty array when listResources throws a ContentiaError', async () => {
+    const { NotFoundError } = await import('contentia/core');
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.fail(new NotFoundError('folder not found')),
+    );
+
+    const media = await backend.getMedia('bad/folder');
+
+    expect(media).toEqual([]);
+  });
+
+  it('skips non-asset resources', async () => {
+    const folder = { key: 'assets/uploads/subfolder', type: 'folder', content: {} };
+    const asset = { key: 'assets/uploads/image.png', type: 'asset', content: { size: 500 } };
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([folder as any, asset as any], { total: 2 }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/image.png' }] as any, { total: 1 }),
+    );
+
+    const media = await backend.getMedia('assets/uploads');
+
+    expect(media).toHaveLength(1);
+    expect(media[0].name).toBe('image.png');
+  });
+
+  it('handles multiple assets across multiple listResources chunks', async () => {
+    const asset1 = { key: 'assets/uploads/a.jpg', type: 'asset', content: { size: 100 } };
+    const asset2 = { key: 'assets/uploads/b.jpg', type: 'asset', content: { size: 200 } };
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([asset1 as any, asset2 as any], { total: 2 }),
+    );
+    mockAssetsRepo.getUrls
+      .mockReturnValueOnce(
+        ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/a.jpg' }] as any, { total: 1 }),
+      )
+      .mockReturnValueOnce(
+        ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/b.jpg' }] as any, { total: 1 }),
+      );
+
+    const media = await backend.getMedia('assets/uploads');
+
+    expect(media).toHaveLength(2);
+    expect(media[0].name).toBe('a.jpg');
+    expect(media[1].name).toBe('b.jpg');
+  });
+
+  it('returns empty array when listResources emits no items', async () => {
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.empty({ total: 0 }),
+    );
+
+    const media = await backend.getMedia('assets/uploads');
+
+    expect(media).toEqual([]);
+  });
+
+  it('skips recoverable errors from listResources and continues, routing them to onWarning', async () => {
+    const { ContentiaStream: LS, NotFoundError: NFE } = await import('contentia/core');
+    const Effect = await import('effect/Effect');
+
+    const observed: unknown[] = [];
+    const localMockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => localMockAssetsRepo as any,
+      onWarning: (e: unknown) => {
+        observed.push(e);
+      },
+    });
+    const localBackend = new ContentiaBackend(makeConfig()) as any;
+    (localBackend as any).assetsRepository = localMockAssetsRepo;
+    (localBackend as any).tokenPromise = () => Promise.resolve('fake-token');
+
+    const asset = { key: 'assets/uploads/good.png', type: 'asset', content: { size: 50 } };
+    const mixedStream = LS.make<typeof asset, object>(emit =>
+      Effect.gen(function*() {
+        yield* emit.recoverableError(new NFE('simulated listing warning'));
+        yield* emit.data(asset);
+        return {};
+      })
+    );
+    localMockAssetsRepo.listResources.mockReturnValue(mixedStream as any);
+    localMockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/good.png' }] as any, { total: 1 }),
+    );
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const media = await localBackend.getMedia('assets/uploads');
+      expect(media).toHaveLength(1);
+      expect(observed).toHaveLength(1);
+      expect(observed[0]).toBeInstanceOf(NFE);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('returns all 101 assets when listResources yields more than 100 items across two pages (pagination loop)', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      key: `assets/uploads/img-${i}.jpg`,
+      type: 'asset',
+      content: { size: 100 + i },
+    }));
+    const page2 = [{ key: 'assets/uploads/img-100.jpg', type: 'asset', content: { size: 200 } }];
+
+    mockAssetsRepo.listResources
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page1 as any[], {}))
+      .mockReturnValueOnce(ContentiaStream.succeedMany(page2 as any[], {}));
+
+    mockAssetsRepo.getUrls.mockImplementation((resources: any[]) =>
+      ContentiaStream.succeedMany(
+        [{ url: `https://cdn.example.com/${resources[0].key}` }] as any,
+        { total: 1 },
+      )
+    );
+
+    const media = await backend.getMedia('assets/uploads');
+
+    expect(media).toHaveLength(101);
+    expect(media[0].name).toBe('img-0.jpg');
+    expect(media[99].name).toBe('img-99.jpg');
+    expect(media[100].name).toBe('img-100.jpg');
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledTimes(2);
+    expect(mockAssetsRepo.listResources).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ pagination: { limit: 100, offset: 0 } }),
+    );
+    expect(mockAssetsRepo.listResources).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ pagination: { limit: 100, offset: 100 } }),
+    );
+  });
+
+  // persistMedia writes the file name below the assets folder, and every
+  // lookup and delete maps a public or media path onto that same folder.
+  // Listing must use that same space or it asks for a folder no asset this
+  // backend wrote can ever be in.
+  it('lists from the assets folder behind media_folder by default', async () => {
+    mockAssetsRepo.listResources.mockReturnValue(ContentiaStream.empty({ total: 0 }));
+
+    await backend.getMedia();
+
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledWith(
+      'assets/uploads',
+      expect.anything(),
+    );
+  });
+
+  it.each([
+    ['', undefined, ''],
+    ['', 'assets/uploads/logos', 'logos'],
+    ['media', undefined, 'media'],
+    ['/media/', 'assets/uploads/logos', 'media/logos'],
+  ])('lists below assets_folder %j for folder %j', async (assetsFolder, folder, expected) => {
+    const localMockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => localMockAssetsRepo as any,
+    });
+    const localBackend: any = new ContentiaBackend(
+      makeConfig({ backend: { ...makeConfig().backend, assets_folder: assetsFolder } }),
+    );
+    localBackend.assetsRepository = localMockAssetsRepo;
+    localBackend.tokenPromise = () => Promise.resolve('fake-token');
+    localMockAssetsRepo.listResources.mockReturnValue(ContentiaStream.empty({ total: 0 }));
+
+    await localBackend.getMedia(folder);
+
+    expect(localMockAssetsRepo.listResources).toHaveBeenCalledWith(expected, expect.anything());
+  });
+
+  it('keeps a folder that is not below media_folder as the storage folder key', async () => {
+    mockAssetsRepo.listResources.mockReturnValue(ContentiaStream.empty({ total: 0 }));
+
+    await backend.getMedia('posts/media');
+
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledWith(
+      'posts/media',
+      expect.anything(),
+    );
+  });
+
+  it('keeps a sub-folder of media_folder below the assets folder', async () => {
+    mockAssetsRepo.listResources.mockReturnValue(ContentiaStream.empty({ total: 0 }));
+
+    await backend.getMedia('assets/uploads/logos');
+
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledWith(
+      'assets/uploads/logos',
+      expect.anything(),
+    );
+  });
+
+  it('maps public_folder onto the assets folder when it differs from media_folder', async () => {
+    const localMockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => localMockAssetsRepo as any,
+    });
+    const localBackend: any = new ContentiaBackend(
+      makeConfig({ media_folder: 'static/img', public_folder: '/img' }),
+    );
+    localBackend.assetsRepository = localMockAssetsRepo;
+    localBackend.tokenPromise = () => Promise.resolve('fake-token');
+    localMockAssetsRepo.listResources.mockReturnValue(ContentiaStream.empty({ total: 0 }));
+
+    await localBackend.getMedia('/img/logos');
+
+    expect(localMockAssetsRepo.listResources).toHaveBeenCalledWith(
+      'static/img/logos',
+      expect.anything(),
+    );
+  });
+
+  it('routes a listResources failure to the warning handler instead of console.error', async () => {
+    const { NotFoundError } = await import('contentia/core');
+    const observed: unknown[] = [];
+    const localMockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => localMockAssetsRepo as any,
+      onWarning: (e: unknown) => {
+        observed.push(e);
+      },
+    });
+    const localBackend = new ContentiaBackend(makeConfig()) as any;
+    (localBackend as any).assetsRepository = localMockAssetsRepo;
+    (localBackend as any).tokenPromise = () => Promise.resolve('fake-token');
+
+    localMockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.fail(new NotFoundError('folder not found')),
+    );
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const media = await localBackend.getMedia('assets/uploads');
+      expect(media).toEqual([]);
+      expect(observed).toHaveLength(1);
+      expect(observed[0]).toBeInstanceOf(NotFoundError);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getMediaPage
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getMediaPage()', () => {
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  // Same storage-space rule as getMedia: the paginated surface lists where
+  // persistMedia writes.
+  it('lists from the assets folder behind media_folder', async () => {
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([], { pagination: {} }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(ContentiaStream.succeedMany([], { total: 0 }));
+
+    await backend.getMediaPage({ perPage: 100 });
+
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledWith(
+      'assets/uploads',
+      expect.objectContaining({ depth: Infinity }),
+    );
+  });
+
+  it('lists from the root of an assets store rooted at the media folder', async () => {
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const flat: any = new ContentiaBackend(
+      makeConfig({ backend: { ...makeConfig().backend, assets_folder: '' } }),
+    );
+    flat.assetsRepository = mockAssetsRepo;
+    flat.tokenPromise = () => Promise.resolve('fake-token');
+    mockAssetsRepo.listResources.mockReturnValue(ContentiaStream.succeedMany([], { pagination: {} }));
+    mockAssetsRepo.getUrls.mockReturnValue(ContentiaStream.succeedMany([], { total: 0 }));
+
+    await flat.getMediaPage({ perPage: 100 });
+
+    expect(mockAssetsRepo.listResources).toHaveBeenCalledWith('', expect.objectContaining({ depth: Infinity }));
+  });
+
+  // folder resources are filtered out of the paginated surface by
+  // default (matching pre-fix behavior for callers that don't understand
+  // isDirectory), but surfaced as isDirectory entries when the caller opts
+  // in via folderSupport, mirroring getMedia's folderSupport handling.
+  it('omits folder resources when folderSupport is not requested', async () => {
+    const folder = { key: 'assets/uploads/subfolder', type: 'folder', content: {} };
+    const asset = { key: 'assets/uploads/image.png', type: 'asset', content: { size: 500 } };
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([folder as any, asset as any], { pagination: {} }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany(
+        [{ key: 'assets/uploads/image.png', url: 'https://cdn.example.com/image.png' }] as any,
+        {
+          total: 1,
+        },
+      ),
+    );
+
+    const page = await backend.getMediaPage({ perPage: 100 });
+
+    expect(page.files).toHaveLength(1);
+    expect(page.files[0]).toMatchObject({ name: 'image.png' });
+    expect(page.files[0].isDirectory).toBeUndefined();
+  });
+
+  it('surfaces folder resources as isDirectory entries when folderSupport is true', async () => {
+    const folder = { key: 'assets/uploads/subfolder', type: 'folder', content: {} };
+    const asset = { key: 'assets/uploads/image.png', type: 'asset', content: { size: 500 } };
+    mockAssetsRepo.listResources.mockReturnValue(
+      ContentiaStream.succeedMany([folder as any, asset as any], { pagination: {} }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany(
+        [{ key: 'assets/uploads/image.png', url: 'https://cdn.example.com/image.png' }] as any,
+        {
+          total: 1,
+        },
+      ),
+    );
+
+    const page: CmsMediaPage = await backend.getMediaPage({ perPage: 100, folderSupport: true });
+
+    expect(page.files).toHaveLength(2);
+    const folderEntry = page.files.find(f => f.isDirectory);
+    expect(folderEntry).toMatchObject({
+      id: 'assets/uploads/subfolder',
+      name: 'subfolder',
+      isDirectory: true,
+    });
+    const fileEntry = page.files.find(f => !f.isDirectory);
+    expect(fileEntry).toMatchObject({ name: 'image.png' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getMediaDisplayURL
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getMediaDisplayURL()', () => {
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns string DisplayURL unchanged', async () => {
+    const url = 'https://cdn.example.com/existing.jpg';
+    const result = await backend.getMediaDisplayURL(url);
+    expect(result).toBe(url);
+  });
+
+  it('calls getMediaFile to resolve an object DisplayURL', async () => {
+    const asset = { key: 'image.png', content: { size: 100 } };
+    mockAssetsRepo.getAsset.mockReturnValue(succeed(asset));
+    mockAssetsRepo.getMetadata.mockReturnValue(
+      ContentiaStream.succeedMany([{ metadata: { mimeType: 'image/png' } }] as any, { total: 1 }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/image.png' }] as any, { total: 1 }),
+    );
+
+    const displayURL = { id: 'image.png', path: 'image.png' };
+    const result = await backend.getMediaDisplayURL(displayURL);
+
+    expect(result).toBe('https://cdn.example.com/image.png');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: getMediaFile
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.getMediaFile()', () => {
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  it('returns correct ImplementationMediaFile shape', async () => {
+    const asset = { key: 'photo.jpg', content: { size: 2048 } };
+    mockAssetsRepo.getAsset.mockReturnValue(succeed(asset));
+    mockAssetsRepo.getMetadata.mockReturnValue(
+      ContentiaStream.succeedMany([{ metadata: { mimeType: 'image/jpeg' } }] as any, { total: 1 }),
+    );
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/photo.jpg' }] as any, { total: 1 }),
+    );
+
+    const result = await backend.getMediaFile('photo.jpg');
+
+    // `path` is the public (media_folder-prefixed) path, not the bare
+    // storage key — it must match what content stores and what Decap's
+    // `dirname(path) === media_folder` picker filter expects.
+    expect(result).toMatchObject({
+      id: 'photo.jpg',
+      name: 'photo.jpg',
+      path: 'assets/uploads/photo.jpg',
+      displayURL: 'https://cdn.example.com/photo.jpg',
+      url: 'https://cdn.example.com/photo.jpg',
+    });
+    expect(result.file).toBeInstanceOf(File);
+    expect(result.file.name).toBe('photo.jpg');
+    expect(result.file.type).toBe('image/jpeg');
+  });
+
+  it.each([
+    // [media_folder, public_folder, assets_folder, path, asset key]
+    ['assets/uploads', 'assets/uploads', undefined, 'assets/uploads/photo.jpg', 'assets/uploads/photo.jpg'],
+    ['static/img', '/img', undefined, '/img/photo.jpg', 'static/img/photo.jpg'],
+    ['static/img', '/img', undefined, 'static/img/photo.jpg', 'static/img/photo.jpg'],
+    ['assets/uploads', 'assets/uploads', '', 'assets/uploads/photo.jpg', 'photo.jpg'],
+    ['static/img', '/img', '', 'static/img/photo.jpg', 'photo.jpg'],
+    ['static/img', '/img', 'media', '/img/photo.jpg', 'media/photo.jpg'],
+  ])(
+    'with media_folder %j, public_folder %j and assets_folder %j, reads %j as %j',
+    async (mediaFolder, publicFolder, assetsFolder, path, key) => {
+      const cfg = makeConfig({
+        media_folder: mediaFolder,
+        public_folder: publicFolder,
+        backend: { ...makeConfig().backend, ...(assetsFolder === undefined ? {} : { assets_folder: assetsFolder }) },
+      });
+      const ContentiaBackend = createContentiaBackend({
+        getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+        getAssetsRepository: () => mockAssetsRepo as any,
+      });
+      const localBackend = new ContentiaBackend(cfg) as any;
+      localBackend.assetsRepository = mockAssetsRepo;
+      localBackend.tokenPromise = () => Promise.resolve('fake-token');
+
+      mockAssetsRepo.getAsset.mockReturnValue(succeed({ key, content: { size: 512 } }));
+      mockAssetsRepo.getMetadata.mockReturnValue(
+        ContentiaStream.succeedMany([{ metadata: { mimeType: 'image/jpeg' } }] as any, { total: 1 }),
+      );
+      mockAssetsRepo.getUrls.mockReturnValue(
+        ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/photo.jpg' }] as any, { total: 1 }),
+      );
+
+      await localBackend.getMediaFile(path);
+
+      expect(mockAssetsRepo.getAsset).toHaveBeenCalledWith(key);
+    },
+  );
+
+  it('throws APIError when getAsset fails', async () => {
+    mockAssetsRepo.getAsset.mockReturnValue(fail({ message: 'Not found' }));
+
+    await expect(backend.getMediaFile('missing.jpg')).rejects.toMatchObject({
+      name: API_ERROR,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: persistMedia
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.persistMedia()', () => {
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+
+  beforeEach(() => {
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    (backend as any).assetsRepository = mockAssetsRepo;
+    (backend as any).tokenPromise = () => Promise.resolve('fake-token');
+  });
+
+  function makeAssetProxy(overrides: Record<string, unknown> = {}) {
+    const fileBlob = new File(['file content'], 'photo.jpg', { type: 'image/jpeg' });
+    return {
+      path: 'assets/uploads/photo.jpg',
+      fileObj: fileBlob,
+      ...overrides,
+    };
+  }
+
+  it('throws APIError when fileObj is absent', async () => {
+    const proxy = { path: 'assets/uploads/photo.jpg', fileObj: undefined };
+    await expect(
+      backend.persistMedia(proxy as any, {}),
+    ).rejects.toMatchObject({ name: API_ERROR, status: 400 });
+  });
+
+  it('stores the file name below media_folder by default', async () => {
+    const newAsset = { key: 'assets/uploads/photo.jpg', content: { size: 13 } };
+    mockAssetsRepo.createAsset.mockReturnValue(succeed(newAsset));
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/photo.jpg' }] as any, { total: 1 }),
+    );
+
+    const proxy = makeAssetProxy();
+    const result = await backend.persistMedia(proxy as any, {});
+
+    expect(mockAssetsRepo.createAsset).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'assets/uploads/photo.jpg' }),
+    );
+    expect(result).toMatchObject({
+      id: 'assets/uploads/photo.jpg',
+      name: 'photo.jpg',
+      path: 'assets/uploads/photo.jpg',
+      displayURL: 'https://cdn.example.com/photo.jpg',
+      url: 'https://cdn.example.com/photo.jpg',
+    });
+  });
+
+  it('stores the bare file name in an assets store rooted at the media folder', async () => {
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const flat: any = new ContentiaBackend(
+      makeConfig({ backend: { ...makeConfig().backend, assets_folder: '' } }),
+    );
+    flat.assetsRepository = mockAssetsRepo;
+    flat.tokenPromise = () => Promise.resolve('fake-token');
+    mockAssetsRepo.createAsset.mockReturnValue(succeed({ key: 'photo.jpg', content: { size: 13 } }));
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/photo.jpg' }] as any, { total: 1 }),
+    );
+
+    const result = await flat.persistMedia(makeAssetProxy() as any, {});
+
+    expect(mockAssetsRepo.createAsset).toHaveBeenCalledWith(expect.objectContaining({ key: 'photo.jpg' }));
+    // Stored flat under the bare filename, but reported back under the
+    // public (media_folder-prefixed) path — see getMediaFile shape test.
+    expect(result).toMatchObject({ id: 'photo.jpg', name: 'photo.jpg', path: 'assets/uploads/photo.jpg' });
+  });
+
+  it('returns ImplementationMediaFile with correct shape', async () => {
+    const newAsset = { key: 'photo.jpg', content: { size: 13 } };
+    mockAssetsRepo.createAsset.mockReturnValue(succeed(newAsset));
+    mockAssetsRepo.getUrls.mockReturnValue(
+      ContentiaStream.succeedMany([{ url: 'https://cdn.example.com/photo.jpg' }] as any, { total: 1 }),
+    );
+
+    const fileBlob = new File(['file content'], 'photo.jpg', { type: 'image/jpeg' });
+    const proxy = makeAssetProxy({ fileObj: fileBlob });
+    const result = await backend.persistMedia(proxy as any, {});
+
+    expect(result.file).toBe(fileBlob);
+    expect(result.size).toBe(fileBlob.size);
+  });
+
+  it('throws APIError when createAsset fails', async () => {
+    mockAssetsRepo.createAsset.mockReturnValue(fail({ message: 'storage error', code: 'INTERNAL' }));
+
+    await expect(
+      backend.persistMedia(makeAssetProxy() as any, {}),
+    ).rejects.toMatchObject({ name: API_ERROR });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sessionStorage mock helper (test env is Node — no browser globals)
+// ---------------------------------------------------------------------------
+
+function makeSessionStorageMock() {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => {
+      store.clear();
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Suite: authenticate()
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.authenticate()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let backend: any;
+  let sessionStorageMock: ReturnType<typeof makeSessionStorageMock>;
+
+  beforeEach(() => {
+    sessionStorageMock = makeSessionStorageMock();
+    (globalThis as any).sessionStorage = sessionStorageMock;
+
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    backend = new ContentiaBackend(makeConfig());
+    vi.mocked(unsentRequest.fetchWithTimeout).mockReset();
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).sessionStorage;
+  });
+
+  it('success: valid token + ok /session response → returns User with correct shape', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Alice',
+              email: 'alice@example.com',
+              avatar_url: 'https://example.com/avatar.png',
+              scopes: ['content:read', 'content:write'],
+            },
+          },
+        }),
+    } as any);
+
+    const user = await backend.authenticate({ token: 'valid-token-abc' });
+
+    expect(user).toMatchObject({
+      name: 'Alice',
+      login: 'alice@example.com',
+      avatar_url: 'https://example.com/avatar.png',
+      scopes: ['content:read', 'content:write'],
+    });
+  });
+
+  it('success: repositories are initialized after authenticate()', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { attributes: { name: 'Alice', email: 'alice@example.com' } } }),
+    } as any);
+
+    // Before auth: getDocumentsRepo() and getAssetsRepo() throw
+    expect(() => backend.getDocumentsRepo()).toThrow();
+    expect(() => backend.getAssetsRepo()).toThrow();
+
+    await backend.authenticate({ token: 'valid-token-abc' });
+
+    // After auth: repositories are set and getters no longer throw
+    expect(() => backend.getDocumentsRepo()).not.toThrow();
+    expect(() => backend.getAssetsRepo()).not.toThrow();
+  });
+
+  it('success: normalizes an OAuth scope string from the session', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Alice',
+              email: 'alice@example.com',
+              scope: 'content:read content:write',
+            },
+          },
+        }),
+    } as any);
+
+    const user = await backend.authenticate({ token: 'valid-token-abc' });
+
+    expect(user.scopes).toEqual(['content:read', 'content:write']);
+  });
+
+  it('success: getToken() resolves to the authenticated token', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { attributes: { name: 'Alice', email: 'alice@example.com' } } }),
+    } as any);
+
+    await backend.authenticate({ token: 'my-token-xyz' });
+
+    await expect(backend.getToken()).resolves.toBe('my-token-xyz');
+  });
+
+  it('success: stores token in sessionStorage', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { attributes: { name: 'Alice', email: 'alice@example.com' } } }),
+    } as any);
+
+    await backend.authenticate({ token: 'stored-token' });
+
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('stored-token');
+  });
+
+  it('failure: non-ok /session response → throws APIError', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: false,
+      text: () => Promise.resolve('Unauthorized'),
+    } as any);
+
+    await expect(backend.authenticate({ token: 'bad-token' })).rejects.toMatchObject({
+      name: API_ERROR,
+    });
+  });
+
+  it('failure: non-ok response removes token from sessionStorage', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    sessionStorageMock.setItem('contentia_access_token', 'old-token');
+
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: false,
+      text: () => Promise.resolve('Unauthorized'),
+    } as any);
+
+    await expect(backend.authenticate({ token: 'bad-token' })).rejects.toBeDefined();
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBeNull();
+  });
+
+  it('throws AccessTokenError when credentials has no token', async () => {
+    await expect(backend.authenticate({} as any)).rejects.toMatchObject({
+      name: ACCESS_TOKEN_ERROR,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: authenticate() acceptRoles enforcement
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.authenticate() acceptRoles enforcement', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let sessionStorageMock: ReturnType<typeof makeSessionStorageMock>;
+
+  function makeBackendWithAcceptRoles(acceptRoles: string[]) {
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    return new ContentiaBackend(makeConfig({
+      backend: {
+        name: 'contentia',
+        base_url: 'https://api.example.com',
+        api_root: '',
+        acceptRoles,
+      },
+    })) as any;
+  }
+
+  beforeEach(() => {
+    sessionStorageMock = makeSessionStorageMock();
+    (globalThis as any).sessionStorage = sessionStorageMock;
+    vi.mocked(unsentRequest.fetchWithTimeout).mockReset();
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).sessionStorage;
+  });
+
+  it('denies access when the session role is not in acceptRoles', async () => {
+    const backend = makeBackendWithAcceptRoles(['editor']);
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Mallory',
+              email: 'mallory@example.com',
+              role: 'viewer',
+              scopes: ['content:read'],
+            },
+          },
+        }),
+    } as any);
+
+    await expect(backend.authenticate({ token: 'valid-token-abc' })).rejects.toMatchObject({
+      name: API_ERROR,
+      status: 403,
+    });
+
+    // No repositories, no persisted session — the rejected role never gets
+    // past the check in authenticate().
+    expect(() => backend.getDocumentsRepo()).toThrow();
+    expect(() => backend.getAssetsRepo()).toThrow();
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBeNull();
+  });
+
+  it('denies access when acceptRoles is configured but the session has no role', async () => {
+    const backend = makeBackendWithAcceptRoles(['editor']);
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Mallory',
+              email: 'mallory@example.com',
+              scopes: ['content:read'],
+            },
+          },
+        }),
+    } as any);
+
+    await expect(backend.authenticate({ token: 'valid-token-abc' })).rejects.toMatchObject({
+      name: API_ERROR,
+      status: 403,
+    });
+  });
+
+  it('admits access when the session role is in acceptRoles', async () => {
+    const backend = makeBackendWithAcceptRoles(['editor', 'admin']);
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Alice',
+              email: 'alice@example.com',
+              role: 'editor',
+              scopes: ['content:read', 'content:write'],
+            },
+          },
+        }),
+    } as any);
+
+    const user = await backend.authenticate({ token: 'valid-token-abc' });
+
+    expect(user).toMatchObject({ name: 'Alice', role: 'editor' });
+    expect(() => backend.getDocumentsRepo()).not.toThrow();
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('valid-token-abc');
+  });
+
+  it('admits any role when acceptRoles is not configured (no behavior change)', async () => {
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: { name: 'Anyone', email: 'anyone@example.com', role: 'anything' },
+          },
+        }),
+    } as any);
+
+    const user = await backend.authenticate({ token: 'valid-token-abc' });
+    expect(user).toMatchObject({ name: 'Anyone', role: 'anything' });
+  });
+
+  // Pinning test: `acceptRoles: []` is truthy but has
+  // `length === 0`, so the `length > 0` guard in authenticate() treats it
+  // identically to `acceptRoles` being unset — no enforcement. This matches
+  // the sibling git-gateway backend's `acceptRoles.length > 0` guard
+  // (implementation.tsx) and is documented as such in README.md. This test
+  // pins that behavior so a future refactor doesn't silently start rejecting
+  // deployments that configure `acceptRoles: []`.
+  it('admits access when acceptRoles is configured as an empty array', async () => {
+    const backend = makeBackendWithAcceptRoles([]);
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          data: {
+            attributes: {
+              name: 'Anyone',
+              email: 'anyone@example.com',
+              role: 'anything',
+              scopes: ['content:read'],
+            },
+          },
+        }),
+    } as any);
+
+    const user = await backend.authenticate({ token: 'valid-token-abc' });
+
+    expect(user).toMatchObject({ name: 'Anyone', role: 'anything' });
+    expect(() => backend.getDocumentsRepo()).not.toThrow();
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('valid-token-abc');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: restoreUser()
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend.restoreUser()', () => {
+  let mockDocRepo: ReturnType<typeof makeMockDocumentsRepository>;
+  let mockAssetsRepo: ReturnType<typeof makeMockAssetsRepository>;
+  let sessionStorageMock: ReturnType<typeof makeSessionStorageMock>;
+
+  const okSessionResponse = {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        data: { attributes: { name: 'Alice', email: 'alice@example.com' } },
+      }),
+  } as any;
+
+  beforeEach(() => {
+    sessionStorageMock = makeSessionStorageMock();
+    (globalThis as any).sessionStorage = sessionStorageMock;
+
+    mockDocRepo = makeMockDocumentsRepository();
+    mockAssetsRepo = makeMockAssetsRepository();
+    vi.mocked(unsentRequest.fetchWithTimeout).mockReset();
+  });
+
+  afterEach(() => {
+    delete (globalThis as any).sessionStorage;
+  });
+
+  it('with devToken: skips sessionStorage and delegates to authenticate()', async () => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue(okSessionResponse);
+
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_root: '',
+          dev_token: 'dev-secret-token',
+        },
+      }),
+    ) as any;
+
+    const user = await backend.restoreUser();
+
+    expect(user).toMatchObject({ name: 'Alice' });
+    expect(vi.mocked(unsentRequest.fetchWithTimeout)).toHaveBeenCalled();
+  });
+
+  it('with devToken: ignores any token in sessionStorage', async () => {
+    sessionStorageMock.setItem('contentia_access_token', 'session-token');
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue(okSessionResponse);
+
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_root: '',
+          dev_token: 'dev-secret-token',
+        },
+      }),
+    ) as any;
+
+    const user = await backend.restoreUser();
+
+    expect(user).toMatchObject({ name: 'Alice' });
+    // authenticate() stores dev-secret-token, overwriting the old session-token
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('dev-secret-token');
+  });
+
+  it('with no stored token and no devToken: rejects with AccessTokenError', async () => {
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    await expect(backend.restoreUser()).rejects.toMatchObject({
+      name: ACCESS_TOKEN_ERROR,
+    });
+  });
+
+  it('with stored sessionStorage token: delegates to authenticate() and returns User', async () => {
+    sessionStorageMock.setItem('contentia_access_token', 'stored-valid-token');
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue(okSessionResponse);
+
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => mockAssetsRepo as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+
+    const user = await backend.restoreUser();
+
+    expect(user).toMatchObject({ name: 'Alice' });
+    expect(vi.mocked(unsentRequest.fetchWithTimeout)).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: api_root resolution
+//
+// The API root is `base_url` combined with `api_root`. Laika's `api_url` alias
+// for `api_root` is not carried over.
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend api_root resolution', () => {
+  it('combines base_url with api_root', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_root: '/api',
+        },
+      }),
+    ) as any;
+
+    expect(backend.apiUrl).toBe('https://api.example.com/api');
+  });
+
+  it('uses base_url alone when api_root is absent, ignoring the Laika-era api_url alias', () => {
+    const ContentiaBackend = createContentiaBackend();
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_url: '/legacy-api',
+        },
+      }),
+    ) as any;
+
+    expect(backend.apiUrl).toBe('https://api.example.com');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: custom getDocumentsRepository/getAssetsRepository baseUrl
+//
+// Pins the documented behavior of `GetDocumentsRepositoryOptions.baseUrl` /
+// `GetAssetsRepositoryOptions.baseUrl`: a custom factory always receives the
+// backend's resolved `apiUrl` (base_url + api_root), never the
+// `documentsApiBaseUrl` / `assetsApiBaseUrl` override — those options are only
+// consumed by the built-in default factories.
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend custom repository factories receive apiUrl as baseUrl', () => {
+  const okSessionResponse = {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        data: { attributes: { name: 'Alice', email: 'alice@example.com' } },
+      }),
+  } as any;
+
+  beforeEach(() => {
+    vi.mocked(unsentRequest.fetchWithTimeout).mockReset();
+    vi.mocked(unsentRequest.fetchWithTimeout).mockResolvedValue(okSessionResponse);
+  });
+
+  it('passes this.apiUrl (base_url + api_root), not documentsApiBaseUrl, to a custom getDocumentsRepository', async () => {
+    const receivedOptions: Array<{ tokenPromise: () => Promise<string>, baseUrl: string }> = [];
+    const mockDocRepo = makeMockDocumentsRepository();
+
+    const ContentiaBackend = createContentiaBackend({
+      documentsApiBaseUrl: 'https://documents-override.example.com',
+      getDocumentsRepository: opts => {
+        receivedOptions.push(opts);
+        return mockDocRepo as any;
+      },
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: { name: 'contentia', base_url: 'https://api.example.com', api_root: '/api' },
+      }),
+    ) as any;
+
+    await backend.authenticate({ token: 'fake-token' });
+
+    expect(receivedOptions).toHaveLength(1);
+    // this.apiUrl === base_url combined with api_root
+    expect(receivedOptions[0].baseUrl).toBe('https://api.example.com/api');
+    expect(receivedOptions[0].baseUrl).not.toBe('https://documents-override.example.com');
+  });
+
+  it('passes this.apiUrl (base_url + api_root), not assetsApiBaseUrl, to a custom getAssetsRepository', async () => {
+    const receivedOptions: Array<{ tokenPromise: () => Promise<string>, baseUrl: string }> = [];
+    const mockAssetsRepo = makeMockAssetsRepository();
+
+    const ContentiaBackend = createContentiaBackend({
+      assetsApiBaseUrl: 'https://assets-override.example.com',
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: opts => {
+        receivedOptions.push(opts);
+        return mockAssetsRepo as any;
+      },
+    });
+    const backend = new ContentiaBackend(
+      makeConfig({
+        backend: { name: 'contentia', base_url: 'https://api.example.com', api_root: '/api' },
+      }),
+    ) as any;
+
+    await backend.authenticate({ token: 'fake-token' });
+
+    expect(receivedOptions).toHaveLength(1);
+    expect(receivedOptions[0].baseUrl).toBe('https://api.example.com/api');
+    expect(receivedOptions[0].baseUrl).not.toBe('https://assets-override.example.com');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: content sync (getSyncToken / getChanges)
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend content sync', () => {
+  function makeSyncBackend(repoOverrides: Record<string, unknown>) {
+    const mockDocRepo = { ...makeMockDocumentsRepository(), ...repoOverrides };
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => mockDocRepo as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    const backend = new ContentiaBackend(makeConfig()) as any;
+    backend.documentsRepository = mockDocRepo;
+    backend.tokenPromise = () => Promise.resolve('fake-token');
+    return { backend, mockDocRepo };
+  }
+
+  const enabledCapabilities = {
+    compatibilityDate: '2026-07-16',
+    changes: { supported: true, description: '', syncToken: true, changeFeed: true },
+  };
+
+  it('getSyncToken() returns null when capabilities do not advertise changes', async () => {
+    const { backend, mockDocRepo } = makeSyncBackend({
+      getSyncToken: vi.fn(() => succeed('sync-1')),
+    });
+    await expect(backend.getSyncToken()).resolves.toBeNull();
+    expect((mockDocRepo as any).getSyncToken).not.toHaveBeenCalled();
+  });
+
+  it('getSyncToken() returns null when the capability probe fails', async () => {
+    const { backend, mockDocRepo } = makeSyncBackend({
+      getCapabilities: vi.fn(() => fail(new NotFoundError('no capabilities endpoint'))),
+      getSyncToken: vi.fn(() => succeed('sync-1')),
+    });
+    await expect(backend.getSyncToken()).resolves.toBeNull();
+    expect((mockDocRepo as any).getSyncToken).not.toHaveBeenCalled();
+  });
+
+  it('getSyncToken() returns the token when the capability is advertised', async () => {
+    const { backend } = makeSyncBackend({
+      getCapabilities: vi.fn(() => succeed(enabledCapabilities)),
+      getSyncToken: vi.fn(() => succeed('sync-1')),
+      listChanges: vi.fn(),
+    });
+    await expect(backend.getSyncToken()).resolves.toBe('sync-1');
+  });
+
+  it('caches the capability probe across calls', async () => {
+    const getCapabilities = vi.fn(() => succeed(enabledCapabilities));
+    const { backend } = makeSyncBackend({
+      getCapabilities,
+      getSyncToken: vi.fn(() => succeed('sync-1')),
+      listChanges: vi.fn(),
+    });
+    await backend.getSyncToken();
+    await backend.getSyncToken();
+    expect(getCapabilities).toHaveBeenCalledTimes(1);
+  });
+
+  it("getChanges() maps change summaries to paths and takes the next token from the feed's done value", async () => {
+    const listChanges = vi.fn(() =>
+      ContentiaStream.succeedMany<ChangeSummary, ListChangesDone>(
+        [
+          { key: 'articles/hello', version: 'v2', deleted: false },
+          { key: 'articles/old', deleted: true },
+        ],
+        { syncToken: SyncToken.make('sync-2') },
+      )
+    );
+    const getSyncToken = vi.fn(() => succeed('sync-3'));
+    const { backend } = makeSyncBackend({
+      getCapabilities: vi.fn(() => succeed(enabledCapabilities)),
+      getSyncToken,
+      listChanges,
+    });
+
+    const feed = await backend.getChanges('sync-1');
+    expect(listChanges).toHaveBeenCalledWith({ since: 'sync-1' });
+    expect(feed).toEqual({
+      changes: [
+        { path: 'articles/hello', deleted: false },
+        { path: 'articles/old', deleted: true },
+      ],
+      token: 'sync-2',
+    });
+    // The token is the feed's own, read at the feed's end: no second request
+    // that could skip changes landing in between.
+    expect(getSyncToken).not.toHaveBeenCalled();
+  });
+
+  it('getChanges() returns null without the change-feed capability', async () => {
+    const { backend } = makeSyncBackend({
+      getCapabilities: vi.fn(() =>
+        succeed({
+          compatibilityDate: '2026-07-16',
+          changes: { supported: true, description: '', syncToken: true, changeFeed: false },
+        })
+      ),
+      getSyncToken: vi.fn(() => succeed('sync-1')),
+      listChanges: vi.fn(),
+    });
+    await expect(backend.getChanges('sync-0')).resolves.toBeNull();
+  });
+
+  it('threads the record version into published entry file ids', async () => {
+    const { backend, mockDocRepo } = makeSyncBackend({});
+    (mockDocRepo as any).getDocument.mockReturnValue(
+      succeed({ key: 'articles/hello', content: { title: 'Hi' }, type: 'published', version: 'v7' }),
+    );
+
+    const entry = await backend.getEntry('articles/hello');
+    expect(entry.file).toEqual({ path: 'articles/hello', id: 'v7' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite: access-token refresh (DCMS: expired-token → silent refresh)
+//
+// `tokenPromise` is a callback evaluated on EVERY call, so the expiry check
+// happens per request — a page left open past the access token's lifetime
+// mints a fresh token via the refresh grant instead of replaying a stale one.
+// The server rotates the pair on refresh, hence the single-flight assertions.
+// ---------------------------------------------------------------------------
+
+describe('ContentiaBackend token refresh', () => {
+  let sessionStorageMock: ReturnType<typeof makeSessionStorageMock>;
+  let backend: any;
+  let now: number;
+  let nowSpy: ReturnType<typeof vi.spyOn>;
+  let onSessionExpired: ReturnType<typeof vi.fn>;
+
+  const okSessionResponse = {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        data: { attributes: { name: 'Alice', email: 'alice@example.com' } },
+      }),
+  } as any;
+
+  function tokenEndpointResponse(body: Record<string, unknown>) {
+    return { ok: true, json: () => Promise.resolve(body) } as any;
+  }
+
+  /** Routes /session vs the token endpoint; records token-endpoint calls. */
+  function routeFetch(tokenHandler: () => Promise<any> | any) {
+    const tokenCalls: Array<{ url: string, opts: any }> = [];
+    vi.mocked(unsentRequest.fetchWithTimeout).mockImplementation(async (url: any, opts?: any) => {
+      const u = String(url);
+      if (u.includes('/oauth2/token')) {
+        tokenCalls.push({ url: u, opts });
+        return tokenHandler();
+      }
+      if (u.includes('/session')) return okSessionResponse;
+      throw new Error(`Unexpected fetch: ${u}`);
+    });
+    return tokenCalls;
+  }
+
+  beforeEach(() => {
+    sessionStorageMock = makeSessionStorageMock();
+    (globalThis as any).sessionStorage = sessionStorageMock;
+    now = 1_000_000_000;
+    nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now) as any;
+
+    const ContentiaBackend = createContentiaBackend({
+      getDocumentsRepository: () => makeMockDocumentsRepository() as any,
+      getAssetsRepository: () => makeMockAssetsRepository() as any,
+    });
+    onSessionExpired = vi.fn();
+    backend = new ContentiaBackend(
+      makeConfig({
+        backend: {
+          name: 'contentia',
+          base_url: 'https://api.example.com',
+          api_root: '',
+          app_id: 'decap-cms',
+          auth_token_endpoint: '/oauth2/token',
+        },
+      }),
+      // Core's Backend wrapper passes this via ImplementationInitOptions.
+      { onSessionExpired },
+    );
+    vi.mocked(unsentRequest.fetchWithTimeout).mockReset();
+  });
+
+  afterEach(() => {
+    nowSpy.mockRestore();
+    delete (globalThis as any).sessionStorage;
+  });
+
+  it('authenticate() persists the refresh token and expiry for restoreUser', async () => {
+    routeFetch(() => {
+      throw new Error('no refresh expected');
+    });
+
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('t1');
+    expect(sessionStorageMock.getItem('contentia_refresh_token')).toBe('r1');
+    expect(sessionStorageMock.getItem('contentia_token_expires_at')).toBe(String(now + 3600_000));
+  });
+
+  it('getToken() returns the current token while it is still fresh', async () => {
+    const tokenCalls = routeFetch(() => tokenEndpointResponse({}));
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    await expect(backend.getToken()).resolves.toBe('t1');
+    expect(tokenCalls).toHaveLength(0);
+  });
+
+  it('getToken() past expiry refreshes via the token endpoint and rewrites storage', async () => {
+    const tokenCalls = routeFetch(() =>
+      tokenEndpointResponse({ access_token: 't2', refresh_token: 'r2', expires_in: 3600 })
+    );
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    now += 3600_000; // past expiry (and skew)
+
+    await expect(backend.getToken()).resolves.toBe('t2');
+    expect(tokenCalls).toHaveLength(1);
+    const body = String(tokenCalls[0].opts.body);
+    expect(body).toContain('grant_type=refresh_token');
+    expect(body).toContain('refresh_token=r1');
+    expect(body).toContain('client_id=decap-cms');
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('t2');
+    expect(sessionStorageMock.getItem('contentia_refresh_token')).toBe('r2');
+  });
+
+  it('concurrent getToken() calls share a single in-flight refresh (server rotates the pair)', async () => {
+    let resolveToken!: (v: any) => void;
+    const tokenCalls = routeFetch(() =>
+      new Promise(resolve => {
+        resolveToken = resolve;
+      })
+    );
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    now += 3600_000;
+
+    const first = backend.getToken();
+    const second = backend.getToken();
+    resolveToken(tokenEndpointResponse({ access_token: 't2', refresh_token: 'r2', expires_in: 3600 }));
+
+    await expect(first).resolves.toBe('t2');
+    await expect(second).resolves.toBe('t2');
+    expect(tokenCalls).toHaveLength(1);
+  });
+
+  it('a dead refresh grant (400) clears the session and reports onSessionExpired', async () => {
+    routeFetch(() => ({ ok: false, status: 400 }) as any);
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    now += 3600_000;
+
+    await expect(backend.getToken()).rejects.toMatchObject({ name: ACCESS_TOKEN_ERROR });
+
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBeNull();
+    expect(sessionStorageMock.getItem('contentia_refresh_token')).toBeNull();
+  });
+
+  it('a transient refresh failure (500) keeps the stored pair so a later call can retry', async () => {
+    routeFetch(() => ({ ok: false, status: 500 }) as any);
+    await backend.authenticate({ token: 't1', refresh_token: 'r1', expires_in: 3600 });
+
+    now += 3600_000;
+
+    await expect(backend.getToken()).rejects.toMatchObject({ name: ACCESS_TOKEN_ERROR });
+
+    expect(onSessionExpired).not.toHaveBeenCalled();
+    expect(sessionStorageMock.getItem('contentia_refresh_token')).toBe('r1');
+  });
+
+  it('expired token with no refresh token drops the session and reports onSessionExpired', async () => {
+    routeFetch(() => {
+      throw new Error('no refresh possible');
+    });
+    await backend.authenticate({ token: 't1', expires_in: 3600 });
+
+    now += 3600_000;
+
+    await expect(backend.getToken()).rejects.toMatchObject({ name: ACCESS_TOKEN_ERROR });
+
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBeNull();
+  });
+
+  it('restoreUser() with an expired stored token refreshes before validating the session', async () => {
+    sessionStorageMock.setItem('contentia_access_token', 'stale');
+    sessionStorageMock.setItem('contentia_refresh_token', 'r1');
+    sessionStorageMock.setItem('contentia_token_expires_at', String(now - 1000));
+
+    const sessionAuthHeaders: string[] = [];
+    vi.mocked(unsentRequest.fetchWithTimeout).mockImplementation(async (url: any, opts?: any) => {
+      const u = String(url);
+      if (u.includes('/oauth2/token')) {
+        return tokenEndpointResponse({ access_token: 't2', refresh_token: 'r2', expires_in: 3600 });
+      }
+      if (u.includes('/session')) {
+        sessionAuthHeaders.push(opts?.headers?.Authorization);
+        return okSessionResponse;
+      }
+      throw new Error(`Unexpected fetch: ${u}`);
+    });
+
+    const user = await backend.restoreUser();
+
+    expect(user).toMatchObject({ name: 'Alice' });
+    expect(sessionAuthHeaders).toEqual(['Bearer t2']);
+    expect(sessionStorageMock.getItem('contentia_access_token')).toBe('t2');
+  });
+});
