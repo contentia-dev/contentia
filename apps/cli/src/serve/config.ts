@@ -7,6 +7,7 @@ import { isScope, type Scope } from 'contentia/auth';
 import { PASSWORD_CONSTANTS } from 'contentia/crypto';
 
 import type { BackendSpec } from '../drivers/types.js';
+import { parseTrustedProxy } from '../trusted-proxies.js';
 import { interpolateConfig } from './interpolate.js';
 import { isHttpsOrLoopback, isJwtAlgorithm, type JwtAlgorithm } from './oidc.js';
 
@@ -16,7 +17,15 @@ import { isHttpsOrLoopback, isJwtAlgorithm, type JwtAlgorithm } from './oidc.js'
  * secrets with `${env:…}` / `${file:…}` (see `interpolate.ts`).
  */
 export interface ServerConfig {
-  readonly listen: { readonly host: string, readonly port: number };
+  readonly listen: {
+    readonly host: string,
+    readonly port: number,
+    /**
+     * Reverse proxies (IPs or CIDR ranges) whose `X-Forwarded-*` headers say
+     * which scheme and host the client used. Unset, those headers are ignored.
+     */
+    readonly trustedProxies?: readonly string[],
+  };
   /** URL prefix for every endpoint, e.g. `/api` → `/api/documents`, `/api/health`. */
   readonly basePath: string;
   readonly cors?: { readonly origins: string[] | '*', readonly maxAge?: number };
@@ -187,6 +196,24 @@ class Reader {
     return Reader.of(this.obj[key], this.path(key));
   }
 }
+
+/**
+ * `listen.trustedProxies`: a list, or one comma-separated string so a single
+ * `${env:…}` can carry several ranges. Each entry must parse, so a typo fails
+ * at startup instead of silently trusting nothing.
+ */
+const readTrustedProxies = (r: Reader): string[] =>
+  r.stringList('trustedProxies').flatMap(value => value.split(',')).map(entry => {
+    const trimmed = entry.trim();
+    try {
+      parseTrustedProxy(trimmed);
+    } catch (err) {
+      throw new Error(`${r.path('trustedProxies')}: ${err instanceof Error ? err.message : String(err)}`, {
+        cause: err,
+      });
+    }
+    return trimmed;
+  });
 
 const readStorage = (r: Reader): BackendSpec => {
   r.allowOnly('backend', 'options');
@@ -367,7 +394,9 @@ export const parseServerConfig = (raw: unknown, defaults: ServerConfigDefaults =
   }
   if (!r.has('auth')) throw new Error('auth: required — configure auth.oidc, auth.login and/or auth.apiKeys');
 
-  const listen = r.has('listen') ? r.child('listen').allowOnly('host', 'port') : new Reader({}, 'listen');
+  const listen = r.has('listen')
+    ? r.child('listen').allowOnly('host', 'port', 'trustedProxies')
+    : new Reader({}, 'listen');
   const basePath = r.string('basePath', DEFAULT_BASE_PATH);
   if (!basePath.startsWith('/')) throw new Error('basePath: must start with "/"');
 
@@ -375,6 +404,7 @@ export const parseServerConfig = (raw: unknown, defaults: ServerConfigDefaults =
     listen: {
       host: listen.string('host', defaults.host ?? DEFAULT_HOST),
       port: listen.integer('port', DEFAULT_PORT, 0, 65_535),
+      ...(listen.has('trustedProxies') && { trustedProxies: readTrustedProxies(listen) }),
     },
     basePath,
     storage: readStorage(r.child('storage')),

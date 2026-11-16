@@ -1,5 +1,6 @@
 import { NodeHttpServer } from '@effect/platform-node';
 import * as Effect from 'effect/Effect';
+import * as HttpMiddleware from 'effect/http/HttpMiddleware';
 import * as HttpRouter from 'effect/http/HttpRouter';
 import * as HttpServer from 'effect/http/HttpServer';
 import type * as HttpServerError from 'effect/http/HttpServerError';
@@ -13,6 +14,7 @@ import type { StorageRepository } from 'contentia/storage';
 import { buildJsonApi } from 'contentia/storage-api';
 
 import { bearerTokenMatches } from './auth.js';
+import { parseTrustedProxies } from './trusted-proxies.js';
 
 export interface StorageServerOptions {
   /**
@@ -100,6 +102,18 @@ export interface FetchServerOptions {
   port: number;
   /** Listen host. Defaults to `127.0.0.1`. */
   host?: string;
+  /**
+   * Reverse proxies whose `X-Forwarded-For`, `X-Forwarded-Proto` and
+   * `X-Forwarded-Host` headers are believed: IP addresses or CIDR ranges such
+   * as `10.0.0.0/8`. The handler's `Request.url` then carries the scheme and
+   * host the client used (`https://cms.example.com/…`), which the login pages,
+   * pagination links and OpenAPI `servers` are built from. Empty or omitted,
+   * every forwarded header is ignored, since any client can send them.
+   *
+   * Proto and host are only used when they list one value per
+   * `X-Forwarded-For` entry. Throws on an entry that isn't an address or range.
+   */
+  trustedProxies?: readonly string[];
   /** Called once the socket is bound, with the base URL clients should use. */
   onListening?: (url: string) => Effect.Effect<void>;
 }
@@ -112,6 +126,7 @@ export const layerFetchServer = (
   options: FetchServerOptions,
 ): Layer.Layer<never, HttpServerError.ServeError> => {
   const host = options.host ?? '127.0.0.1';
+  const trustedProxies = parseTrustedProxies(options.trustedProxies ?? []);
   const Routes = HttpRouter.add(
     '*',
     '/*',
@@ -122,7 +137,10 @@ export const layerFetchServer = (
     }),
   );
   return Layer.mergeAll(
-    HttpRouter.serve(Routes, { disableListenLog: options.onListening !== undefined }),
+    HttpRouter.serve(Routes, {
+      disableListenLog: options.onListening !== undefined,
+      ...(trustedProxies.length > 0 && { middleware: HttpMiddleware.xForwardedHeaders({ trustedProxies }) }),
+    }),
     layerOnListening(host, options.onListening),
   ).pipe(
     Layer.provide(NodeHttpServer.layer(createServer, { port: options.port, host })),

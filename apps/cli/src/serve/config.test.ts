@@ -74,6 +74,12 @@ describe('parseServerConfig', () => {
     });
   });
 
+  it('reads trusted proxies as a list or one comma-separated string (as ${env:…} gives)', () => {
+    const listen = (trustedProxies: unknown) => parseServerConfig({ ...minimal, listen: { trustedProxies } }).listen;
+    expect(listen(['10.0.0.0/8', 'fd00::/8']).trustedProxies).toEqual(['10.0.0.0/8', 'fd00::/8']);
+    expect(listen('10.0.0.0/8, 192.168.1.7').trustedProxies).toEqual(['10.0.0.0/8', '192.168.1.7']);
+  });
+
   it('accepts OIDC alone', () => {
     expect(parseServerConfig(oidc()).auth).toEqual({
       apiKeys: [],
@@ -89,6 +95,11 @@ describe('parseServerConfig', () => {
     [withAuth({ ...minimal.auth, odic: {} }), /^auth.odic: unknown setting/],
     [{ ...minimal, storage: { backend: 'fs', option: {} } }, /^storage.option: unknown setting/],
     [{ ...minimal, listen: { port: 70000 } }, /^listen.port: must be an integer/],
+    [{ ...minimal, listen: { trustedProxies: [] } }, /^listen.trustedProxies: must be a non-empty/],
+    [
+      { ...minimal, listen: { trustedProxies: ['10.0.0.0/8', 'ingress.local'] } },
+      /^listen.trustedProxies: "ingress.local" is not an IP address or CIDR range/,
+    ],
     [{ ...minimal, basePath: 'api' }, /^basePath: must start with "\/"/],
     [{ ...minimal, catalog: 'notion' }, /^catalog.provider: must be "convention" or "decap"/],
     [{ ...minimal, catalog: { provider: 'convention', configKey: 'x' } }, /only applies to the decap provider/],

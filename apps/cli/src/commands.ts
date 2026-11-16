@@ -334,6 +334,7 @@ export const makeApiServerCommand = (name = 'serve', binName = 'contentia') =>
           fetch: request => api.fetch(request),
           port: config.listen.port,
           host: config.listen.host,
+          trustedProxies: config.listen.trustedProxies ?? [],
           onListening: url => Effect.logInfo(`${binName} ${name}: ${summary} on ${url}${config.basePath}`),
         }));
       }),

@@ -1,6 +1,7 @@
 import * as Effect from 'effect/Effect';
 import * as Fiber from 'effect/Fiber';
 import * as Layer from 'effect/Layer';
+import * as IpNetwork from 'effect/net/IpNetwork';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ContentiaTask } from 'contentia/core';
@@ -8,7 +9,8 @@ import { InMemoryStorageRepository } from 'contentia/storage/testing';
 
 import { bearerTokenMatches } from './auth.js';
 import { resolveServeBackend } from './commands.js';
-import { layerStorageServer } from './server.js';
+import { layerFetchServer, layerStorageServer } from './server.js';
+import { parseTrustedProxy } from './trusted-proxies.js';
 
 describe('bearerTokenMatches', () => {
   it('returns true for a correct bearer token', () => {
@@ -73,6 +75,76 @@ describe('layerStorageServer', () => {
     const url = await serve('s3cret');
     expect((await fetch(`${url}/atoms`)).status).toBe(401);
     expect((await fetch(`${url}/atoms`, { headers: { authorization: 'Bearer s3cret' } })).status).toBe(200);
+  });
+});
+
+describe('layerFetchServer behind a reverse proxy', () => {
+  const fibers: Fiber.Fiber<unknown, unknown>[] = [];
+  afterEach(async () => {
+    await Promise.all(fibers.splice(0).map(f => Effect.runPromise(Fiber.interrupt(f))));
+  });
+
+  /** Serve a handler that answers with the URL it was given. */
+  const serveEcho = (trustedProxies?: string[]): Promise<string> =>
+    new Promise<string>((resolve, reject) => {
+      const fiber = Effect.runFork(Layer.launch(layerFetchServer({
+        fetch: request => Promise.resolve(new Response(request.url)),
+        port: 0,
+        ...(trustedProxies && { trustedProxies }),
+        onListening: url => Effect.sync(() => resolve(url)),
+      })));
+      fibers.push(fiber);
+      fiber.addObserver(exit => reject(exit));
+    });
+
+  // What a TLS-terminating proxy in front of the server adds for one client.
+  const forwarded = {
+    'x-forwarded-for': '203.0.113.7',
+    'x-forwarded-proto': 'https',
+    'x-forwarded-host': 'cms.example.com',
+  };
+
+  it('gives the handler the scheme and host the client used when the proxy is trusted', async () => {
+    const url = await serveEcho(['127.0.0.1']);
+    const seen = await fetch(`${url}/api/health?x=1`, { headers: forwarded }).then(r => r.text());
+    expect(seen).toBe('https://cms.example.com/api/health?x=1');
+  });
+
+  it('ignores forwarded headers by default, since any client can send them', async () => {
+    const url = await serveEcho();
+    const seen = await fetch(`${url}/api/health`, { headers: forwarded }).then(r => r.text());
+    expect(seen).toBe(`${url}/api/health`);
+  });
+
+  it('ignores forwarded headers from a peer outside the trusted ranges', async () => {
+    const url = await serveEcho(['10.0.0.0/8']);
+    const seen = await fetch(`${url}/api/health`, { headers: forwarded }).then(r => r.text());
+    expect(seen).toBe(`${url}/api/health`);
+  });
+
+  it('refuses an entry that is not an address or range', () => {
+    expect(() =>
+      layerFetchServer({ fetch: () => Promise.resolve(new Response()), port: 0, trustedProxies: ['10.0.0.1/8'] })
+    )
+      .toThrow(/"10\.0\.0\.1\/8" is not an IP address or CIDR range \(address has non-zero host bits\)/);
+  });
+});
+
+describe('parseTrustedProxy', () => {
+  it('takes CIDR ranges as given and single addresses as one-address ranges', () => {
+    expect(IpNetwork.format(parseTrustedProxy('172.16.0.0/12'))).toBe('172.16.0.0/12');
+    expect(IpNetwork.format(parseTrustedProxy(' 10.0.0.7 '))).toBe('10.0.0.7/32');
+    expect(IpNetwork.format(parseTrustedProxy('::1'))).toBe('::1/128');
+  });
+
+  it('reads an IPv4-mapped IPv6 address as the IPv4 address peers are matched as', () => {
+    expect(IpNetwork.format(parseTrustedProxy('::ffff:10.0.0.7'))).toBe('10.0.0.7/32');
+  });
+
+  it('names the entry and the reason when it does not parse', () => {
+    expect(() => parseTrustedProxy('proxy.internal')).toThrow(
+      /^"proxy\.internal" is not an IP address or CIDR range \(/,
+    );
   });
 });
 

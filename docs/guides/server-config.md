@@ -42,16 +42,17 @@ npx @contentia/cli serve --config contentia.yaml --check
 
 ## Config reference
 
-| Setting       | Default      | Description                                                                                             |
-| ------------- | ------------ | ------------------------------------------------------------------------------------------------------- |
-| `listen.host` | `127.0.0.1`  | Interface to bind. The `CONTENTIA_LISTEN_HOST` environment variable replaces the default.               |
-| `listen.port` | `8080`       | Port to listen on.                                                                                      |
-| `basePath`    | `/api`       | Prefix for every endpoint: `/api/documents`, `/api/storage`, `/api/assets`, `/api/health`.              |
-| `storage`     | required     | `backend` plus its `options`. See [Choosing a backend](#choosing-a-backend).                            |
-| `catalog`     | `convention` | Where collection settings come from: `convention`, or `decap` to read a Decap config stored in storage. |
-| `assets`      | `true`       | Serve the `/assets` endpoint (the media library).                                                       |
-| `cors`        | off          | `origins` (a list, or `'*'`) and optional `maxAge`. Needed when a browser app on another origin calls.  |
-| `auth`        | required     | `oidc`, `login` and/or `apiKeys`. See [Authentication](#authentication).                                |
+| Setting                 | Default      | Description                                                                                             |
+| ----------------------- | ------------ | ------------------------------------------------------------------------------------------------------- |
+| `listen.host`           | `127.0.0.1`  | Interface to bind. The `CONTENTIA_LISTEN_HOST` environment variable replaces the default.               |
+| `listen.port`           | `8080`       | Port to listen on.                                                                                      |
+| `listen.trustedProxies` | none         | IPs or CIDR ranges of your reverse proxies. See [Behind a reverse proxy](#behind-a-reverse-proxy).      |
+| `basePath`              | `/api`       | Prefix for every endpoint: `/api/documents`, `/api/storage`, `/api/assets`, `/api/health`.              |
+| `storage`               | required     | `backend` plus its `options`. See [Choosing a backend](#choosing-a-backend).                            |
+| `catalog`               | `convention` | Where collection settings come from: `convention`, or `decap` to read a Decap config stored in storage. |
+| `assets`                | `true`       | Serve the `/assets` endpoint (the media library).                                                       |
+| `cors`                  | off          | `origins` (a list, or `'*'`) and optional `maxAge`. Needed when a browser app on another origin calls.  |
+| `auth`                  | required     | `oidc`, `login` and/or `apiKeys`. See [Authentication](#authentication).                                |
 
 Unknown settings are an error, so a typo such as `apikeys:` fails at startup instead of silently
 switching something off.
@@ -219,8 +220,8 @@ at `/oauth2/token`, with form-encoded token requests. For Decap that is `base_ur
 URL), `auth_endpoint: oauth2/authorize`, `auth_token_endpoint: oauth2/token`,
 `auth_token_endpoint_content_type: application/x-www-form-urlencoded` and `app_id` (the `clientId`).
 Add the admin's origin to `cors.origins` as well, so it can call the API after signing in. Behind a
-proxy that terminates TLS, forward the `Host` header and set `X-Forwarded-Proto: https` (most do by
-default), so the login form posts back over https.
+proxy that terminates TLS, set [`listen.trustedProxies`](#behind-a-reverse-proxy) so the login form
+posts back over https.
 
 Each user gets exactly the scopes listed here, whatever scopes the client asks for. Logins live in
 the server's memory: a restart signs everyone out, and a login only works on the replica that issued
@@ -232,3 +233,32 @@ it. The server warns about this at startup. In production, use your own provider
 - **Logs:** rejected credentials log as one-line warnings; server errors keep their stack trace.
 - **Replicas:** the "being edited by …" locks live in the server process, so editors only see each
   other's locks when they reach the same replica. Run a single replica if you rely on them.
+
+### Behind a reverse proxy
+
+The server builds some URLs from the request: pagination links, the OpenAPI `servers` entry and the
+login pages. Behind a proxy that terminates TLS, the server itself only sees plain http from the
+proxy, so those URLs come out as `http://` unless it knows which scheme and host the client used.
+List your proxies' addresses and the server takes them from the proxy's `X-Forwarded-Proto` and
+`X-Forwarded-Host` headers:
+
+```yaml
+listen:
+  host: 0.0.0.0
+  trustedProxies: [10.0.0.0/8] # the network your ingress or load balancer connects from
+```
+
+Entries are single addresses (`10.0.0.7`, `::1`) or CIDR ranges (`172.16.0.0/12`, `fd00::/8`). One
+comma-separated string works too, so a single `${env:TRUSTED_PROXIES}` can carry several.
+
+Without `trustedProxies` the server ignores every `X-Forwarded-*` header, since any client can send
+them. With it, the headers count only on connections from a listed address, and only like this:
+
+- The proxy has to append the client's address to `X-Forwarded-For`. nginx does with
+  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`; Caddy, Traefik and ingress-nginx do
+  by default.
+- `X-Forwarded-Proto` and `X-Forwarded-Host` are used only when they hold one value per
+  `X-Forwarded-For` entry. A single proxy gets this right. With a chain of proxies (a CDN in front
+  of a load balancer, say), list all of them and have each one append to `X-Forwarded-Proto` too. A
+  proxy that overwrites it with a single value makes the server fall back to the scheme it sees
+  itself. Without `X-Forwarded-Host`, the `Host` header the proxy forwards is used.
