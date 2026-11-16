@@ -53,7 +53,9 @@ export function toJsonApi<
  *
  * Injects `type` from the resource envelope (it was stripped from attributes
  * by `toJsonApi` to comply with JSON:API §7.2.2) and merges the id back under
- * the caller-supplied idField.
+ * the caller-supplied idField. The envelope wins over same-named attributes, so
+ * a write body's `attributes.key` / `attributes.type` cannot redirect it away
+ * from `data.id` / `data.type`.
  *
  * @param data - The JSON:API resource
  * @param _type - JSON:API resource type (for type checking, not used at runtime)
@@ -65,9 +67,9 @@ export function fromJsonApi<
   O extends Record<string, unknown>,
 >(data: { type: T, id: string, attributes: Omit<O, I | 'type' | 'id'> }, _type: T, idField: I): O {
   return {
+    ...data.attributes,
     type: data.type,
     [idField]: data.id,
-    ...data.attributes,
   } as unknown as O;
 }
 

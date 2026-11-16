@@ -20,6 +20,7 @@
  */
 
 import type { OpenApiMediaType, OpenApiParameter, OpenApiResponse, OpenApiSchema } from './openapi.js';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './pagination.js';
 
 /** The media type every `api/*` handler answers success responses with. */
 export const JSON_API_MEDIA_TYPE = 'application/vnd.api+json';
@@ -67,10 +68,13 @@ export function jsonApiErrorComponents(
         detail: { type: 'string' },
         source: {
           type: 'object',
-          description: 'Set on validation failures to point at the offending member or query parameter.',
+          description: 'Set when the error is about one part of the request body, e.g. the failed entry of an '
+            + 'atomic-operations request.',
           properties: {
-            pointer: { type: 'string' },
-            parameter: { type: 'string' },
+            pointer: {
+              type: 'string',
+              description: 'JSON Pointer into the request document, e.g. `/operations/2`.',
+            },
           },
         },
       },
@@ -303,23 +307,32 @@ export function apiInfoComponents(id: string): Record<string, OpenApiSchema> {
 
 export interface PaginationParameterOptions {
   /**
-   * Page size the handler falls back to when the request carries no `page[*]`
+   * Page size the handler lists with when the request carries no `page[*]`
    * parameter at all. Documented verbatim, so it must match what the handler
-   * actually does.
+   * actually does; `parsePaginationQuery` on its own gives
+   * {@link DEFAULT_PAGE_SIZE}.
    */
   defaultPageSize: number;
+  /**
+   * Page size the handler fills in when `page[number]`, `page[after]`,
+   * `page[before]` or `page[offset]` arrives without a size of its own.
+   * `parsePaginationQuery` leaves the size unset there, so the backend picks
+   * it; set this only for a handler that substitutes its own.
+   */
+  unsizedPageSize?: number | undefined;
 }
 
 /**
  * The six `page[*]` query parameters understood by `parsePaginationQuery`.
  *
- * Sizes above `MAX_PAGE_SIZE` are clamped rather than rejected, and cursor
- * parameters are refused with 400 by backends that do not declare cursor
- * support — both documented here so the behaviour is described identically on
- * every listing endpoint.
+ * Sizes outside 1..`MAX_PAGE_SIZE` are clamped rather than rejected, `page[limit]`
+ * is read only alongside `page[offset]`, and cursor parameters are refused with
+ * 400 by backends that do not declare cursor support. All documented here so
+ * the behaviour is described identically on every listing endpoint.
  */
 export function paginationParameters(options: PaginationParameterOptions): OpenApiParameter[] {
-  const { defaultPageSize } = options;
+  const { defaultPageSize, unsizedPageSize } = options;
+  const backendPicks = unsizedPageSize === undefined;
 
   return [
     {
@@ -331,21 +344,26 @@ export function paginationParameters(options: PaginationParameterOptions): OpenA
     {
       name: 'page[size]',
       in: 'query',
-      description: 'Items per page — combines with page[number], page[after], or page[before]. '
-        + `Defaults to ${defaultPageSize}; values above 100 are clamped to 100 rather than rejected.`,
+      description: 'Items per page. Combines with page[number], page[after] or page[before]; on its own it asks for '
+        + `the first page of that many items. With no page[*] parameter at all a page holds ${defaultPageSize} `
+        + 'items; when page[number], page[after] or page[before] comes without page[size], '
+        + (backendPicks ? 'the backend picks the page size. ' : `a page holds ${unsizedPageSize} items. `)
+        + `Values outside 1 to ${MAX_PAGE_SIZE} are clamped into that range rather than rejected.`,
       schema: { type: 'integer', minimum: 1 },
     },
     {
       name: 'page[offset]',
       in: 'query',
-      description: 'Zero-based item offset for offset-based pagination.',
+      description: 'Zero-based item offset for offset-based pagination. Without page[limit], '
+        + (backendPicks ? 'the backend picks how many items to return.' : `${unsizedPageSize} items are returned.`),
       schema: { type: 'integer', minimum: 0 },
     },
     {
       name: 'page[limit]',
       in: 'query',
-      description: 'Maximum number of items to return — combines with page[offset]. '
-        + 'Values above 100 are clamped to 100.',
+      description: 'Maximum number of items to return. Read only together with page[offset]; on its own it is '
+        + `ignored and the request gets page 1 of ${DEFAULT_PAGE_SIZE} items. Values outside 1 to ${MAX_PAGE_SIZE} `
+        + 'are clamped into that range.',
       schema: { type: 'integer', minimum: 1 },
     },
     {

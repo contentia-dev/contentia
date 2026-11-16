@@ -220,8 +220,14 @@ export function schemaIssueFormatter(
   };
 }
 
+/** `application/json` or any `+json` media type, such as JSON:API's `application/vnd.api+json`. */
+const isJsonContentType = (contentType: string | null): boolean => {
+  const mediaType = contentType?.split(';')[0]?.trim().toLowerCase() ?? '';
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+};
+
 export const errorFromResponse = async (response: Response) => {
-  let isJson = response.headers.get('Content-Type')?.includes('application/json');
+  let isJson = isJsonContentType(response.headers.get('Content-Type'));
   let error: JsonApiError['errors'][number] | undefined;
   let detail: string | undefined;
 

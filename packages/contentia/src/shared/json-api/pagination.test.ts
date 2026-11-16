@@ -117,6 +117,13 @@ describe('parsePaginationQuery — MAX_PAGE_SIZE clamping', () => {
     });
   });
 
+  it.each(['0', '-5'])('clamps a page size of %s up to 1', size => {
+    expect(parsePaginationQuery({ 'page[size]': size })).toEqual({ page: 1, perPage: 1 });
+    expect(parsePaginationQuery({ 'page[number]': '2', 'page[size]': size })).toEqual({ page: 2, perPage: 1 });
+    expect(parsePaginationQuery({ 'page[after]': 'cur', 'page[size]': size })).toEqual({ after: 'cur', perPage: 1 });
+    expect(parsePaginationQuery({ 'page[offset]': '40', 'page[limit]': size })).toEqual({ offset: 40, limit: 1 });
+  });
+
   it('leaves in-range sizes untouched', () => {
     expect(parsePaginationQuery({ 'page[size]': '25' })).toEqual({ page: 1, perPage: 25 });
     expect(parsePaginationQuery({ 'page[size]': String(MAX_PAGE_SIZE) })).toEqual({ page: 1, perPage: MAX_PAGE_SIZE });
@@ -146,9 +153,11 @@ describe('buildPaginationLinks', () => {
       expect(links.next).toBeUndefined();
     });
 
-    it('defaults perPage to 10 when not provided', () => {
-      const links = buildPaginationLinks(base, { page: 1 }, true);
-      expect(links.next).toContain('page[size]=10');
+    it('leaves page[size] out when the request named none, so the backend picks the same size again', () => {
+      const links = buildPaginationLinks(base, { page: 2 }, true);
+      expect(links.first).toBe(`${base}?page[number]=1`);
+      expect(links.prev).toBe(`${base}?page[number]=1`);
+      expect(links.next).toBe(`${base}?page[number]=3`);
     });
   });
 
@@ -168,6 +177,13 @@ describe('buildPaginationLinks', () => {
     it('omits prev when at offset 0', () => {
       const links = buildPaginationLinks(base, { offset: 0, limit: 10 }, true);
       expect(links.prev).toBeUndefined();
+    });
+
+    it('builds only an unsized first link when the request named no limit', () => {
+      const links = buildPaginationLinks(base, { offset: 40 }, true);
+      expect(links.first).toBe(`${base}?page[offset]=0`);
+      expect(links.prev).toBeUndefined();
+      expect(links.next).toBeUndefined();
     });
   });
 

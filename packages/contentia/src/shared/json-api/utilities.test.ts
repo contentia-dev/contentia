@@ -122,6 +122,19 @@ describe('errorFromResponse', () => {
     expect(err.message).toBe('item missing');
   });
 
+  it.each(['application/vnd.api+json', 'application/vnd.api+json; charset=utf-8'])(
+    'reads a JSON:API error body served as %s',
+    async contentType => {
+      // Every api/* server answers errors with the JSON:API media type, not application/json.
+      const body = {
+        errors: [{ status: '403', code: ForbiddenError.CODE, detail: 'policy says no', title: 'Forbidden' }],
+      };
+      const err = await errorFromResponse(makeResponse(403, body, contentType));
+      expect(err).toBeInstanceOf(ForbiddenError);
+      expect(err.message).toBe('policy says no');
+    },
+  );
+
   it('falls back to UnknownError for an unrecognised code in a valid JSON:API body', async () => {
     const res = makeJsonApiErrorResponse(400, 'this_code_does_not_exist', 'weird error', 'Strange Error');
     const err = await errorFromResponse(res);

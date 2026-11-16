@@ -120,32 +120,33 @@ export function buildPaginationLinks(
       }
     }
   } else if (isPageBased(pagination)) {
-    // Page-based pagination
+    // Page-based pagination. Without a size the backend picked one, so the
+    // links leave it out too and get that same size again.
     const page = pagination.page;
-    const perPage = pagination.perPage || 10;
+    const size = pagination.perPage ? `&page[size]=${pagination.perPage}` : '';
 
-    links.first = `${baseUrl}?page[number]=1&page[size]=${perPage}`;
+    links.first = `${baseUrl}?page[number]=1${size}`;
 
     if (page > 1) {
-      links.prev = `${baseUrl}?page[number]=${page - 1}&page[size]=${perPage}`;
+      links.prev = `${baseUrl}?page[number]=${page - 1}${size}`;
     }
 
     if (hasMore) {
-      links.next = `${baseUrl}?page[number]=${page + 1}&page[size]=${perPage}`;
+      links.next = `${baseUrl}?page[number]=${page + 1}${size}`;
     }
   } else if (isOffsetBased(pagination)) {
-    // Offset-based pagination
-    const offset = pagination.offset;
-    const limit = pagination.limit || 10;
+    // Offset-based pagination. Without a limit the window the backend returned
+    // is unknown, so only `first` can be built.
+    const { offset, limit } = pagination;
 
-    links.first = `${baseUrl}?page[offset]=0&page[limit]=${limit}`;
+    links.first = limit ? `${baseUrl}?page[offset]=0&page[limit]=${limit}` : `${baseUrl}?page[offset]=0`;
 
-    if (offset > 0) {
+    if (limit && offset > 0) {
       const prevOffset = Math.max(0, offset - limit);
       links.prev = `${baseUrl}?page[offset]=${prevOffset}&page[limit]=${limit}`;
     }
 
-    if (hasMore) {
+    if (limit && hasMore) {
       links.next = `${baseUrl}?page[offset]=${offset + limit}&page[limit]=${limit}`;
     }
   }
@@ -185,9 +186,19 @@ function safeIntReq(s: string, fallback: number): number {
  */
 export const MAX_PAGE_SIZE = 100;
 
-/** Clamp an optional client-supplied page size down to {@link MAX_PAGE_SIZE}. */
+/**
+ * Page size {@link parsePaginationQuery} falls back to when it picks page 1 for
+ * a request that names no usable size: no `page[*]` key, a bare `page[limit]`,
+ * or an unparseable `page[size]`.
+ */
+export const DEFAULT_PAGE_SIZE = 10;
+
+/**
+ * Clamp an optional client-supplied page size into 1..{@link MAX_PAGE_SIZE}. A
+ * zero or negative size would otherwise reach the backend (and `slice`) as is.
+ */
 function clampPageSize(n: number | undefined): number | undefined {
-  return n === undefined ? undefined : Math.min(n, MAX_PAGE_SIZE);
+  return n === undefined ? undefined : Math.min(Math.max(n, 1), MAX_PAGE_SIZE);
 }
 
 /**
@@ -243,6 +254,6 @@ export function parsePaginationQuery(query: Record<string, string | string[] | u
   const sizeStr = firstStr(pageSize);
   return {
     page: 1,
-    perPage: sizeStr ? (clampPageSize(safeIntOpt(sizeStr)) ?? 10) : 10,
+    perPage: sizeStr ? (clampPageSize(safeIntOpt(sizeStr)) ?? DEFAULT_PAGE_SIZE) : DEFAULT_PAGE_SIZE,
   };
 }

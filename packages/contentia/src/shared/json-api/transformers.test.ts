@@ -53,6 +53,16 @@ describe('fromJsonApi', () => {
     const domain = fromJsonApi(resource, 'users', 'id');
     expect(domain).toEqual({ type: 'users', id: 'abc-123', name: 'Alice', age: 30 });
   });
+
+  it('lets the envelope id and type win over same-named attributes', () => {
+    // A write body must not redirect itself to another key (or type) through its attributes.
+    const resource = {
+      type: 'published' as const,
+      id: 'posts/allowed',
+      attributes: { key: 'posts/other', type: 'unpublished', title: 'Hi' },
+    };
+    expect(fromJsonApi(resource, 'published', 'key')).toEqual({ type: 'published', key: 'posts/allowed', title: 'Hi' });
+  });
 });
 
 describe('toJsonApi / fromJsonApi round-trip', () => {
