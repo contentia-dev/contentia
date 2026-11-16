@@ -15,7 +15,7 @@ import {
   InvalidData,
   NotFoundError,
 } from 'contentia/core';
-import type { AuthorizeDecision, JsonApiLogger } from 'contentia/json-api';
+import type { AuthorizeDecision, JsonApiLogger, Pagination } from 'contentia/json-api';
 import { errorToJsonApiMapper, recoverableErrorsToWarnings, resolveAuthorization } from 'contentia/json-api';
 
 /** Convert any caught throw into a ContentiaError, preserving ContentiaError instances and wrapping defects in InternalError. */
@@ -93,6 +93,7 @@ import { buildPaginationLinks, parsePaginationQuery } from 'contentia/json-api';
 import { openApiDocumentToYaml } from 'contentia/json-api';
 import type { FolderCreate } from 'contentia/storage';
 import { SyncToken } from 'contentia/storage';
+import { ASSETS_API_VERSION, UNSIZED_PAGE_SIZE } from './contract.js';
 import type { JsonApiCollectionResponse, JsonApiResource, JsonApiResponse } from './jsonapi.js';
 import {
   assetToJsonApi,
@@ -435,10 +436,10 @@ function validateOperationShape(operation: AssetOperation, index: number): Conte
 /**
  * Build a JSON:API handler for the assets repository.
  *
- * ⚠️ This handler ships **no authentication**. Wrap it (e.g. with
- * `contentia/server/api` or a custom middleware that validates a Bearer token)
- * before exposing it to an untrusted network — otherwise anyone who can reach
- * `fetch` can list, upload, modify, and delete asset binaries.
+ * The handler requires an access policy (`authorize`), which runs before every
+ * action except `GET /`. It authenticates no one itself: validate credentials
+ * inside the policy, or mount the handler behind `contentia/server/api`, which
+ * checks a Bearer token first.
  */
 export function buildAssetsApi(options: AssetsApiOptions): AssetsApi {
   const { repository, basePath = '/api/assets', onError, logger, authorize } = options;
@@ -502,7 +503,7 @@ export function buildAssetsApi(options: AssetsApiOptions): AssetsApi {
           id: 'assets',
           attributes: {
             name: 'Assets API',
-            version: '1.0.0',
+            version: ASSETS_API_VERSION,
             endpoints: [
               { path: '/openapi.json', methods: ['GET'], description: 'OpenAPI 3.1 specification for this API' },
               {
@@ -708,28 +709,19 @@ export function buildAssetsApi(options: AssetsApiOptions): AssetsApi {
       }
 
       // Build pagination options from the shared pagination union. Forward
-      // cursor (`after`) maps directly; backward cursor (`before`) is treated
-      // as forward from that point for repository calls that only support
-      // `after`. Page-based and offset-based fall back to offset pagination.
+      // cursor (`after`) maps directly; page-based and offset-based fall back
+      // to offset pagination.
       //
-      // parsePaginationQuery now defaults to page-based (page: 1) for a bare
-      // page[size]=N request (LCMS-277). We still read page[size] directly from
-      // the query as a belt-and-suspenders guard for the perPage value, and
-      // the paginationForLinks derivation below remains correct for all shapes.
+      // The page size is the one parsePaginationQuery settled on: a client
+      // size is already clamped to MAX_PAGE_SIZE, and a request with no page[*]
+      // key already has the default. A page/cursor/offset request without a
+      // size of its own lists UNSIZED_PAGE_SIZE. The links carry that same
+      // size, so following them keeps the page size the listing used.
       const afterCursor = 'after' in pagination ? pagination.after : undefined;
-      const rawPageSize = str(query['page[size]']);
-      const rawPageSizeNum = rawPageSize ? parseInt(rawPageSize, 10) : undefined;
-      const perPage = rawPageSizeNum
-        ?? ('perPage' in pagination ? pagination.perPage : undefined)
-        ?? ('limit' in pagination ? pagination.limit : undefined)
-        ?? 100;
-      // Build a corrected pagination object that carries the real page size so
-      // buildPaginationLinks emits the correct page[size] on next/prev links.
-      const paginationForLinks = 'after' in pagination
-        ? { after: pagination.after, perPage }
-        : 'before' in pagination
-        ? { before: (pagination as { before?: string }).before, perPage }
-        : pagination;
+      const perPage = ('limit' in pagination ? pagination.limit : pagination.perPage) ?? UNSIZED_PAGE_SIZE;
+      const paginationForLinks: Pagination = 'offset' in pagination
+        ? { offset: pagination.offset, limit: perPage }
+        : { ...pagination, perPage };
       // Convert page-based pagination to offset for the backend call.
       // page[number]=N → offset=(N-1)*perPage so page advances correctly.
       // Cursor-shaped requests stay cursor-shaped even when `after` is still

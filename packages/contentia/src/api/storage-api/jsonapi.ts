@@ -32,6 +32,9 @@ export {
   parsePaginationQuery,
 } from 'contentia/json-api';
 
+/** Version of the Storage API contract: the OpenAPI `info.version`, also reported by `GET /`. */
+export const STORAGE_API_VERSION = '1.0.1';
+
 // JSON:API resource types
 //
 // Storage objects carry a `metadata` field at the domain level (extension,

@@ -5,17 +5,18 @@ import type {
   AssetUrl,
   AssetVariation,
   AssetVariations,
-  Folder,
   ListResourcesDone,
   ListResourcesOptions,
   Resource,
 } from 'contentia/assets';
+import type { Folder } from 'contentia/storage';
 import * as Effect from 'effect/Effect';
 import { describe, expect, it, vi } from 'vitest';
 import { allowAll } from '../../shared/json-api/authorize.js';
 
 import {
   BadRequestError,
+  type ContentiaDone,
   ContentiaStream,
   ContentiaTask,
   EntryAlreadyExistsError,
@@ -166,7 +167,7 @@ describe('assets-api meta.warnings', () => {
             key,
             createdAt: '2026-01-01T00:00:00Z',
             updatedAt: '2026-01-01T00:00:00Z',
-            content: { size: 4, etag: 'e' } as Resource['content'],
+            content: { size: 4, etag: 'e' },
           }])
         ),
       deleteAsset: (_key: string) =>
@@ -352,7 +353,7 @@ describe('assets-api meta.warnings', () => {
             key,
             createdAt: '2026-01-01T00:00:00Z',
             updatedAt: '2026-01-01T00:00:00Z',
-            content: { size: 4, etag: 'e' } as Resource['content'],
+            content: { size: 4, etag: 'e' },
           }])
         ),
       deleteAsset: (_key: string) => ContentiaTask.succeed(undefined),
@@ -984,6 +985,38 @@ describe('POST /resources — unsupported Content-Type', () => {
     const body = await res.json() as { errors: Array<{ code: string }> };
     expect(body.errors[0]?.code).toBe('bad_request');
   });
+
+  it('accepts a JSON create sent as application/json', async () => {
+    const createFolder = vi.fn(() =>
+      ContentiaTask.succeed<Folder>({ type: 'folder', key: 'uploads', createdAt: '', updatedAt: '' })
+    );
+    const api = buildAssetsApi({ repository: { createFolder } as unknown as AssetsRepository, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { type: 'folder', id: 'uploads', attributes: {} } }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    expect(createFolder).toHaveBeenCalledWith({ key: 'uploads', type: 'folder' });
+  });
+});
+
+describe('POST /resources — folder attributes', () => {
+  it('rejects a folder create without attributes with 400', async () => {
+    const createFolder = vi.fn();
+    const api = buildAssetsApi({ repository: { createFolder } as unknown as AssetsRepository, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/api/assets/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'folder', id: 'uploads' } }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(createFolder).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1370,28 +1403,31 @@ const stubVariations: AssetVariations = {
 
 const stubMetadata: AssetMetadata = {
   key: 'images/hero.jpg',
-  metadata: { mimeType: 'image/jpeg', size: 1024, filename: 'hero.jpg' },
+  metadata: { kind: 'image', mimeType: 'image/jpeg', size: 1024, filename: 'hero.jpg', width: 1200, height: 630 },
 };
 
 function makeIncludeRepo(): AssetsRepository {
   return {
     getResource: (_key: string) => ContentiaTask.make<ReadonlyArray<Resource>>(() => Effect.succeed([singleAsset])),
     getUrls: (_assets: Asset[]) =>
-      ContentiaStream.make<AssetUrl>(emit =>
+      ContentiaStream.make<AssetUrl, ContentiaDone>(emit =>
         Effect.gen(function*() {
           yield* emit.data(stubAssetUrl);
+          return {};
         })
       ),
     getVariations: (_assets: Asset[]) =>
-      ContentiaStream.make<AssetVariations>(emit =>
+      ContentiaStream.make<AssetVariations, ContentiaDone>(emit =>
         Effect.gen(function*() {
           yield* emit.data(stubVariations);
+          return {};
         })
       ),
     getMetadata: (_assets: Asset[]) =>
-      ContentiaStream.make<AssetMetadata>(emit =>
+      ContentiaStream.make<AssetMetadata, ContentiaDone>(emit =>
         Effect.gen(function*() {
           yield* emit.data(stubMetadata);
+          return {};
         })
       ),
   } as unknown as AssetsRepository;
@@ -1490,9 +1526,10 @@ describe('GET /resources/:key — ?meta=true inlines metadata', () => {
 
 function makeCollectionMetaRepo(opts: { getMetadataSpy?: ReturnType<typeof vi.fn> } = {}): AssetsRepository {
   const getMetadataImpl = (_assets: Asset[]) =>
-    ContentiaStream.make<AssetMetadata>(emit =>
+    ContentiaStream.make<AssetMetadata, ContentiaDone>(emit =>
       Effect.gen(function*() {
         yield* emit.data(stubMetadata);
+        return {};
       })
     );
   return {
@@ -1523,9 +1560,10 @@ describe('GET /resources (collection) — ?meta=true inlines metadata (LCMS-343)
 
   it('without ?meta, getMetadata is NOT called and data[0].meta is absent', async () => {
     const getMetadataSpy = vi.fn((_assets: Asset[]) =>
-      ContentiaStream.make<AssetMetadata>(emit =>
+      ContentiaStream.make<AssetMetadata, ContentiaDone>(emit =>
         Effect.gen(function*() {
           yield* emit.data(stubMetadata);
+          return {};
         })
       )
     );
@@ -1549,15 +1587,17 @@ function makeCollectionIncludeRepo(opts: {
   getVariationsSpy?: ReturnType<typeof vi.fn>,
 } = {}): AssetsRepository {
   const getUrlsImpl = (_assets: Asset[]) =>
-    ContentiaStream.make<AssetUrl>(emit =>
+    ContentiaStream.make<AssetUrl, ContentiaDone>(emit =>
       Effect.gen(function*() {
         yield* emit.data(stubAssetUrl);
+        return {};
       })
     );
   const getVariationsImpl = (_assets: Asset[]) =>
-    ContentiaStream.make<AssetVariations>(emit =>
+    ContentiaStream.make<AssetVariations, ContentiaDone>(emit =>
       Effect.gen(function*() {
         yield* emit.data(stubVariations);
+        return {};
       })
     );
   return {
@@ -2041,6 +2081,102 @@ describe('GET /resources — repository done.pagination cursor links', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// GET /resources — page size: clamped, defaulted, and the same in the links
+// ---------------------------------------------------------------------------
+
+describe('GET /resources — page size', () => {
+  const sizeCaps = {
+    compatibilityDate: '2026-01-01' as unknown as import('contentia/assets').AssetsCapabilities['compatibilityDate'],
+    pagination: {
+      supported: true as const,
+      description: 'every style',
+      styles: { offset: true, page: true, cursor: true },
+    },
+  };
+
+  /**
+   * A backend that always fills the page it is asked for, so the length
+   * heuristic sees a full page and emits a next link; cursor requests get a
+   * native next cursor.
+   */
+  const makeFullPageRepo = () => {
+    const listResources = vi.fn((_folderKey: string, options: ListResourcesOptions) =>
+      ContentiaStream.make<Resource, ListResourcesDone>(emit =>
+        Effect.gen(function*() {
+          const p = options.pagination as { offset: number, limit: number } | { after?: string, perPage: number };
+          const size = 'limit' in p ? p.limit : p.perPage;
+          for (let i = 0; i < size; i++) {
+            yield* emit.data({ type: 'folder', key: `f${i}`, createdAt: '', updatedAt: '' });
+          }
+          return 'after' in p ? { pagination: { after: 'NEXT', perPage: size } } : {};
+        })
+      )
+    );
+    const repository = {
+      getCapabilities: () => ContentiaTask.succeed(sizeCaps),
+      listResources,
+    } as unknown as AssetsRepository;
+    return { listResources, repository };
+  };
+
+  const list = async (queryString: string) => {
+    const { listResources, repository } = makeFullPageRepo();
+    const api = buildAssetsApi({ repository, authorize: allowAll });
+    const res = await api.fetch(new Request(`http://localhost/api/assets/resources?${queryString}`));
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: unknown[], links: { next?: string | null } };
+    const next = body.links.next ? new URL(body.links.next, 'http://localhost') : undefined;
+    return { pagination: listResources.mock.calls[0]![1].pagination, count: body.data.length, next };
+  };
+
+  it('clamps page[size] above the maximum to 100', async () => {
+    const { pagination, count, next } = await list('page%5Bsize%5D=1000');
+    expect(pagination).toEqual({ offset: 0, limit: 100 });
+    expect(count).toBe(100);
+    expect(next?.searchParams.get('page[size]')).toBe('100');
+  });
+
+  it('clamps page[size] above the maximum alongside page[number]', async () => {
+    const { pagination } = await list('page%5Bnumber%5D=2&page%5Bsize%5D=1000');
+    expect(pagination).toEqual({ offset: 100, limit: 100 });
+  });
+
+  it('gives a non-numeric page[size] the default size instead of NaN', async () => {
+    const { pagination, next } = await list('page%5Bsize%5D=abc');
+    expect(pagination).toEqual({ offset: 0, limit: 10 });
+    expect(next?.searchParams.get('page[size]')).toBe('10');
+  });
+
+  it('lists 10 for a request with no page[*] key, and the links say 10', async () => {
+    const { pagination, next } = await list('');
+    expect(pagination).toEqual({ offset: 0, limit: 10 });
+    expect(next?.searchParams.get('page[number]')).toBe('2');
+    expect(next?.searchParams.get('page[size]')).toBe('10');
+  });
+
+  it('lists 100 for an unsized page[number], and the links say 100', async () => {
+    const { pagination, next } = await list('page%5Bnumber%5D=2');
+    expect(pagination).toEqual({ offset: 100, limit: 100 });
+    expect(next?.searchParams.get('page[number]')).toBe('3');
+    expect(next?.searchParams.get('page[size]')).toBe('100');
+  });
+
+  it('lists 100 for an unsized page[offset], and the links say 100', async () => {
+    const { pagination, next } = await list('page%5Boffset%5D=5');
+    expect(pagination).toEqual({ offset: 5, limit: 100 });
+    expect(next?.searchParams.get('page[offset]')).toBe('105');
+    expect(next?.searchParams.get('page[limit]')).toBe('100');
+  });
+
+  it('lists 100 for an unsized page[after]=, and the links say 100', async () => {
+    const { pagination, next } = await list('page%5Bafter%5D=');
+    expect(pagination).toEqual({ after: undefined, perPage: 100 });
+    expect(next?.searchParams.get('page[after]')).toBe('NEXT');
+    expect(next?.searchParams.get('page[size]')).toBe('100');
+  });
+});
+
 describe('assets-api onError / logger (LCMS-331)', () => {
   it('calls onError when the route handler throws unexpectedly', async () => {
     const boom = new Error('unexpected crash');
@@ -2368,6 +2504,26 @@ describe('POST /operations — repo-failure status codes', () => {
       { op: 'add', data: { type: 'folder', id: 'images/new-folder' } },
     ]);
     expect(res.status).toBe(200);
+    expect(createFolder).not.toHaveBeenCalled();
+
+    const body = await res.json() as OperationsBody;
+    expect(body.results).toHaveLength(1);
+    expect((body.results[0] as OperationResultError).errors[0]!.status).toBe('404');
+  });
+
+  it('fails a remove whose target lookup comes back empty with 404, without deleting, and ends the batch', async () => {
+    const getResource = vi.fn(() => ContentiaTask.succeed<ReadonlyArray<Resource>>([]));
+    const deleteAsset = vi.fn();
+    const createFolder = vi.fn();
+    const repo = { getResource, deleteAsset, createFolder } as unknown as AssetsRepository;
+
+    const api = buildAssetsApi({ repository: repo, authorize: allowAll });
+    const res = await postOperations(api, [
+      { op: 'remove', ref: { type: 'asset', id: 'images/missing.jpg' } },
+      { op: 'add', data: { type: 'folder', id: 'images/new-folder' } },
+    ]);
+    expect(res.status).toBe(200);
+    expect(deleteAsset).not.toHaveBeenCalled();
     expect(createFolder).not.toHaveBeenCalled();
 
     const body = await res.json() as OperationsBody;

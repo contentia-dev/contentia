@@ -312,7 +312,11 @@ export class StorageJsonApiProxyRepository extends StorageRepository {
           // up). Forward them regardless of success/failure of the op itself.
           for (const w of warningsFromMeta(entry.meta)) yield* emit.recoverableError(w);
           if (entry.errors) {
-            yield* emit.recoverableError(new InvalidData(`Failed to remove "${keys[i]}"`));
+            // The entry's errors are what the upstream repository reported for
+            // this key; they share the meta.warnings object shape.
+            const upstream = warningsFromMeta({ warnings: entry.errors });
+            const errors = upstream.length > 0 ? upstream : [new InvalidData(`Failed to remove "${keys[i]}"`)];
+            for (const e of errors) yield* emit.recoverableError(e);
             skipped += 1;
           } else {
             yield* emit.data(keys[i]!);

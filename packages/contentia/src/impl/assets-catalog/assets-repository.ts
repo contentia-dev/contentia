@@ -22,7 +22,13 @@ import {
 } from 'contentia/assets';
 import type { CatalogProvider, MediaCollectionSettings } from 'contentia/catalog';
 import type { ContentiaDone, ContentiaError } from 'contentia/core';
-import { BadRequestError, ContentiaStream, ContentiaTask, EntryAlreadyExistsError } from 'contentia/core';
+import {
+  BadRequestError,
+  ContentiaStream,
+  ContentiaTask,
+  EntryAlreadyExistsError,
+  NotFoundError,
+} from 'contentia/core';
 import type { Atom, Folder, FolderCreate, StorageRepository } from 'contentia/storage';
 import { pathCombine, pathToSegments } from 'contentia/storage';
 
@@ -377,42 +383,67 @@ export class CatalogAssetsRepository extends AssetsRepository {
     return ContentiaTask.make<void>(emit =>
       Effect.gen({ self: this }, function*() {
         const path = yield* this.getAssetPath(key, emit);
-        yield* Effect.map(
-          ContentiaStream.runCollectForwarding(this.storageRepository.removeAtoms([path.physical]), emit),
-          r => r.data,
-        );
+        yield* this.removePhysical(path.physical, () => new NotFoundError(`Asset not found: ${key}`), emit);
       })
     );
   }
 
+  /**
+   * Removes keys one at a time: a batched `removeAtoms` can't say which key a warning belongs to,
+   * and a backend may report a removed key under its on-disk name, so per-key calls are the only
+   * way to attribute each result to its logical key.
+   */
   deleteAssets(keys: readonly string[]): ContentiaStream.ContentiaStream<string, DeleteAssetsDone> {
     return ContentiaStream.make<string, DeleteAssetsDone>(emit =>
       Effect.gen({ self: this }, function*() {
-        const physicalToLogical = new Map<string, string>();
-        const physicalKeys: string[] = [];
+        let removed = 0;
         for (const key of keys) {
           const path = yield* Effect.result(this.getAssetPath(key, emit));
           if (Result.isFailure(path)) {
             yield* emit.recoverableError(path.failure);
             continue;
           }
-          physicalKeys.push(path.success.physical);
-          physicalToLogical.set(path.success.physical, key);
+          const removal = yield* Effect.result(
+            this.removePhysical(path.success.physical, () => new NotFoundError(`Asset not found: ${key}`), emit),
+          );
+          if (Result.isFailure(removal)) {
+            yield* emit.recoverableError(removal.failure);
+            continue;
+          }
+          yield* emit.data(key);
+          removed += 1;
         }
-        if (physicalKeys.length === 0) return { removed: 0, skipped: keys.length };
-
-        const removed = yield* Effect.map(
-          ContentiaStream.runCollectForwarding(this.storageRepository.removeAtoms(physicalKeys), emit),
-          r => r.data,
-        );
-        let count = 0;
-        for (const physical of removed) {
-          yield* emit.data(physicalToLogical.get(physical) ?? physical);
-          count += 1;
-        }
-        return { removed: count, skipped: keys.length - count };
+        return { removed, skipped: keys.length - removed };
       })
     );
+  }
+
+  /**
+   * Remove one physical atom, failing when the storage layer removed nothing.
+   *
+   * `removeAtoms` reports a key it could not remove as a recoverable warning, not a failure, so
+   * forwarding its warnings alone would report a delete as successful while the key is still
+   * there. Success is read from `done.removed` rather than from the emitted keys, because a
+   * backend may emit the removed key under its on-disk name (the filesystem backend appends its
+   * serializer's extension). On failure, the storage layer's own error for the key is the failure;
+   * `notFound` supplies one when it reported none.
+   */
+  private removePhysical(
+    physical: string,
+    notFound: () => ContentiaError,
+    emit: ContentiaTask.ContentiaMetadataEmit,
+  ): Effect.Effect<void, ContentiaError> {
+    return Effect.gen({ self: this }, function*() {
+      const { recoverableErrors, progress, done } = yield* ContentiaStream.runCollect(
+        this.storageRepository.removeAtoms([physical]),
+      );
+      for (const event of progress) yield* emit.progress(event);
+      if (done.removed > 0) {
+        for (const error of recoverableErrors) yield* emit.recoverableError(error);
+        return;
+      }
+      return yield* Effect.fail(recoverableErrors[0] ?? notFound());
+    });
   }
 
   getVariations(assets: Asset[]): ContentiaStream.ContentiaStream<AssetVariations, ContentiaDone> {
@@ -514,10 +545,7 @@ export class CatalogAssetsRepository extends AssetsRepository {
     return ContentiaTask.make<void>(emit =>
       Effect.gen({ self: this }, function*() {
         const path = yield* this.getAssetPath(key, emit);
-        yield* Effect.map(
-          ContentiaStream.runCollectForwarding(this.storageRepository.removeAtoms([path.physical]), emit),
-          r => r.data,
-        );
+        yield* this.removePhysical(path.physical, () => new NotFoundError(`Folder not found: ${key}`), emit);
       })
     );
   }

@@ -8,6 +8,8 @@ import type {
   OpenApiParameter,
   OpenApiPathItem,
   OpenApiRef,
+  OpenApiResponse,
+  OpenApiSchema,
 } from 'contentia/json-api';
 import type { StorageRepository } from 'contentia/storage';
 
@@ -21,6 +23,7 @@ const EXPECTED_PATHS = [
   '/',
   '/atom-summaries',
   '/atom-summaries/{key}',
+  '/atom/{key}',
   '/atoms',
   '/atoms/{key}',
   '/capabilities',
@@ -36,6 +39,28 @@ const HTTP_METHODS = ['get', 'put', 'post', 'patch', 'delete', 'head', 'options'
 
 const operationsOf = (item: OpenApiPathItem): OpenApiOperation[] =>
   HTTP_METHODS.map(method => item[method]).filter((op): op is OpenApiOperation => op !== undefined);
+
+/** Every operation with its `METHOD /path` label. */
+const labelledOperations = (doc: OpenApiDocument): Array<[label: string, operation: OpenApiOperation]> =>
+  Object.entries(doc.paths).flatMap(([path, item]) =>
+    HTTP_METHODS.flatMap(method => {
+      const operation = item[method];
+      return operation ? [[`${method.toUpperCase()} ${path}`, operation] as [string, OpenApiOperation]] : [];
+    })
+  );
+
+/** A response's effective description, following a `$ref` (whose own description overrides the target's). */
+const responseDescription = (doc: OpenApiDocument, response: OpenApiResponse | OpenApiRef | undefined) => {
+  if (!response) return undefined;
+  if (!('$ref' in response)) return response.description;
+  return response.description ?? doc.components?.responses?.[response.$ref.split('/').pop() ?? '']?.description;
+};
+
+const schemaOf = (doc: OpenApiDocument, name: string) =>
+  doc.components?.schemas?.[name] as OpenApiSchema & {
+    properties?: Record<string, OpenApiSchema & { properties?: Record<string, unknown> }>,
+    description?: string,
+  };
 
 describe('GET /openapi.json', () => {
   it('returns 200 with an application/json OpenAPI 3.1 document', async () => {
@@ -131,7 +156,7 @@ describe('buildStorageOpenApi', () => {
   });
 
   it('uses the basePath as the static server url', () => {
-    expect(buildStorageOpenApi({ basePath: '/api/storage', authorize: allowAll }).servers?.[0]?.url).toBe(
+    expect(buildStorageOpenApi({ basePath: '/api/storage' }).servers?.[0]?.url).toBe(
       '/api/storage',
     );
     expect(buildStorageOpenApi().servers?.[0]?.url).toBe('/');
@@ -141,5 +166,92 @@ describe('buildStorageOpenApi', () => {
     const doc = buildStorageOpenApi();
     const paths = doc.paths as Record<string, { post?: { responses: Record<string, unknown> } }>;
     expect(Object.keys(paths['/objects']!.post!.responses)).toContain('409');
+  });
+
+  it('declares a 403 on every operation the access policy guards, which is all but GET /', () => {
+    const doc = buildStorageOpenApi();
+    for (const [label, operation] of labelledOperations(doc)) {
+      const forbidden = responseDescription(doc, operation.responses['403']);
+      if (label === 'GET /') expect(forbidden, label).toBeUndefined();
+      else expect(forbidden, label).toBe('The access policy denied this action.');
+    }
+  });
+
+  it('documents GET /atom/{key}: an object or a folder, 404 when the key is neither', () => {
+    const doc = buildStorageOpenApi();
+    const operation = doc.paths['/atom/{key}']?.get;
+    expect(operation?.operationId).toBe('getAtom');
+    expect(Object.keys(operation?.responses ?? {})).toEqual(expect.arrayContaining(['200', '400', '403', '404']));
+    const data = schemaOf(doc, 'AtomResponse').properties?.['data'];
+    expect(data).toEqual({ $ref: '#/components/schemas/AtomResource' });
+  });
+
+  it('documents the 400 for path segments after the key on every keyed operation', () => {
+    const doc = buildStorageOpenApi();
+    for (const [label, operation] of labelledOperations(doc)) {
+      if (!label.includes('{key}')) continue;
+      expect(responseDescription(doc, operation.responses['400']), label).toContain('%2F');
+    }
+  });
+
+  it('leaves `type` out of response attributes, which the handler strips', () => {
+    const doc = buildStorageOpenApi();
+    const attributeSchemas = [
+      schemaOf(doc, 'StorageObjectAttributes'),
+      schemaOf(doc, 'FolderAttributes'),
+      schemaOf(doc, 'StorageObjectSummaryResource').properties?.['attributes'],
+      schemaOf(doc, 'FolderSummaryResource').properties?.['attributes'],
+    ];
+    for (const schema of attributeSchemas) {
+      expect(Object.keys(schema?.properties ?? {})).not.toContain('type');
+      expect(schema?.required ?? []).not.toContain('type');
+    }
+  });
+
+  it('describes compatibilityDate as a YYYY-MM-DD contract version', () => {
+    const doc = buildStorageOpenApi();
+    expect(schemaOf(doc, 'Capabilities').properties?.['compatibilityDate']).toEqual({
+      type: 'string',
+      format: 'date',
+      description: 'The repository contract version the backend implements, as YYYY-MM-DD. It changes when the '
+        + 'repository contract changes, so a client can compare it to detect an incompatible backend.',
+    });
+  });
+
+  it('states the exact Allow header that /objects/{key} sends with a 405', () => {
+    expect(buildStorageOpenApi().paths['/objects/{key}']?.description).toContain('`Allow: GET, PATCH, DELETE`');
+  });
+
+  it('says content defaults to {} on create', () => {
+    const create = schemaOf(buildStorageOpenApi(), 'StorageObjectCreateData');
+    const attributes = create.properties?.['attributes'] as { properties: Record<string, { description?: string }> };
+    expect(attributes.properties['content']?.description).toContain('Defaults to `{}`');
+  });
+
+  it('pins the removed ref type to `atom`, the only type the handler reports', () => {
+    const removeResult = schemaOf(buildStorageOpenApi(), 'AtomicRemoveResult');
+    const meta = removeResult.properties?.['meta'] as {
+      properties: { ref: { properties: { type: unknown } } },
+    };
+    expect(meta.properties.ref.properties.type).toEqual({ const: 'atom' });
+  });
+
+  it('documents that a failed remove keeps its slot and a failed add or update is omitted', () => {
+    const doc = buildStorageOpenApi();
+    const operation = doc.paths['/operations']?.post;
+    for (const text of [schemaOf(doc, 'AtomicResultsResponse').description, operation?.description]) {
+      expect(text).toContain('failed remove keeps its slot');
+      expect(text).toMatch(/failed add or update is omitted/i);
+    }
+    expect(operation?.description).toContain('concurrently');
+  });
+});
+
+describe('GET /', () => {
+  it("reports the spec's info.version", async () => {
+    const api = buildJsonApi({ repo: stubRepo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/'));
+    const body = await res.json() as { data: { attributes: { version: string } } };
+    expect(body.data.attributes.version).toBe(buildStorageOpenApi().info.version);
   });
 });

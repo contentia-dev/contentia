@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ContentiaStream, ContentiaTask, InvalidData, NotFoundError } from 'contentia/core';
+import { ContentiaStream, ContentiaTask, EntryAlreadyExistsError, InvalidData, NotFoundError } from 'contentia/core';
 
+import { buildJsonApi } from '../../api/documents-api/server.js';
+import { InMemoryDocumentsRepository } from '../../domain/documents/testing/in-memory-documents.js';
+import { allowAll } from '../../shared/json-api/authorize.js';
 import { DocumentsJsonApiProxyRepository } from './documents-jsonapi-proxy-repository.js';
 
 // Minimal valid JSON:API resource shapes reused across tests.
@@ -608,6 +611,18 @@ describe('DocumentsJsonApiProxyRepository.getRevision', () => {
     await ContentiaTask.runPromise(proxy.getRevision('posts/a b', 'rev 1'));
     expect(capturedUrl).toContain('/revisions/posts%2Fa%20b/rev%201');
   });
+
+  it('keeps the envelope type when attributes carry a conflicting type', async () => {
+    const doc = revisionDoc('posts/hello', 'rev-abc');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ data: { ...doc, attributes: { ...doc.attributes, type: 'published' } } })),
+    );
+
+    const proxy = new DocumentsJsonApiProxyRepository({ baseUrl: 'http://upstream' });
+    const rev = await ContentiaTask.runPromise(proxy.getRevision('posts/hello', 'rev-abc'));
+    expect(rev.type).toBe('revision');
+  });
 });
 
 describe('DocumentsJsonApiProxyRepository error rehydration', () => {
@@ -930,7 +945,7 @@ describe('DocumentsJsonApiProxyRepository.applyOperations', () => {
 
 describe('DocumentsJsonApiProxyRepository change signals', () => {
   it('getSyncToken parses attributes.syncToken and forwards filter[folder]', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: { type: 'sync-token', id: 'posts', attributes: { syncToken: 'tok-42', folder: 'posts' } },
       })
@@ -981,7 +996,7 @@ describe('DocumentsJsonApiProxyRepository change signals', () => {
   });
 
   it('listChanges emits change summaries and returns meta.syncToken in the done value', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: [
           { type: 'change-summary', id: 'posts/a', attributes: { deleted: false, version: 'v7' } },
@@ -1048,5 +1063,49 @@ describe('DocumentsJsonApiProxyRepository version passthrough', () => {
     const doc = await ContentiaTask.runPromise(proxy.getDocument('posts/hello'));
 
     expect(doc.version).toBe('v7');
+  });
+});
+
+describe('DocumentsJsonApiProxyRepository round trip through documents-api', () => {
+  const ORIGIN = 'http://documents-round-trip.test';
+
+  /** A proxy whose fetches land on an in-process documents-api over an in-memory repository. */
+  const connect = () => {
+    const backing = new InMemoryDocumentsRepository();
+    const api = buildJsonApi({ repo: backing, authorize: allowAll });
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => api.fetch(new Request(input, init)));
+    return { backing, proxy: new DocumentsJsonApiProxyRepository({ baseUrl: ORIGIN }) };
+  };
+
+  it('getRevision reaches the repository with the revision id the caller passed', async () => {
+    const { backing, proxy } = connect();
+    await ContentiaTask.runPromise(
+      backing.createRevision({
+        key: 'posts/hello',
+        type: 'revision',
+        revision: 'rev 1/a',
+        language: 'en',
+        content: {},
+      }),
+    );
+
+    const rev = await ContentiaTask.runPromise(proxy.getRevision('posts/hello', 'rev 1/a'));
+    expect(rev).toMatchObject({ key: 'posts/hello', revision: 'rev 1/a' });
+  });
+
+  it('applyOperations rehydrates a per-op failure as its typed error', async () => {
+    const { backing, proxy } = connect();
+    const create = {
+      key: 'posts/a',
+      type: 'published' as const,
+      status: 'published' as const,
+      language: 'en',
+      content: {},
+    };
+    await ContentiaTask.runPromise(backing.createDocument(create));
+
+    const error = await ContentiaTask.runPromise(proxy.applyOperations([{ kind: 'createDocument', create }]))
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(EntryAlreadyExistsError);
   });
 });

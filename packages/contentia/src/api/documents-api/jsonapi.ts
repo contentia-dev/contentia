@@ -244,8 +244,8 @@ export const revisionToJsonApi = (rev: Revision): RevisionJsonApi => {
 };
 
 export const revisionFromJsonApi = (jsonApi: RevisionJsonApi): Revision => ({
-  type: 'revision',
   ...jsonApi.attributes,
+  type: 'revision',
 });
 
 export const revisionCreateToJsonApi = (rev: RevisionCreate): RevisionCreateJsonApi =>
@@ -262,8 +262,8 @@ export const revisionSummaryToJsonApi = (rev: RevisionSummary): RevisionSummaryJ
 };
 
 export const revisionSummaryFromJsonApi = (jsonApi: RevisionSummaryJsonApi): RevisionSummary => ({
-  type: 'revision-summary',
   ...jsonApi.attributes,
+  type: 'revision-summary',
 });
 
 // ===== JSON:API SCHEMAS FOR VALIDATION =====

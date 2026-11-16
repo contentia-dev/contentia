@@ -130,7 +130,7 @@ describe('buildDocumentsOpenApi', () => {
   });
 
   it('uses the given basePath as the server url', () => {
-    const doc = buildDocumentsOpenApi({ basePath: '/api/documents', authorize: allowAll });
+    const doc = buildDocumentsOpenApi({ basePath: '/api/documents' });
     expect(doc.servers![0]!.url).toBe('/api/documents');
   });
 
@@ -179,5 +179,157 @@ describe('buildDocumentsOpenApi', () => {
     const doc = buildDocumentsOpenApi();
     const paths = doc.paths as Record<string, { delete?: { responses: Record<string, unknown> } }>;
     expect(Object.keys(paths['/unpublished/{key}']!.delete!.responses)).toContain('404');
+  });
+});
+
+describe('buildDocumentsOpenApi — matches the handler', () => {
+  const doc = buildDocumentsOpenApi();
+  const schemas = doc.components!.schemas! as Record<string, Record<string, unknown>>;
+  const paths = doc.paths as Record<string, OpenApiPathItem>;
+  const schema = (name: string) =>
+    schemas[name] as {
+      required?: string[],
+      properties?: Record<string, Record<string, unknown>>,
+      allOf?: Array<{ required?: string[], properties?: Record<string, unknown> }>,
+    };
+  /** A response's effective description: a `$ref`'s own description overrides the component's. */
+  const descriptionOf = (response: unknown): string | undefined => {
+    const r = response as { $ref?: string, description?: string };
+    if (r.description !== undefined || !r.$ref) return r.description;
+    return doc.components!.responses![r.$ref.replace('#/components/responses/', '')]!.description;
+  };
+  const responsesOf = (path: string, method: (typeof httpMethods)[number]) => paths[path]![method]!.responses;
+  const writeAttributes = (dataSchema: string) =>
+    schema(dataSchema).properties!['attributes'] as {
+      required?: string[],
+      properties: Record<string, { description?: string }>,
+    };
+
+  it('declares 403 on every authorized operation, and not on GET /', () => {
+    for (const [path, item] of Object.entries(paths)) {
+      for (const method of httpMethods) {
+        const operation = item[method];
+        if (!operation) continue;
+        const forbidden = operation.responses['403'];
+        if (path === '/' && method === 'get') {
+          expect(forbidden).toBeUndefined();
+          continue;
+        }
+        expect(forbidden, `${method.toUpperCase()} ${path}`).toBeDefined();
+        expect(descriptionOf(forbidden)).toBe('The access policy denied this action.');
+      }
+    }
+  });
+
+  it('says a batch is authorized whole before any write', () => {
+    expect(paths['/operations']!.post!.description).toContain('one denial fails the whole batch with 403');
+  });
+
+  it('keeps `type` out of every response attribute schema', () => {
+    for (
+      const name of [
+        'PublishedResource',
+        'PublishedSummaryResource',
+        'UnpublishedResource',
+        'UnpublishedSummaryResource',
+        'RevisionResource',
+        'RevisionSummaryResource',
+      ]
+    ) {
+      const attributes = schema(name).properties!['attributes'] as {
+        allOf: Array<{ required?: string[], properties?: Record<string, unknown> }>,
+      };
+      for (const part of attributes.allOf) {
+        expect(part.required ?? [], name).not.toContain('type');
+        expect(Object.keys(part.properties ?? {}), name).not.toContain('type');
+      }
+    }
+  });
+
+  it('declares the optional version on published and unpublished records, full and summary', () => {
+    const ownAttributes = (name: string) =>
+      (schema(name).properties!['attributes'] as {
+        allOf: Array<{ required?: string[], properties?: Record<string, { type?: string }> }>,
+      }).allOf[1]!;
+    for (
+      const name of [
+        'PublishedResource',
+        'PublishedSummaryResource',
+        'UnpublishedResource',
+        'UnpublishedSummaryResource',
+      ]
+    ) {
+      expect(ownAttributes(name).properties!['version'], name).toMatchObject({ type: 'string' });
+      expect(ownAttributes(name).required, name).not.toContain('version');
+    }
+    for (const name of ['RevisionResource', 'RevisionSummaryResource']) {
+      expect(ownAttributes(name).properties!['version'], name).toBeUndefined();
+    }
+  });
+
+  it('describes the composite revision id and the key attribute', () => {
+    for (const name of ['RevisionResource', 'RevisionSummaryResource']) {
+      expect(schema(name).properties!['id']!['description']).toContain('{key}/{revision}');
+      const own = (schema(name).properties!['attributes'] as { allOf: Array<{ required?: string[] }> }).allOf[1]!;
+      expect(own.required).toContain('key');
+    }
+  });
+
+  it('maps DELETE /published/{key} not-found to 404', () => {
+    expect(descriptionOf(responsesOf('/published/{key}', 'delete')['404'])).toBe('Document not found.');
+  });
+
+  it('declares 409 on both PATCH routes for a body id that differs from the URL key', () => {
+    for (const path of ['/published/{key}', '/unpublished/{key}']) {
+      expect(descriptionOf(responsesOf(path, 'patch')['409'])).toContain('`data.id`');
+    }
+  });
+
+  it('offers only document and unpublished as batch refs', () => {
+    expect(schema('ResourceRef').properties!['type']!['enum']).toEqual(['document', 'unpublished']);
+  });
+
+  it('declares no page[*] parameters on GET /changes, whose feed is not paginated', () => {
+    const names = (paths['/changes']!.get!.parameters ?? []).map(p => JSON.stringify(p));
+    // Compaction may turn a parameter into a `$ref` such as `#/components/parameters/PageNumber`.
+    expect(names.some(n => /page/i.test(n))).toBe(false);
+    expect(names.length).toBe(2);
+    expect(paths['/changes']!.get!.description).toContain('one `change-summary` per changed key');
+  });
+
+  it('lets record listings return folder entries', () => {
+    const items = (name: string) => JSON.stringify((schema(name).properties!['data'] as { items: unknown }).items);
+    expect(items('RecordsCollectionResponse')).toContain('FolderResource');
+    expect(items('RecordSummariesCollectionResponse')).toContain('FolderSummaryResource');
+  });
+
+  it('requires status on an unpublished create and revision on a revision create', () => {
+    expect(writeAttributes('UnpublishedCreateData').required).toEqual(['status']);
+    expect(writeAttributes('UnpublishedUpdateData').required).toBeUndefined();
+    expect(writeAttributes('RevisionWriteData').required).toEqual(['revision']);
+    expect(JSON.stringify(schema('AddUnpublishedOperation'))).toContain('UnpublishedCreateData');
+    expect(JSON.stringify(schema('UpdateUnpublishedOperation'))).toContain('UnpublishedUpdateData');
+  });
+
+  it('documents the `und` language default on every create', () => {
+    for (const name of ['PublishedWriteData', 'UnpublishedCreateData', 'RevisionWriteData']) {
+      expect(writeAttributes(name).properties['language']!.description).toContain('`und`');
+    }
+  });
+
+  it('says DELETE /unpublished/{key} is permanent', () => {
+    expect(paths['/unpublished/{key}']!.delete!.description).toContain('permanently');
+  });
+
+  it('describes batch error entries exactly, code included', () => {
+    expect(schema('AtomicResultError').required).toEqual(['status', 'code', 'title', 'detail']);
+    expect(schema('AtomicResultError').properties!['title']).toEqual({ const: 'Operation Failed' });
+  });
+
+  it('types compatibilityDate as a date', () => {
+    const attributes = schema('CapabilitiesResource').properties!['attributes'] as {
+      properties: Record<string, Record<string, unknown>>,
+    };
+    expect(attributes.properties['compatibilityDate']).toMatchObject({ type: 'string', format: 'date' });
   });
 });

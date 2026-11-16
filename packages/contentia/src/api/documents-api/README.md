@@ -148,7 +148,7 @@ Accepts the same pagination parameters as `/records`.
 
 ## Resource types
 
-The API uses seven JSON:API resource types:
+The API uses these JSON:API resource types:
 
 | Type                     | Returned by                                       |
 | ------------------------ | ------------------------------------------------- |
@@ -156,7 +156,9 @@ The API uses seven JSON:API resource types:
 | `published-summary`      | `/record-summaries` for published entries         |
 | `unpublished`            | Draft CRUD, unpublish state transition            |
 | `unpublished-summary`    | `/record-summaries` for unpublished entries       |
-| `revision`               | Revision create and detail                        |
+| `folder`                 | `/records` for folder entries                     |
+| `folder-summary`         | `/record-summaries` for folder entries            |
+| `revision`               | Revision create and detail; `id` is `{key}/{rev}` |
 | `revision-summary`       | Revision list (`GET /revisions/{key}`)            |
 | `documents-capabilities` | `GET /capabilities`                               |
 | `sync-token`             | `GET /sync-token`                                 |
@@ -172,12 +174,20 @@ The `/operations` endpoint accepts a batch of operations:
     // Add an unpublished draft
     {
       "op": "add",
-      "data": { "type": "unpublished", "id": "blog/draft", "attributes": { "title": "Draft" } }
+      "data": {
+        "type": "unpublished",
+        "id": "blog/draft",
+        "attributes": { "status": "draft", "content": { "title": "Draft" } }
+      }
     },
     // Add a published document
     {
       "op": "add",
-      "data": { "type": "published", "id": "blog/hello", "attributes": { "title": "Hello" } }
+      "data": {
+        "type": "published",
+        "id": "blog/hello",
+        "attributes": { "content": { "title": "Hello" } }
+      }
     },
     // Publish an unpublished draft
     { "op": "update", "href": "/publish", "ref": { "type": "unpublished", "id": "blog/draft" } },
@@ -191,7 +201,11 @@ The `/operations` endpoint accepts a batch of operations:
     // Update draft content
     {
       "op": "update",
-      "data": { "type": "unpublished", "id": "blog/draft", "attributes": { "title": "Updated" } }
+      "data": {
+        "type": "unpublished",
+        "id": "blog/draft",
+        "attributes": { "content": { "title": "Updated" } }
+      }
     },
     // Remove a published document
     { "op": "remove", "ref": { "type": "document", "id": "blog/hello" } },
@@ -204,17 +218,20 @@ The `/operations` endpoint accepts a batch of operations:
 **Fail-fast batch semantics** — not a transaction:
 
 1. **Pre-flight validation**: every op in the batch is validated for request shape (e.g. `data.id`
-   present on add) _before_ any I/O. If any op fails shape validation, the endpoint returns HTTP 400
-   with zero writes.
-2. **Sequential application**: once validation passes, ops are applied in order. The first
-   repository failure stops processing — no subsequent ops run.
-3. **No rollback**: a mid-batch repository failure leaves previously-applied ops applied. This
+   present on add, `data.attributes.status` present on an unpublished add) _before_ any I/O. If any
+   op fails shape validation, the endpoint returns HTTP 400 with zero writes.
+2. **Authorization**: every op is then authorized before any write. One denial fails the whole batch
+   with 403 and nothing is written.
+3. **Sequential application**: once both pass, ops are applied in order. The first repository
+   failure stops processing — no subsequent ops run.
+4. **No rollback**: a mid-batch repository failure leaves previously-applied ops applied. This
    endpoint is a fail-fast batch, not a transaction.
 
 The response is a `results` array with one entry per applied operation: a `data` object on success,
-a `meta: { deleted: true }` on remove success, or an `errors` array on the failing op. The overall
-response status is `200` when ops were applied (even if one failed); it is `400` when the batch
-failed pre-flight validation.
+a `meta: { deleted: true }` on remove success, or an `errors` array on the failing op. Its one error
+object carries `status`, the Contentia error `code`, `title: "Operation Failed"`, and `detail`. The
+overall response status is `200` when ops were applied (even if one failed); it is `400` when the
+batch failed pre-flight validation.
 
 ## Partial success: `meta.warnings`
 

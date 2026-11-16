@@ -71,22 +71,27 @@ export default { fetch: api.fetch };
 | PATCH  | `/collections/:key` | 200    | Update a collection                |
 | DELETE | `/collections/:key` | 204    | Delete a collection                |
 
-All responses carry `Cache-Control: no-store`.
+All responses carry `Cache-Control: no-store`. JSON:API documents (data and errors) use
+`Content-Type: application/vnd.api+json`; `/openapi.json` uses `application/json`.
+
+`POST` and `PATCH` answer with the submitted collection as decoded, not a read-back from the
+provider. `PATCH` replaces the collection's settings with the submitted attributes rather than
+merging them.
 
 ## Resource types
 
-The API uses two JSON:API resource types:
+The API uses two JSON:API resource types. The resource type alone sets the collection type;
+`attributes` carry no `type`.
 
-| Resource type         | Collection type  | Description             |
-| --------------------- | ---------------- | ----------------------- |
-| `document-collection` | `type: document` | Document content folder |
-| `media-collection`    | `type: media`    | Media/binary folder     |
+| Resource type         | Collection type | Description             |
+| --------------------- | --------------- | ----------------------- |
+| `document-collection` | `document`      | Document content folder |
+| `media-collection`    | `media`         | Media/binary folder     |
 
 ### `document-collection` attributes
 
 | Attribute                | Type                                | Required | Description                                                      |
 | ------------------------ | ----------------------------------- | -------- | ---------------------------------------------------------------- |
-| `type`                   | `"document"`                        | yes      | Discriminator                                                    |
 | `name`                   | string                              | no       | Human-readable label                                             |
 | `directory`              | string                              | no       | Storage root directory for this collection                       |
 | `recursive`              | boolean                             | no       | Include sub-directories in listings                              |
@@ -102,15 +107,14 @@ The API uses two JSON:API resource types:
 
 ### `media-collection` attributes
 
-| Attribute    | Type      | Required | Description                                                                                                                   |
-| ------------ | --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `type`       | `"media"` | yes      | Discriminator                                                                                                                 |
-| `name`       | string    | no       | Human-readable label                                                                                                          |
-| `directory`  | string    | no       | Storage root directory for this collection                                                                                    |
-| `recursive`  | boolean   | no       | Include sub-directories in listings                                                                                           |
-| `accept`     | string[]  | no       | Files the collection accepts: MIME types (`image/png`), wildcards (`image/*`), or file extensions (`.png`). Empty accepts any |
-| `url`        | string    | no       | Public URL prefix for served media files                                                                                      |
-| `pathFormat` | string    | no       | Template for generating media file paths                                                                                      |
+| Attribute    | Type     | Required | Description                                                                                                                   |
+| ------------ | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `name`       | string   | no       | Human-readable label                                                                                                          |
+| `directory`  | string   | no       | Storage root directory for this collection                                                                                    |
+| `recursive`  | boolean  | no       | Include sub-directories in listings                                                                                           |
+| `accept`     | string[] | no       | Files the collection accepts: MIME types (`image/png`), wildcards (`image/*`), or file extensions (`.png`). Empty accepts any |
+| `url`        | string   | no       | Public URL prefix for served media files                                                                                      |
+| `pathFormat` | string   | no       | Template for generating media file paths                                                                                      |
 
 ## Request / response examples
 
@@ -124,12 +128,12 @@ The API uses two JSON:API resource types:
     {
       "type": "document-collection",
       "id": "posts",
-      "attributes": { "type": "document", "name": "Posts", "directory": "content/posts" }
+      "attributes": { "name": "Posts", "directory": "content/posts" }
     },
     {
       "type": "media-collection",
       "id": "images",
-      "attributes": { "type": "media", "name": "Images", "directory": "public/uploads" }
+      "attributes": { "name": "Images", "directory": "public/uploads" }
     }
   ]
 }
@@ -144,7 +148,7 @@ The API uses two JSON:API resource types:
   "data": {
     "type": "document-collection",
     "id": "articles",
-    "attributes": { "type": "document", "name": "Articles", "directory": "content/articles" }
+    "attributes": { "name": "Articles", "directory": "content/articles" }
   }
 }
 ```
@@ -156,7 +160,7 @@ The API uses two JSON:API resource types:
   "data": {
     "type": "document-collection",
     "id": "articles",
-    "attributes": { "type": "document", "name": "Articles", "directory": "content/articles" }
+    "attributes": { "name": "Articles", "directory": "content/articles" }
   }
 }
 ```
@@ -172,7 +176,7 @@ The API uses two JSON:API resource types:
   "data": {
     "type": "document-collection",
     "id": "articles",
-    "attributes": { "type": "document", "name": "All Articles", "recursive": true }
+    "attributes": { "name": "All Articles", "recursive": true }
   }
 }
 ```
@@ -192,7 +196,8 @@ Errors follow JSON:API format:
   "errors": [
     {
       "status": "404",
-      "title": "not_found",
+      "code": "not_found",
+      "title": "Not Found",
       "detail": "Collection 'missing' not found."
     }
   ]
@@ -202,9 +207,11 @@ Errors follow JSON:API format:
 | HTTP status | When                                            |
 | ----------- | ----------------------------------------------- |
 | 400         | Malformed body or invalid JSON:API schema       |
+| 403         | The access policy denied the action             |
 | 404         | Collection key does not exist                   |
 | 409         | `data.id` in PATCH body differs from URL `:key` |
 | 503         | Downstream service (e.g. DynamoDB) unreachable  |
+| any other   | The settings provider's error, with its status  |
 
 ## Options
 
@@ -221,7 +228,7 @@ interface CatalogApiOptions {
 | Option      | Type                                              | Default | Description                                                                                                                                                                                                                                                                                                       |
 | ----------- | ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `repo`      | `CatalogProvider`                                 | —       | Required. The settings provider to read/write collections.                                                                                                                                                                                                                                                        |
-| `basePath`  | `string`                                          | `''`    | Mount path advertised in the `servers` URL of the served OpenAPI document. The Hono app is prefix-agnostic; mount it at this path.                                                                                                                                                                                |
+| `basePath`  | `string`                                          | `''`    | Mount path advertised in the `servers` URL of the served OpenAPI document. The handler strips it from request paths before routing.                                                                                                                                                                               |
 | `onError`   | `(error: unknown) => void`                        | —       | Called with each fatal error before the JSON:API error response is returned. Use for logging or Sentry breadcrumbs.                                                                                                                                                                                               |
 | `logger`    | `Pick<Console, 'error'\|'warn'\|'info'\|'debug'>` | —       | Passed to the JSON:API error serialiser for structured error logging.                                                                                                                                                                                                                                             |
 | `authorize` | `CatalogAuthorize`                                | —       | **Required.** Per-action authorization policy. Runs before every action (including the OpenAPI routes) with the action descriptor and originating `Request`. Return `true` to allow, `false` for 403, or a `ContentiaError` for a custom status/message. Pass `allowAll` to declare a surface intentionally open. |

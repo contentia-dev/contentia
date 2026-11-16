@@ -1,5 +1,6 @@
 import type { OpenApiDocument, OpenApiParameter, OpenApiResponse, OpenApiSchema } from 'contentia/json-api';
 import {
+  apiInfoComponents,
   capabilityComponents,
   compactOpenApiDocument,
   jsonApiContent,
@@ -9,13 +10,19 @@ import {
   paginationParameters,
   schemaRef as ref,
 } from 'contentia/json-api';
+import { ASSETS_API_VERSION, UNSIZED_PAGE_SIZE } from './contract.js';
 
 // ============================================
 // Reusable Schemas
 // ============================================
 
-/** Page size the handler lists with when the request carries no `page[*]` key. */
-const DEFAULT_PAGE_SIZE = 100;
+/** Page size the handler lists with when the request carries no `page[*]` key (`parsePaginationQuery`'s default). */
+const DEFAULT_PAGE_SIZE = 10;
+
+const cacheControlSchema: OpenApiSchema = {
+  type: 'string',
+  description: 'A `Cache-Control` header value (e.g. `public, max-age=3600`) stored with the asset.',
+};
 
 const assetAttributesSchema: OpenApiSchema = {
   type: 'object',
@@ -28,6 +35,11 @@ const assetAttributesSchema: OpenApiSchema = {
       type: 'object',
       description: 'Implementation-specific content descriptor (e.g. size, etag).',
       additionalProperties: true,
+    },
+    version: {
+      type: 'string',
+      description: 'Opaque per-asset version token; changes when the content changes. Compare only by equality. '
+        + 'Omitted on backends without version tracking (see GET /capabilities, `versionTracking`).',
     },
   },
 };
@@ -193,7 +205,12 @@ const capabilitiesResourceSchema: OpenApiSchema = {
       type: 'object',
       required: ['compatibilityDate', 'pagination', 'versionTracking', 'changes'],
       properties: {
-        compatibilityDate: { type: 'string' },
+        compatibilityDate: {
+          type: 'string',
+          format: 'date',
+          description: 'The repository contract version the backend implements, as YYYY-MM-DD. It changes when '
+            + 'the repository contract changes, so a client can compare it to detect an incompatible backend.',
+        },
         pagination: ref('PaginationCapability'),
         versionTracking: ref('VersionTrackingCapability'),
         changes: ref('ChangesCapability'),
@@ -328,7 +345,7 @@ const assetCreateDataSchema: OpenApiSchema = {
       properties: {
         mimeType: { type: 'string', description: "Defaults to 'application/octet-stream' when omitted." },
         filename: { type: 'string' },
-        cacheControl: { type: 'string' },
+        cacheControl: cacheControlSchema,
         customMetadata: { type: 'object', additionalProperties: { type: 'string' } },
         content: {
           type: 'string',
@@ -356,6 +373,21 @@ const folderCreateDataSchema: OpenApiSchema = {
   },
 };
 
+/** A JSON create request for POST /resources: one folder, or one asset with base64 content. */
+const createResourceRequestSchema: OpenApiSchema = {
+  type: 'object',
+  required: ['data'],
+  properties: {
+    data: { oneOf: [ref('AssetCreateData'), ref('FolderCreateData')] },
+  },
+};
+
+/** `FolderCreateData` as a batch `add` takes it: `attributes` may be omitted. */
+const operationFolderCreateDataSchema: OpenApiSchema = {
+  ...folderCreateDataSchema,
+  required: ['type', 'id'],
+};
+
 const assetUpdateDataSchema: OpenApiSchema = {
   type: 'object',
   required: ['type', 'attributes'],
@@ -365,7 +397,7 @@ const assetUpdateDataSchema: OpenApiSchema = {
       type: 'object',
       properties: {
         mimeType: { type: 'string' },
-        cacheControl: { type: 'string' },
+        cacheControl: cacheControlSchema,
         customMetadata: { type: 'object', additionalProperties: { type: 'string' } },
       },
     },
@@ -395,7 +427,7 @@ const addFolderOperationSchema: OpenApiSchema = {
   required: ['op', 'data'],
   properties: {
     op: { const: 'add' },
-    data: ref('FolderCreateData'),
+    data: ref('OperationFolderCreateData'),
   },
 };
 
@@ -409,7 +441,7 @@ const operationAssetUpdateDataSchema: OpenApiSchema = {
       type: 'object',
       properties: {
         mimeType: { type: 'string' },
-        cacheControl: { type: 'string' },
+        cacheControl: cacheControlSchema,
         customMetadata: { type: 'object', additionalProperties: { type: 'string' } },
       },
     },
@@ -503,9 +535,10 @@ const operationsResponseSchema: OpenApiSchema = {
   properties: {
     results: {
       type: 'array',
-      description: 'One entry per applied operation, in request order. Processing stops at the first '
-        + 'repository failure — subsequent operations are not applied. A failing operation produces an '
-        + '`errors` entry; preceding ops that succeeded remain applied (fail-fast batch, not a transaction).',
+      description: 'One entry per attempted operation, in request order. The first failing operation gets an '
+        + '`errors` entry and ends the batch: later operations are not attempted and have no entry, and '
+        + 'operations before it stay applied (a fail-fast batch, not a transaction). A `remove` whose target '
+        + 'does not exist fails this way, with status 404.',
       items: ref('OperationResult'),
     },
   },
@@ -592,6 +625,9 @@ const errorResponse = (description: string): OpenApiResponse => ({
 
 const internalErrorResponse = errorResponse('Unexpected error while handling the request.');
 
+/** Every operation except `GET /` runs the access policy first. */
+const forbiddenResponse = errorResponse('The access policy denied this action.');
+
 // ============================================
 // Document Builder
 // ============================================
@@ -608,13 +644,13 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
     openapi: '3.1.0',
     info: {
       title: 'Contentia Assets API',
-      version: '1.0.1',
+      version: ASSETS_API_VERSION,
       description: 'JSON:API-style HTTP interface over a Contentia assets repository: list, fetch, '
-        + 'upload, update and delete assets and folders, plus capability introspection. '
+        + 'upload, update and delete assets and folders, plus capability introspection and change signals. '
         + 'Success responses use the application/vnd.api+json media type. '
-        + '⚠️ The handler ships no authentication — wrap it (e.g. with contentia/server/api or a custom '
-        + 'middleware that validates a Bearer token) before exposing it to an untrusted network, '
-        + 'otherwise anyone who can reach it can list, upload, modify, and delete asset binaries.',
+        + 'The handler requires an access policy (`authorize`), which runs before every action except `GET /`. '
+        + 'It authenticates no one itself: validate credentials inside the policy, or mount the handler behind '
+        + 'contentia/server/api, which checks a Bearer token first.',
       license: { name: 'MIT', identifier: 'MIT' },
     },
     servers: [{ url: basePath }],
@@ -626,6 +662,20 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
       { name: 'Meta', description: 'API self-description.' },
     ],
     paths: {
+      '/': {
+        get: {
+          operationId: 'getApiInfo',
+          summary: 'List available endpoints',
+          description: 'Served without running the access policy.',
+          tags: ['Meta'],
+          responses: {
+            '200': {
+              description: 'API info resource enumerating the available endpoints.',
+              content: jsonApiContent(ref('ApiInfoResponse')),
+            },
+          },
+        },
+      },
       '/openapi.json': {
         get: {
           operationId: 'getOpenApiDocument',
@@ -639,6 +689,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
                 'application/json': { schema: { type: 'object' } },
               },
             },
+            '403': forbiddenResponse,
             '500': internalErrorResponse,
           },
         },
@@ -656,6 +707,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
                 'application/yaml': { schema: { type: 'object' } },
               },
             },
+            '403': forbiddenResponse,
             '500': internalErrorResponse,
           },
         },
@@ -673,6 +725,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               description: 'The capabilities resource.',
               content: jsonApiContent(ref('CapabilitiesDocument')),
             },
+            '403': forbiddenResponse,
             '500': internalErrorResponse,
             default: errorResponse(
               'Repository failure, with the HTTP status mapped from the ContentiaError code (e.g. 404, 500).',
@@ -701,6 +754,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               description: 'The current sync token for the scope.',
               content: jsonApiContent(ref('SyncTokenDocument')),
             },
+            '403': forbiddenResponse,
             '501': errorResponse('The backing repository does not support sync tokens.'),
             '500': internalErrorResponse,
           },
@@ -725,7 +779,8 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
             {
               name: 'filter[folder]',
               in: 'query',
-              description: 'Scope the feed to a folder. Omit for the whole store.',
+              description: 'Scope the feed to a folder. Omit for the whole store. A token covers one scope, so '
+                + 'this must match the `filter[folder]` the token was obtained with.',
               schema: { type: 'string' },
             },
           ],
@@ -735,6 +790,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               content: jsonApiContent(ref('ChangesCollectionDocument')),
             },
             '400': errorResponse('Missing filter[since] or an unrecognized sync token.'),
+            '403': forbiddenResponse,
             '501': errorResponse('The backing repository does not support a change feed.'),
             '500': internalErrorResponse,
           },
@@ -747,7 +803,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
           tags: ['Resources'],
           parameters: [
             ...folderScopeParameters,
-            ...paginationParameters({ defaultPageSize: DEFAULT_PAGE_SIZE }),
+            ...paginationParameters({ defaultPageSize: DEFAULT_PAGE_SIZE, unsizedPageSize: UNSIZED_PAGE_SIZE }),
             includeParameter,
             metaParameter,
           ],
@@ -760,6 +816,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
             '400': errorResponse(
               'Listing failed, or a cursor parameter was used against a backend without cursor support.',
             ),
+            '403': forbiddenResponse,
             '500': internalErrorResponse,
           },
         },
@@ -769,8 +826,9 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
           tags: ['Resources'],
           requestBody: {
             required: true,
-            description: 'Either a multipart upload (binary asset) or a JSON:API document creating a '
-              + 'folder or a base64-encoded asset. Any other Content-Type is rejected with 400.',
+            description: 'Either a multipart upload (binary asset) or a JSON document creating a folder or a '
+              + 'base64-encoded asset, sent as application/vnd.api+json or application/json. Any other '
+              + 'Content-Type is rejected with 400.',
             content: {
               'multipart/form-data': {
                 schema: {
@@ -794,7 +852,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
                       description: "Falls back to the file's type, then 'application/octet-stream'.",
                     },
                     filename: { type: 'string', description: 'Falls back to the file name.' },
-                    cacheControl: { type: 'string' },
+                    cacheControl: cacheControlSchema,
                     customMetadata: {
                       type: 'string',
                       description: 'JSON-encoded string-to-string record. Invalid JSON is ignored.',
@@ -802,17 +860,8 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
                   },
                 },
               },
-              'application/vnd.api+json': {
-                schema: {
-                  type: 'object',
-                  required: ['data'],
-                  properties: {
-                    data: {
-                      oneOf: [ref('AssetCreateData'), ref('FolderCreateData')],
-                    },
-                  },
-                },
-              },
+              'application/vnd.api+json': { schema: ref('CreateResourceRequest') },
+              'application/json': { schema: ref('CreateResourceRequest') },
             },
           },
           responses: {
@@ -828,6 +877,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               'Missing file or content, invalid body, unsupported Content-Type, invalid resource type, '
                 + 'or repository failure.',
             ),
+            '403': forbiddenResponse,
             '409': errorResponse('An asset or folder already exists at the requested key.'),
             '500': internalErrorResponse,
           },
@@ -845,6 +895,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               description: 'The resource, with optional included related resources and meta.warnings.',
               content: jsonApiContent(ref('ResourceDocument')),
             },
+            '403': forbiddenResponse,
             '404': errorResponse('Resource not found.'),
             '500': internalErrorResponse,
           },
@@ -875,6 +926,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
               content: jsonApiContent(ref('AssetDocument')),
             },
             '400': errorResponse('Invalid request body, invalid update data, or repository failure.'),
+            '403': forbiddenResponse,
             '404': errorResponse('Asset not found.'),
             '500': internalErrorResponse,
           },
@@ -882,7 +934,10 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
         delete: {
           operationId: 'deleteResource',
           summary: 'Delete an asset or folder',
-          description: 'Looks the resource up first to decide between asset and folder deletion.',
+          description: 'Looks the resource up first to decide between asset and folder deletion. Answers 204 on a '
+            + 'clean delete. When the repository removes the resource but reports recoverable warnings, it '
+            + 'answers 200 with them in `meta.warnings`. A resource the repository could not remove is an error, '
+            + 'with the HTTP status mapped from its ContentiaError code.',
           tags: ['Resources'],
           parameters: [
             {
@@ -895,12 +950,17 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
           responses: {
             '204': { description: 'Deleted cleanly with no warnings.' },
             '200': {
-              description: 'Deleted, but recoverable warnings were collected (HTTP 204 forbids a body).',
+              description: 'The delete finished with recoverable warnings, carried in `meta.warnings` '
+                + '(HTTP 204 forbids a body).',
               content: jsonApiContent(ref('DeleteResultDocument')),
             },
+            '403': forbiddenResponse,
             '404': errorResponse('Resource not found.'),
             '400': errorResponse('Deletion failed.'),
             '500': internalErrorResponse,
+            default: errorResponse(
+              'The repository could not remove the resource; the HTTP status is mapped from its ContentiaError code.',
+            ),
           },
         },
       },
@@ -908,13 +968,15 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
         post: {
           operationId: 'postBatchOperations',
           summary: 'Batch write operations (add asset/folder, update asset, remove)',
-          description: 'Fail-fast batch: all operations are validated for request shape before any I/O. '
-            + 'A shape-invalid op (e.g. missing `data.id`, or a missing `content` on an asset add) returns '
-            + 'HTTP 400 with zero writes. Once validation passes, ops are applied sequentially; the first '
-            + 'repository failure stops processing and no subsequent ops run. A mid-batch repository '
-            + 'failure leaves previously-applied ops applied — this endpoint is a fail-fast batch, not a '
-            + 'transaction. Response vocabulary is `operations` / `results`, not the JSON:API Atomic '
-            + "Operations extension's `atomic:*` vocabulary — this endpoint never negotiates that extension.",
+          description: 'Fail-fast batch. Every operation is first validated for request shape, before any I/O: a '
+            + 'shape-invalid op (e.g. missing `data.id`, or a missing `content` on an asset add) returns 400 with '
+            + 'zero writes. Every operation is then authorized up front as its own action (createAsset, '
+            + 'createFolder, updateAsset, deleteResource); one denial rejects the whole batch with 403 before any '
+            + 'write. The ops run in order, and the first failing op ends the batch with an `errors` entry in '
+            + '`results`; a `remove` whose target does not exist fails with status 404. Ops applied before the '
+            + 'failure stay applied: this is a fail-fast batch, not a transaction. The vocabulary is `operations` / '
+            + '`results`, not the `atomic:*` vocabulary of the JSON:API Atomic Operations extension, which this '
+            + 'endpoint never negotiates.',
           tags: ['Operations'],
           requestBody: {
             required: true,
@@ -922,13 +984,14 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
           },
           responses: {
             '200': {
-              description: 'Results for all applied operations. Processing stopped if a repository failure occurred.',
+              description: 'One result per attempted operation, ending at the first failure if one occurred.',
               content: jsonApiContent(ref('OperationsResponse')),
             },
             '400': errorResponse(
-              'Shape-invalid batch (missing required field, wrong type) — zero writes performed; '
-                + 'or malformed JSON / schema-invalid body.',
+              'Shape-invalid batch (missing required field, wrong type), malformed JSON, or a schema-invalid '
+                + 'body. Zero writes performed.',
             ),
+            '403': forbiddenResponse,
             '500': internalErrorResponse,
           },
         },
@@ -939,6 +1002,7 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
         ...jsonApiErrorComponents(),
         ...jsonApiLinkComponents(),
         ...capabilityComponents({ versionTracking: true }),
+        ...apiInfoComponents('assets'),
         FilteringCapability: filteringCapabilitySchema,
         ChangesMeta: {
           allOf: [
@@ -972,9 +1036,11 @@ export function buildAssetsOpenApi(options: { basePath?: string } = {}): OpenApi
         DeleteResultDocument: deleteResultDocumentSchema,
         AssetCreateData: assetCreateDataSchema,
         FolderCreateData: folderCreateDataSchema,
+        CreateResourceRequest: createResourceRequestSchema,
         AssetUpdateData: assetUpdateDataSchema,
         OperationRef: operationRefSchema,
         AddAssetOperation: addAssetOperationSchema,
+        OperationFolderCreateData: operationFolderCreateDataSchema,
         AddFolderOperation: addFolderOperationSchema,
         OperationAssetUpdateData: operationAssetUpdateDataSchema,
         UpdateAssetOperation: updateAssetOperationSchema,

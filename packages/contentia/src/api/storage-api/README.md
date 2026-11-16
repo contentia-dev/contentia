@@ -69,6 +69,7 @@ export default { fetch: api.fetch };
 | POST   | `/atoms`                | Create a folder                    |
 | GET    | `/atoms`                | List atoms at root                 |
 | GET    | `/atoms/{key}`          | List atoms in a folder             |
+| GET    | `/atom/{key}`           | Read an object or a folder         |
 | GET    | `/atom-summaries`       | List atom summaries at root        |
 | GET    | `/atom-summaries/{key}` | List atom summaries in folder      |
 | GET    | `/objects/{key}`        | Read a storage object              |
@@ -77,6 +78,9 @@ export default { fetch: api.fetch };
 | DELETE | `/objects/{key}`        | Delete a storage object            |
 | GET    | `/folders/{key}`        | Read a folder                      |
 | POST   | `/operations`           | Atomic batch operations            |
+
+`{key}` is one path segment, so a slash in a key is percent-encoded as `%2F`
+(`/objects/posts%2Fhello-world`). A URL with more segments after the key is rejected with 400.
 
 ## Options
 

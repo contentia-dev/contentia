@@ -65,13 +65,23 @@ const makeRevision = (key = 'posts/hello', revision = 'rev-1') => ({
   updatedAt: '2026-01-01T00:00:00Z',
 });
 
-const makeCapabilities = (): DocumentsCapabilities => ({
+const cursorPagination: DocumentsCapabilities['pagination'] = {
+  supported: true,
+  description: 'cursor supported',
+  styles: { offset: false, page: false, cursor: true },
+};
+
+const offsetPagination: DocumentsCapabilities['pagination'] = {
+  supported: true,
+  description: 'offset only',
+  styles: { offset: true, page: true, cursor: false },
+};
+
+const makeCapabilities = (pagination = cursorPagination): DocumentsCapabilities => ({
   compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-  pagination: {
-    supported: true,
-    description: 'cursor-only for tests',
-    styles: { offset: false, page: false, cursor: true },
-  },
+  pagination,
+  versionTracking: { supported: false, description: 'no version tracking in tests' },
+  changes: { supported: false, description: 'no change signals in tests' },
 });
 
 describe('documents-api Cache-Control', () => {
@@ -1890,15 +1900,7 @@ describe('GET /revisions/:key — cursor capability guard', () => {
     );
     const repo = {
       listRevisions: spy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'cursor supported',
-            styles: { offset: false, page: false, cursor: true },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities()),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -1914,15 +1916,7 @@ describe('GET /revisions/:key — cursor capability guard', () => {
     const listSpy = vi.fn();
     const repo = {
       listRevisions: listSpy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -1939,15 +1933,7 @@ describe('GET /revisions/:key — cursor capability guard', () => {
     const listSpy = vi.fn();
     const repo = {
       listRevisions: listSpy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2274,15 +2260,7 @@ describe('GET /records — pagination forwarding', () => {
     );
     const repo = {
       listRecords: spy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'cursor supported',
-            styles: { offset: false, page: false, cursor: true },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities()),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2298,15 +2276,7 @@ describe('GET /records — pagination forwarding', () => {
     const listSpy = vi.fn();
     const repo = {
       listRecords: listSpy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2322,15 +2292,7 @@ describe('GET /records — pagination forwarding', () => {
   it('returns 400 for page[before] when backend does not support cursor', async () => {
     const repo = {
       listRecords: vi.fn(),
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2344,15 +2306,7 @@ describe('GET /records — pagination forwarding', () => {
     );
     const repo = {
       listRecords: spy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2527,7 +2481,7 @@ describe('GET /record-summaries — filter param forwarding', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /record-summaries — meta.page.total', () => {
-  const makeSummary = (type: 'published-summary' | 'unpublished-summary', key: string) => ({
+  const makeSummary = <T extends 'published-summary' | 'unpublished-summary'>(type: T, key: string) => ({
     type,
     key,
     status: type === 'published-summary' ? 'published' : 'draft',
@@ -2630,15 +2584,7 @@ describe('GET /record-summaries — pagination forwarding', () => {
     );
     const repo = {
       listRecordSummaries: spy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'cursor supported',
-            styles: { offset: false, page: false, cursor: true },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities()),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2654,15 +2600,7 @@ describe('GET /record-summaries — pagination forwarding', () => {
     const listSpy = vi.fn();
     const repo = {
       listRecordSummaries: listSpy,
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -2678,15 +2616,7 @@ describe('GET /record-summaries — pagination forwarding', () => {
   it('returns 400 for page[before] when backend does not support cursor', async () => {
     const repo = {
       listRecordSummaries: vi.fn(),
-      getCapabilities: () =>
-        ContentiaTask.succeed<DocumentsCapabilities>({
-          compatibilityDate: '2026-01-01' as DocumentsCapabilities['compatibilityDate'],
-          pagination: {
-            supported: true,
-            description: 'offset only',
-            styles: { offset: true, page: true, cursor: false },
-          },
-        }),
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities(offsetPagination)),
     } as unknown as DocumentsRepository;
     const api = buildJsonApi({ repo, authorize: allowAll });
 
@@ -3541,5 +3471,359 @@ describe('documents-api lock routes (LCMS-544)', () => {
     expect(res.status).toBe(403);
     const body = await res.json() as { errors: Array<{ code: string }> };
     expect(body.errors[0]!.code).toBe(errorCode.FORBIDDEN);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec/code alignment fixes
+// ---------------------------------------------------------------------------
+
+describe('cursor pagination links', () => {
+  it('GET /records emits links.next after the last key and links.prev before the first', async () => {
+    const repo = {
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities()),
+      listRecords: () =>
+        ContentiaStream.make<ReturnType<typeof makeDocument>, ListRecordsDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data(makeDocument('posts/b'));
+            yield* emit.data(makeDocument('posts/c'));
+            return {};
+          })
+        ),
+    } as unknown as DocumentsRepository;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await api.fetch(
+      new Request('http://localhost/records?filter%5Bfolder%5D=posts&page%5Bafter%5D=posts%2Fa&page%5Bsize%5D=2'),
+    );
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { links: { next?: string, prev?: string } };
+    const next = new URL(body.links.next!);
+    expect(next.searchParams.get('page[after]')).toBe('posts/c');
+    expect(next.searchParams.get('page[size]')).toBe('2');
+    const prev = new URL(body.links.prev!);
+    expect(prev.searchParams.get('page[before]')).toBe('posts/b');
+  });
+
+  it('GET /revisions/:key uses the revision, not the shared document key, as the cursor', async () => {
+    const repo = {
+      getCapabilities: () => ContentiaTask.succeed(makeCapabilities()),
+      listRevisions: () =>
+        ContentiaStream.make<RevisionSummary, ListRevisionsDone>(emit =>
+          Effect.gen(function*() {
+            yield* emit.data(makeRevisionSummary('posts/hello', 'rev-2'));
+            yield* emit.data(makeRevisionSummary('posts/hello', 'rev-3'));
+            return {};
+          })
+        ),
+    } as unknown as DocumentsRepository;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await api.fetch(
+      new Request('http://localhost/revisions/posts%2Fhello?page%5Bafter%5D=rev-1&page%5Bsize%5D=2'),
+    );
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { links: { next?: string, prev?: string } };
+    expect(new URL(body.links.next!).searchParams.get('page[after]')).toBe('rev-3');
+    expect(new URL(body.links.prev!).searchParams.get('page[before]')).toBe('rev-2');
+  });
+});
+
+describe('GET /revisions/:key/:revisionId — URL decoding', () => {
+  it('decodes revisionId before it reaches the authorize hook and the repository', async () => {
+    const getRevision = vi.fn((key: string, revision: string) =>
+      ContentiaTask.succeed({ ...makeRevision(key, revision), type: 'revision' as const })
+    );
+    const authorize = vi.fn(() => true);
+    const api = buildJsonApi({ repo: { getRevision } as unknown as DocumentsRepository, authorize });
+
+    const res = await api.fetch(new Request('http://localhost/revisions/posts%2Fhello/rev%201%2Fa'));
+    expect(res.status).toBe(200);
+
+    expect(getRevision).toHaveBeenCalledWith('posts/hello', 'rev 1/a');
+    expect(authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'getRevision', key: 'posts/hello', revisionId: 'rev 1/a' }),
+    );
+    const body = await res.json() as { data: { id: string } };
+    expect(body.data.id).toBe('posts/hello/rev 1/a');
+  });
+
+  it('passes a malformed percent-encoding through raw instead of answering 500', async () => {
+    const getRevision = vi.fn((_key: string, _revision: string) =>
+      ContentiaTask.fail(new NotFoundError('revision not found'))
+    );
+    const api = buildJsonApi({ repo: { getRevision } as unknown as DocumentsRepository, authorize: allowAll });
+
+    const res = await api.fetch(new Request('http://localhost/revisions/posts%2Fhello/%E0%A4%A'));
+    expect(res.status).toBe(404);
+    expect(getRevision).toHaveBeenCalledWith('posts/hello', '%E0%A4%A');
+  });
+});
+
+describe('GET /changes — not paginated', () => {
+  it('answers with links.self only, even when the feed fills a default-sized page', async () => {
+    const changes = Array.from({ length: 10 }, (_, i) => ({ key: `posts/${i}`, deleted: false }));
+    const listChanges = vi.fn(() =>
+      ContentiaStream.succeedMany(changes, { syncToken: 'next' as never, total: changes.length })
+    );
+    const api = buildJsonApi({ repo: { listChanges } as unknown as DocumentsRepository, authorize: allowAll });
+
+    const res = await api.fetch(new Request('http://localhost/changes?filter%5Bsince%5D=0'));
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { data: unknown[], links: Record<string, string> };
+    expect(body.data).toHaveLength(10);
+    expect(Object.keys(body.links)).toEqual(['self']);
+    expect(listChanges).toHaveBeenCalledWith({ since: '0' });
+  });
+});
+
+describe('unpublished create requires attributes.status', () => {
+  it('POST /unpublished without status returns 400 before touching the repository', async () => {
+    const createUnpublished = vi.fn();
+    const api = buildJsonApi({
+      repo: { createUnpublished } as unknown as DocumentsRepository,
+      authorize: allowAll,
+    });
+
+    for (const attributes of [{ content: { title: 'x' } }, { status: '', content: {} }, { status: 3 }]) {
+      const res = await api.fetch(
+        new Request('http://localhost/unpublished', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/vnd.api+json' },
+          body: JSON.stringify({ data: { type: 'unpublished', id: 'posts/draft', attributes } }),
+        }),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+      expect(body.errors[0]!.code).toBe('bad_request');
+      expect(body.errors[0]!.detail).toContain('data.attributes.status');
+    }
+    expect(createUnpublished).not.toHaveBeenCalled();
+  });
+
+  it('POST /operations add/unpublished without status returns 400 with zero writes', async () => {
+    const createDocument = vi.fn();
+    const createUnpublished = vi.fn();
+    const api = buildJsonApi({
+      repo: { createDocument, createUnpublished } as unknown as DocumentsRepository,
+      authorize: allowAll,
+    });
+
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'published', id: 'posts/a', attributes: { content: {} } } },
+      { op: 'add', data: { type: 'unpublished', id: 'posts/b', attributes: { content: {} } } },
+    ]);
+    expect(res.status).toBe(400);
+    expect(createDocument).not.toHaveBeenCalled();
+    expect(createUnpublished).not.toHaveBeenCalled();
+
+    const body = await res.json() as BatchErrorBody;
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0]!.source?.pointer).toBe('/operations/1');
+    expect(body.errors[0]!.detail).toContain('data.attributes.status');
+  });
+});
+
+describe('POST /operations — per-op error entries carry the error code', () => {
+  it('includes the ContentiaError code alongside status, title and detail', async () => {
+    const repo = {
+      createDocument: () => ContentiaTask.fail(new EntryAlreadyExistsError('posts/existing already exists')),
+    } as unknown as DocumentsRepository;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'published', id: 'posts/existing', attributes: { content: {} } } },
+    ]);
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as { results: Array<{ errors: unknown[] }> };
+    expect(body.results[0]!.errors).toEqual([{
+      status: '409',
+      code: errorCode.ENTRY_ALREADY_EXISTS,
+      title: 'Operation Failed',
+      detail: 'posts/existing already exists',
+    }]);
+  });
+});
+
+describe('GET / — version', () => {
+  it('reports the OpenAPI document info.version', async () => {
+    const api = buildJsonApi({ repo: stubRepo, authorize: allowAll });
+    const info = await (await api.fetch(new Request('http://localhost/'))).json() as {
+      data: { attributes: { version: string } },
+    };
+    const spec = await (await api.fetch(new Request('http://localhost/openapi.json'))).json() as {
+      info: { version: string },
+    };
+    expect(info.data.attributes.version).toBe(spec.info.version);
+  });
+});
+
+describe('POST /published — language default', () => {
+  it('stores and returns `und` when the body omits language', async () => {
+    const repo = new InMemoryDocumentsRepository();
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await api.fetch(
+      new Request('http://localhost/published', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'published', id: 'posts/a', attributes: { content: { t: 1 } } } }),
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json() as { data: { attributes: Record<string, unknown> } };
+    expect(body.data.attributes['language']).toBe('und');
+    expect(body.data.attributes).not.toHaveProperty('type');
+  });
+});
+
+describe('record listings carry the optional version attribute', () => {
+  const listing = (items: unknown[]) => () =>
+    ContentiaStream.make<unknown, ListRecordsDone>(emit =>
+      Effect.gen(function*() {
+        for (const item of items) yield* emit.data(item);
+        return {};
+      })
+    );
+
+  it('passes version through on full records and on summaries', async () => {
+    const repo = {
+      listRecords: listing([
+        { ...makeDocument('posts/a'), version: 'v-a' },
+        { ...makeUnpublished('posts/b'), version: 'v-b' },
+      ]),
+      listRecordSummaries: listing([
+        { type: 'published-summary', key: 'posts/a', status: 'published', language: 'en', version: 'v-a' },
+        { type: 'unpublished-summary', key: 'posts/b', status: 'draft', language: 'en', version: 'v-b' },
+      ]),
+    } as unknown as DocumentsRepository;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    for (const path of ['records', 'record-summaries']) {
+      const res = await api.fetch(
+        new Request(`http://localhost/${path}?filter%5Btype%5D=all&filter%5Bfolder%5D=posts`),
+      );
+      expect(res.status).toBe(200);
+      const body = await res.json() as { data: Array<{ attributes: { version?: string } }> };
+      expect(body.data.map(d => d.attributes.version)).toEqual(['v-a', 'v-b']);
+    }
+  });
+});
+
+describe('a body attributes.key cannot redirect a write', () => {
+  const send = (api: ReturnType<typeof buildJsonApi>, method: string, path: string, body: unknown) =>
+    api.fetch(
+      new Request(`http://localhost${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify(body),
+      }),
+    );
+  const published = (key: string, title: string) => ({
+    key,
+    type: 'published' as const,
+    status: 'published' as const,
+    language: 'en',
+    content: { title },
+  });
+  const draft = (key: string, title: string) => ({
+    key,
+    type: 'unpublished' as const,
+    status: 'draft',
+    language: 'en',
+    content: { title },
+  });
+  const has = async (task: ContentiaTask.ContentiaTask<unknown>) => {
+    try {
+      await ContentiaTask.runPromise(task);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it('PATCH /published/{key} updates the URL key, and authorize sees the URL key', async () => {
+    const repo = new InMemoryDocumentsRepository();
+    await ContentiaTask.runPromise(repo.createDocument(published('posts/a', 'A')));
+    await ContentiaTask.runPromise(repo.createDocument(published('posts/b', 'B')));
+    const authorize = vi.fn(() => true);
+    const api = buildJsonApi({ repo, authorize });
+
+    const res = await send(api, 'PATCH', '/published/posts%2Fa', {
+      data: { type: 'published', id: 'posts/a', attributes: { key: 'posts/b', content: { title: 'hijack' } } },
+    });
+    expect(res.status).toBe(200);
+    expect((await ContentiaTask.runPromise(repo.getDocument('posts/a'))).content).toEqual({ title: 'hijack' });
+    expect((await ContentiaTask.runPromise(repo.getDocument('posts/b'))).content).toEqual({ title: 'B' });
+    expect(authorize).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'updateDocument', data: expect.objectContaining({ key: 'posts/a' }) }),
+    );
+  });
+
+  it('PATCH /unpublished/{key} updates the URL key', async () => {
+    const repo = new InMemoryDocumentsRepository();
+    await ContentiaTask.runPromise(repo.createUnpublished(draft('posts/a', 'A')));
+    await ContentiaTask.runPromise(repo.createUnpublished(draft('posts/b', 'B')));
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await send(api, 'PATCH', '/unpublished/posts%2Fa', {
+      data: { type: 'unpublished', id: 'posts/a', attributes: { key: 'posts/b', content: { title: 'hijack' } } },
+    });
+    expect(res.status).toBe(200);
+    expect((await ContentiaTask.runPromise(repo.getUnpublished('posts/a'))).content).toEqual({ title: 'hijack' });
+    expect((await ContentiaTask.runPromise(repo.getUnpublished('posts/b'))).content).toEqual({ title: 'B' });
+  });
+
+  it('POST /published, /unpublished and /revisions create at data.id', async () => {
+    const repo = new InMemoryDocumentsRepository();
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const attributes = { key: 'posts/other', type: 'unpublished', content: { title: 'x' } };
+
+    expect((await send(api, 'POST', '/published', { data: { type: 'published', id: 'posts/a', attributes } })).status)
+      .toBe(201);
+    expect(
+      (await send(api, 'POST', '/unpublished', {
+        data: { type: 'unpublished', id: 'posts/b', attributes: { ...attributes, status: 'draft' } },
+      })).status,
+    ).toBe(201);
+    expect(
+      (await send(api, 'POST', '/revisions', {
+        data: { type: 'revision', id: 'posts/a', attributes: { ...attributes, revision: 'v1' } },
+      })).status,
+    ).toBe(201);
+
+    expect(await has(repo.getDocument('posts/a'))).toBe(true);
+    expect(await has(repo.getUnpublished('posts/b'))).toBe(true);
+    expect(await has(repo.getRevision('posts/a', 'v1'))).toBe(true);
+    expect(await has(repo.getDocument('posts/other'))).toBe(false);
+    expect(await has(repo.getUnpublished('posts/other'))).toBe(false);
+    expect(await has(repo.getRevision('posts/other', 'v1'))).toBe(false);
+  });
+
+  it('POST /operations add and update ops write to data.id', async () => {
+    const repo = new InMemoryDocumentsRepository();
+    await ContentiaTask.runPromise(repo.createUnpublished(draft('posts/c', 'C')));
+    await ContentiaTask.runPromise(repo.createUnpublished(draft('posts/other', 'other')));
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const hijack = { key: 'posts/other', content: { title: 'hijack' } };
+
+    const res = await postOperations(api, [
+      { op: 'add', data: { type: 'published', id: 'posts/a', attributes: hijack } },
+      { op: 'add', data: { type: 'unpublished', id: 'posts/b', attributes: { ...hijack, status: 'draft' } } },
+      { op: 'update', data: { type: 'unpublished', id: 'posts/c', attributes: hijack } },
+    ]);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { results: Array<{ data?: { id: string } }> };
+    expect(body.results.map(r => r.data?.id)).toEqual(['posts/a', 'posts/b', 'posts/c']);
+
+    expect(await has(repo.getDocument('posts/a'))).toBe(true);
+    expect(await has(repo.getDocument('posts/other'))).toBe(false);
+    expect((await ContentiaTask.runPromise(repo.getUnpublished('posts/b'))).content).toEqual({ title: 'hijack' });
+    expect((await ContentiaTask.runPromise(repo.getUnpublished('posts/c'))).content).toEqual({ title: 'hijack' });
+    expect((await ContentiaTask.runPromise(repo.getUnpublished('posts/other'))).content).toEqual({ title: 'other' });
   });
 });

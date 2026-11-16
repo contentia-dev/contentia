@@ -3,7 +3,12 @@ import { type CollectionSettings } from 'contentia/catalog';
 import type { ContentiaResult } from 'contentia/core';
 import { BadRequestError, ConflictError, ContentiaTask, NotFoundError } from 'contentia/core';
 import type { AuthorizeDecision, JsonApiLogger } from 'contentia/json-api';
-import { errorToJsonApiMapper, openApiDocumentToYaml, resolveAuthorization } from 'contentia/json-api';
+import {
+  errorToJsonApiMapper,
+  JSON_API_MEDIA_TYPE,
+  openApiDocumentToYaml,
+  resolveAuthorization,
+} from 'contentia/json-api';
 import * as Result from 'effect/Result';
 import {
   collectionFromJsonApi,
@@ -70,10 +75,12 @@ export interface CatalogApi {
   fetch(request: Request): Promise<Response>;
 }
 
-function jsonResponse(body: unknown, status: number = 200): Response {
+// JSON:API documents (data and errors) go out as `application/vnd.api+json`;
+// only the OpenAPI document, which is not one, is plain `application/json`.
+function jsonResponse(body: unknown, status: number = 200, contentType: string = JSON_API_MEDIA_TYPE): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store' },
   });
 }
 
@@ -134,6 +141,20 @@ export function buildJsonApi(options: CatalogApiOptions): CatalogApi {
     return respondError(Result.fail(denial));
   };
 
+  // Only parsing and decoding the body answers an exception with 400: a bad
+  // body is the caller's fault. Anything the settings provider throws later
+  // reaches the shared handler at the bottom, like it does on every other route.
+  const decodeBody = async (request: Request): Promise<CollectionSettings | Response> => {
+    try {
+      const jsonData = await request.json() as { data: unknown };
+      return collectionFromJsonApi(decodeCollectionJsonApi(jsonData.data) as CollectionJsonApi);
+    } catch (error) {
+      onError?.(error);
+      const mapped = errorToJsonApiMapper(new BadRequestError((error as Error).message), logger);
+      return jsonResponse({ errors: mapped.errors }, 400);
+    }
+  };
+
   return {
     async fetch(request: Request): Promise<Response> {
       try {
@@ -154,7 +175,7 @@ export function buildJsonApi(options: CatalogApiOptions): CatalogApi {
           const denied = await authorizeAction(request, { action: 'readOpenApi', format: 'json' });
           if (denied) return denied;
           const doc = (await loadOpenApiBuilder())({ basePath });
-          return jsonResponse({ ...doc, servers: [{ url: `${url.origin}${basePath}` }] });
+          return jsonResponse({ ...doc, servers: [{ url: `${url.origin}${basePath}` }] }, 200, 'application/json');
         }
 
         // GET /openapi.yaml
@@ -181,29 +202,22 @@ export function buildJsonApi(options: CatalogApiOptions): CatalogApi {
 
         // POST /collections — create
         if (routePath === '/collections' && method === 'POST') {
-          try {
-            const jsonData = await request.json() as { data: unknown };
-            const validatedData = decodeCollectionJsonApi(jsonData.data);
-            const body = collectionFromJsonApi(validatedData as CollectionJsonApi);
+          const body = await decodeBody(request);
+          if (body instanceof Response) return body;
 
-            const denied = await authorizeAction(request, { action: 'createCollection', collection: body });
-            if (denied) return denied;
+          const denied = await authorizeAction(request, { action: 'createCollection', collection: body });
+          if (denied) return denied;
 
-            if (body.type === 'document') {
-              const result = await ContentiaTask.runPromiseResult(repo.putDocumentCollectionSettings(body.key, body));
-              if (Result.isFailure(result)) return respondError(result);
-              return jsonResponse({ data: collectionToJsonApi(body) }, 201);
-            } else if (body.type === 'media') {
-              const result = await ContentiaTask.runPromiseResult(repo.putMediaCollectionSettings(body.key, body));
-              if (Result.isFailure(result)) return respondError(result);
-              return jsonResponse({ data: collectionToJsonApi(body) }, 201);
-            }
-            return respondError(Result.fail(new BadRequestError('Unknown collection type')));
-          } catch (error) {
-            onError?.(error);
-            const mapped = errorToJsonApiMapper(new BadRequestError((error as Error).message), logger);
-            return jsonResponse({ errors: mapped.errors }, 400);
+          if (body.type === 'document') {
+            const result = await ContentiaTask.runPromiseResult(repo.putDocumentCollectionSettings(body.key, body));
+            if (Result.isFailure(result)) return respondError(result);
+            return jsonResponse({ data: collectionToJsonApi(body) }, 201);
+          } else if (body.type === 'media') {
+            const result = await ContentiaTask.runPromiseResult(repo.putMediaCollectionSettings(body.key, body));
+            if (Result.isFailure(result)) return respondError(result);
+            return jsonResponse({ data: collectionToJsonApi(body) }, 201);
           }
+          return respondError(Result.fail(new BadRequestError('Unknown collection type')));
         }
 
         // /collections/:key routes
@@ -236,50 +250,41 @@ export function buildJsonApi(options: CatalogApiOptions): CatalogApi {
 
           // PATCH /collections/:key — update
           if (method === 'PATCH') {
-            try {
-              // Authorize before any repo read so callers cannot probe collection
-              // existence via 404/409 differentials without valid credentials.
-              const denied = await authorizeAction(request, { action: 'updateCollection', key });
-              if (denied) return denied;
+            // Authorize before any repo read so callers cannot probe collection
+            // existence via 404/409 differentials without valid credentials.
+            const denied = await authorizeAction(request, { action: 'updateCollection', key });
+            if (denied) return denied;
 
-              const allSettings = await ContentiaTask.runPromiseResult(repo.getCatalog());
-              if (Result.isFailure(allSettings)) return respondError(allSettings);
-              const collections = allSettings.success.collections ?? {};
-              if (!collections[key]) {
-                return respondError(Result.fail(new NotFoundError(`Collection '${key}' not found.`)));
-              }
-
-              const jsonData = await request.json() as { data: unknown };
-              const validatedData = decodeCollectionJsonApi(jsonData.data);
-              const body = collectionFromJsonApi(validatedData as CollectionJsonApi);
-
-              if (body.key !== key) {
-                return respondError(Result.fail(
-                  new ConflictError(
-                    `Body data.id ('${body.key}') does not match URL key ('${key}'). Use the URL key as the resource identifier.`,
-                  ),
-                ));
-              }
-
-              const bodyWithKey = { ...body, key };
-
-              if (bodyWithKey.type === 'document') {
-                const result = await ContentiaTask.runPromiseResult(
-                  repo.putDocumentCollectionSettings(key, bodyWithKey),
-                );
-                if (Result.isFailure(result)) return respondError(result);
-                return jsonResponse({ data: collectionToJsonApi(bodyWithKey) });
-              } else if (bodyWithKey.type === 'media') {
-                const result = await ContentiaTask.runPromiseResult(repo.putMediaCollectionSettings(key, bodyWithKey));
-                if (Result.isFailure(result)) return respondError(result);
-                return jsonResponse({ data: collectionToJsonApi(bodyWithKey) });
-              }
-              return respondError(Result.fail(new BadRequestError('Unknown collection type')));
-            } catch (error) {
-              onError?.(error);
-              const mapped = errorToJsonApiMapper(new BadRequestError((error as Error).message), logger);
-              return jsonResponse({ errors: mapped.errors }, 400);
+            const allSettings = await ContentiaTask.runPromiseResult(repo.getCatalog());
+            if (Result.isFailure(allSettings)) return respondError(allSettings);
+            const collections = allSettings.success.collections ?? {};
+            if (!collections[key]) {
+              return respondError(Result.fail(new NotFoundError(`Collection '${key}' not found.`)));
             }
+
+            const body = await decodeBody(request);
+            if (body instanceof Response) return body;
+
+            if (body.key !== key) {
+              return respondError(Result.fail(
+                new ConflictError(
+                  `Body data.id ('${body.key}') does not match URL key ('${key}'). Use the URL key as the resource identifier.`,
+                ),
+              ));
+            }
+
+            const bodyWithKey = { ...body, key };
+
+            if (bodyWithKey.type === 'document') {
+              const result = await ContentiaTask.runPromiseResult(repo.putDocumentCollectionSettings(key, bodyWithKey));
+              if (Result.isFailure(result)) return respondError(result);
+              return jsonResponse({ data: collectionToJsonApi(bodyWithKey) });
+            } else if (bodyWithKey.type === 'media') {
+              const result = await ContentiaTask.runPromiseResult(repo.putMediaCollectionSettings(key, bodyWithKey));
+              if (Result.isFailure(result)) return respondError(result);
+              return jsonResponse({ data: collectionToJsonApi(bodyWithKey) });
+            }
+            return respondError(Result.fail(new BadRequestError('Unknown collection type')));
           }
 
           // DELETE /collections/:key

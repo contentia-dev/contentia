@@ -281,6 +281,33 @@ describe('StorageJsonApiProxyRepository.removeAtoms', () => {
     expect(collected.recoverableErrors).toHaveLength(1);
     expect(collected.recoverableErrors[0]!.message).toContain('orphaned sidecar');
   });
+
+  it('re-emits the upstream error of a failed remove, not a generic one', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        jsonResponse({
+          'atomic:results': [
+            { errors: [{ code: 'forbidden', status: '403', title: 'Forbidden', detail: 'notes/a is not empty' }] },
+            { errors: [] },
+            { meta: { deleted: true, ref: { type: 'atom', id: 'notes/c' } } },
+          ],
+        })
+      ),
+    );
+
+    const proxy = new StorageJsonApiProxyRepository({ baseUrl: 'http://upstream' });
+    const collected = await ContentiaStream.runPromiseCollect(
+      proxy.removeAtoms(['notes/a', 'notes/b', 'notes/c']),
+    );
+
+    expect(collected.data).toEqual(['notes/c']);
+    expect(collected.done).toEqual({ removed: 1, skipped: 2 });
+    expect(collected.recoverableErrors.map(e => [e.code, e.message])).toEqual([
+      ['forbidden', 'notes/a is not empty'],
+      ['invalid_data', 'Failed to remove "notes/b"'],
+    ]);
+  });
 });
 
 // ─── getObject ───────────────────────────────────────────────────────────────
@@ -314,7 +341,7 @@ describe('StorageJsonApiProxyRepository.getObject', () => {
   });
 
   it('URL-encodes the key in the request path', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: {
           type: 'object',
@@ -560,7 +587,7 @@ describe('StorageJsonApiProxyRepository.getFolder', () => {
 
 describe('StorageJsonApiProxyRepository.createFolder', () => {
   it('returns a Folder decoded from the POST /atoms response', async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       jsonResponse({
         data: {
           type: 'folder',

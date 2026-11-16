@@ -1,4 +1,5 @@
-import type { OpenApiDocument, OpenApiSchema } from 'contentia/json-api';
+import type { OpenApiDocument, OpenApiOperation, OpenApiRef, OpenApiResponse, OpenApiSchema } from 'contentia/json-api';
+import { JSON_API_MEDIA_TYPE } from 'contentia/json-api';
 import { describe, expect, it } from 'vitest';
 
 import { buildAssetsOpenApi } from './assets-api/openapi.js';
@@ -23,6 +24,29 @@ const documents: Array<[name: string, doc: OpenApiDocument]> = [
 const refsInto = (doc: OpenApiDocument, section: string): string[] => {
   const pattern = new RegExp(`"#/components/${section}/([^"]+)"`, 'g');
   return [...JSON.stringify(doc).matchAll(pattern)].map(match => match[1]!);
+};
+
+const HTTP_METHODS = ['get', 'put', 'post', 'patch', 'delete', 'head', 'options'] as const;
+
+/** Every operation in the document, keyed `METHOD /path`. */
+const operationsOf = (doc: OpenApiDocument): Array<[route: string, operation: OpenApiOperation]> =>
+  Object.entries(doc.paths).flatMap(([path, item]) =>
+    HTTP_METHODS.flatMap(method => {
+      const operation = item[method];
+      return operation ? [[`${method.toUpperCase()} ${path}`, operation] as [string, OpenApiOperation]] : [];
+    })
+  );
+
+/**
+ * The response an operation declares for `code`, with a `$ref` into
+ * `components.responses` followed. `compactOpenApiDocument` turns an inline
+ * error body into `{ $ref: '#/components/responses/ErrorResponse', description }`,
+ * so a check against the resolved body holds for both forms.
+ */
+const responseOf = (doc: OpenApiDocument, operation: OpenApiOperation, code: string): OpenApiResponse | undefined => {
+  const response: OpenApiResponse | OpenApiRef | undefined = operation.responses[code];
+  if (response === undefined || !('$ref' in response)) return response;
+  return doc.components?.responses?.[response.$ref.replace('#/components/responses/', '')];
 };
 
 describe.each(documents)('%s OpenAPI document', (_name, doc) => {
@@ -51,6 +75,20 @@ describe.each(documents)('%s OpenAPI document', (_name, doc) => {
       .filter(body => body !== JSON.stringify({ description: undefined }));
 
     expect(new Set(bodies).size).toBe(bodies.length);
+  });
+
+  it('declares the access-policy 403 on every operation except GET /', () => {
+    // Each handler runs `authorize` before every action but the `GET /`
+    // endpoint listing, and a denial answers with a JSON:API error document.
+    const undeclared = operationsOf(doc)
+      .filter(([route]) => route !== 'GET /')
+      .filter(([, operation]) =>
+        responseOf(doc, operation, '403')?.content?.[JSON_API_MEDIA_TYPE]?.schema?.['$ref']
+          !== '#/components/schemas/JsonApiError'
+      )
+      .map(([route]) => route);
+
+    expect(undeclared).toEqual([]);
   });
 });
 

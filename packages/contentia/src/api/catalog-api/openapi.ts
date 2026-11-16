@@ -11,18 +11,48 @@ export interface CatalogOpenApiOptions {
   basePath?: string;
 }
 
+// The handler sets this header on every response it writes, errors included.
+const noStoreHeaders: NonNullable<OpenApiResponse['headers']> = {
+  'Cache-Control': {
+    description: 'Always `no-store`.',
+    schema: { type: 'string', const: 'no-store' },
+  },
+};
+
 // Authored inline so every operation keeps its own wording; the document is run
 // through `compactOpenApiDocument` on the way out, which folds each occurrence
 // into a `$ref` against the `ErrorResponse` component.
 const errorResponse = (description: string): OpenApiResponse => ({
   description,
   content: jsonApiContent(ref('JsonApiError')),
+  headers: noStoreHeaders,
 });
+
+const forbiddenResponse = errorResponse('The access policy denied this action.');
+
+// A failure the settings provider returns is mapped through its own status, and
+// a provider may fail with any ContentiaError, so the set is open-ended.
+const providerErrorResponse = errorResponse(
+  'The settings provider failed; the response carries the status of its error (e.g. 500 for an internal '
+    + 'error), which may also be a status listed separately.',
+);
+
+const writeBadRequestResponse = errorResponse('Malformed body or invalid JSON:API schema.');
+
+const unreachableResponse = errorResponse('Downstream service (e.g. DynamoDB) unreachable.');
 
 const collectionResponse = (description: string): OpenApiResponse => ({
   description,
   content: jsonApiContent(ref('CollectionDocument')),
+  headers: noStoreHeaders,
 });
+
+// The shared `ErrorResponse` plus this handler's `Cache-Control` header, so the
+// inline error responses above still fold into it rather than into a twin.
+const responseComponents: Record<string, OpenApiResponse> = Object.fromEntries(
+  Object.entries(jsonApiErrorResponseComponents())
+    .map(([name, response]) => [name, { ...response, headers: noStoreHeaders }]),
+);
 
 const schemas: Record<string, OpenApiSchema> = {
   // This handler never attaches meta.warnings to a successful response.
@@ -39,7 +69,6 @@ const schemas: Record<string, OpenApiSchema> = {
   DocumentCollectionAttributes: {
     type: 'object',
     properties: {
-      type: { type: 'string', const: 'document' },
       name: { type: 'string', description: 'Human-readable label.' },
       directory: { type: 'string', description: 'Storage root directory for this collection.' },
       recursive: { type: 'boolean', description: 'Include sub-directories in listings.' },
@@ -69,12 +98,10 @@ const schemas: Record<string, OpenApiSchema> = {
           'Shorthand for unpublishedStatuses.trash.directory (name defaults to "Trash"). Explicit unpublishedStatuses.trash wins if both are provided.',
       },
     },
-    required: ['type'],
   },
   MediaCollectionAttributes: {
     type: 'object',
     properties: {
-      type: { type: 'string', const: 'media' },
       name: { type: 'string', description: 'Human-readable label.' },
       directory: { type: 'string', description: 'Storage root directory for this collection.' },
       recursive: { type: 'boolean', description: 'Include sub-directories in listings.' },
@@ -87,12 +114,15 @@ const schemas: Record<string, OpenApiSchema> = {
       url: { type: 'string', description: 'Public URL prefix for served media files.' },
       pathFormat: { type: 'string', description: 'Template for generating media file paths.' },
     },
-    required: ['type'],
   },
   DocumentCollectionResource: {
     type: 'object',
     properties: {
-      type: { type: 'string', const: 'document-collection' },
+      type: {
+        type: 'string',
+        const: 'document-collection',
+        description: 'Resource type; selects a document collection.',
+      },
       id: { type: 'string', description: 'Collection key.' },
       attributes: ref('DocumentCollectionAttributes'),
     },
@@ -101,7 +131,7 @@ const schemas: Record<string, OpenApiSchema> = {
   MediaCollectionResource: {
     type: 'object',
     properties: {
-      type: { type: 'string', const: 'media-collection' },
+      type: { type: 'string', const: 'media-collection', description: 'Resource type; selects a media collection.' },
       id: { type: 'string', description: 'Collection key.' },
       attributes: ref('MediaCollectionAttributes'),
     },
@@ -143,9 +173,9 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
       license: { name: 'MIT', identifier: 'MIT' },
       description: 'JSON:API-style server for catalog collection settings (document and media collections). '
         + 'All responses carry Cache-Control: no-store. '
-        + 'Warning: this API ships no built-in authentication — wrap the handler with an authentication '
-        + 'layer before exposing it to an untrusted network, otherwise anyone who can reach it can read, '
-        + 'mutate, and delete collection settings.',
+        + 'The handler requires an access policy (`authorize`) and runs it before every operation; a denial '
+        + 'answers 403 unless the policy returns its own error. The handler authenticates no one itself: '
+        + 'validate credentials inside the policy, or mount the handler behind a layer that does.',
     },
     servers: [{ url: basePath === '' ? '/' : basePath }],
     tags: [
@@ -160,13 +190,15 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
           tags: ['openapi'],
           responses: {
             '200': {
-              description: 'The OpenAPI document.',
+              description: 'The OpenAPI document, with `servers` set to the request origin plus the mount path.',
               content: {
                 'application/json': {
                   schema: { type: 'object' },
                 },
               },
+              headers: noStoreHeaders,
             },
+            '403': forbiddenResponse,
           },
         },
       },
@@ -177,13 +209,16 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
           tags: ['openapi'],
           responses: {
             '200': {
-              description: 'The OpenAPI document, serialized as YAML.',
+              description:
+                'The OpenAPI document as YAML, with `servers` set to the request origin plus the mount path.',
               content: {
                 'application/yaml': {
                   schema: { type: 'object' },
                 },
               },
+              headers: noStoreHeaders,
             },
+            '403': forbiddenResponse,
           },
         },
       },
@@ -196,23 +231,30 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
             '200': {
               description: 'All configured collections.',
               content: jsonApiContent(ref('CollectionListDocument')),
+              headers: noStoreHeaders,
             },
-            '400': errorResponse('The settings provider failed to load settings.'),
-            '503': errorResponse('Downstream service (e.g. DynamoDB) unreachable.'),
+            '403': forbiddenResponse,
+            '503': unreachableResponse,
+            default: providerErrorResponse,
           },
         },
         post: {
           operationId: 'createCollection',
           summary: 'Create a collection',
+          description: 'Writes the collection under `data.id`, replacing any existing collection with that key.',
           tags: ['collections'],
           requestBody: {
             required: true,
             content: jsonApiContent(ref('CollectionDocument')),
           },
           responses: {
-            '201': collectionResponse('The created collection.'),
-            '400': errorResponse('Malformed body, invalid JSON:API schema, or the settings provider failed.'),
-            '503': errorResponse('Downstream service (e.g. DynamoDB) unreachable.'),
+            '201': collectionResponse(
+              'The submitted collection as decoded, echoed back; it is not read back from the settings provider.',
+            ),
+            '400': writeBadRequestResponse,
+            '403': forbiddenResponse,
+            '503': unreachableResponse,
+            default: providerErrorResponse,
           },
         },
       },
@@ -232,25 +274,33 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
           tags: ['collections'],
           responses: {
             '200': collectionResponse('The requested collection.'),
-            '400': errorResponse('The settings provider failed, or the collection has an unknown type.'),
+            '400': errorResponse('The stored collection has an unknown type.'),
+            '403': forbiddenResponse,
             '404': errorResponse('Collection key does not exist.'),
-            '503': errorResponse('Downstream service (e.g. DynamoDB) unreachable.'),
+            '503': unreachableResponse,
+            default: providerErrorResponse,
           },
         },
         patch: {
           operationId: 'updateCollection',
           summary: 'Update a collection',
+          description: "The submitted attributes replace the collection's settings; they are not merged with the "
+            + 'stored ones.',
           tags: ['collections'],
           requestBody: {
             required: true,
             content: jsonApiContent(ref('CollectionDocument')),
           },
           responses: {
-            '200': collectionResponse('The updated collection.'),
-            '400': errorResponse('Malformed body, invalid JSON:API schema, or the settings provider failed.'),
+            '200': collectionResponse(
+              'The submitted collection as decoded, echoed back; it is not read back from the settings provider.',
+            ),
+            '400': writeBadRequestResponse,
+            '403': forbiddenResponse,
             '404': errorResponse('Collection key does not exist.'),
             '409': errorResponse('Body data.id does not match the URL key.'),
-            '503': errorResponse('Downstream service (e.g. DynamoDB) unreachable.'),
+            '503': unreachableResponse,
+            default: providerErrorResponse,
           },
         },
         delete: {
@@ -258,14 +308,15 @@ export function buildCatalogOpenApi(options: CatalogOpenApiOptions = {}): OpenAp
           summary: 'Delete a collection',
           tags: ['collections'],
           responses: {
-            '204': { description: 'Collection deleted. Empty body.' },
-            '400': errorResponse('The settings provider failed to load or persist settings.'),
+            '204': { description: 'Collection deleted. Empty body.', headers: noStoreHeaders },
+            '403': forbiddenResponse,
             '404': errorResponse('Collection key does not exist.'),
-            '503': errorResponse('Downstream service (e.g. DynamoDB) unreachable.'),
+            '503': unreachableResponse,
+            default: providerErrorResponse,
           },
         },
       },
     },
-    components: { schemas, responses: jsonApiErrorResponseComponents() },
+    components: { schemas, responses: responseComponents },
   });
 }

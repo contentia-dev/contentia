@@ -9,6 +9,7 @@ import type {
   FolderCreate,
   ListAtomsDone,
   ListAtomsOptions,
+  RemoveAtomsDone,
   StorageObject,
   StorageObjectCreate,
   StorageObjectUpdate,
@@ -99,7 +100,7 @@ describe('storage-api meta.warnings', () => {
 
     const api = buildJsonApi({ repo: partialRepo, authorize: allowAll });
     const res = await api.fetch(
-      new Request('http://localhost/objects/notes%2Fhello', {
+      new Request('http://localhost/objects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -179,9 +180,7 @@ describe('storage-api meta.warnings', () => {
       // The atomic batch also drains removeAtoms; provide a no-op so the
       // shared `removalResult` step doesn't blow up.
       removeAtoms: () =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(() =>
-          Effect.succeed({ removed: 0, skipped: 0 })
-        ),
+        ContentiaStream.make<string, RemoveAtomsDone>(() => Effect.succeed({ removed: 0, skipped: 0 })),
     } as unknown as StorageRepository;
 
     const api = buildJsonApi({ repo: partialRepo, authorize: allowAll });
@@ -246,7 +245,7 @@ describe('storage-api meta.warnings', () => {
   it('emits a meta.deleted entry per successful remove in atomic:results', async () => {
     const partialRepo = {
       removeAtoms: (keys: readonly string[]) =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(emit =>
+        ContentiaStream.make<string, RemoveAtomsDone>(emit =>
           Effect.gen(function*() {
             for (const k of keys) yield* emit.data(k);
             return { removed: keys.length, skipped: 0 };
@@ -305,9 +304,7 @@ describe('storage-api meta.warnings', () => {
         );
       },
       removeAtoms: () =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(() =>
-          Effect.succeed({ removed: 0, skipped: 0 })
-        ),
+        ContentiaStream.make<string, RemoveAtomsDone>(() => Effect.succeed({ removed: 0, skipped: 0 })),
     } as unknown as StorageRepository;
 
     const api = buildJsonApi({ repo: partialRepo, authorize: allowAll });
@@ -407,7 +404,7 @@ describe('storage-api LCMS-245 rawSerializer extra-field error propagation', () 
     // Race with a timeout so the test fails fast if we regress to a hang
     const res = await Promise.race([
       api.fetch(
-        new Request('http://localhost/objects/notes%2Fhello', {
+        new Request('http://localhost/objects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/vnd.api+json' },
           body: JSON.stringify({
@@ -448,7 +445,7 @@ describe('storage-api LCMS-245 rawSerializer extra-field error propagation', () 
 
     const api = buildJsonApi({ repo: partialRepo, authorize: allowAll });
     const res = await api.fetch(
-      new Request('http://localhost/objects/notes%2Fhello', {
+      new Request('http://localhost/objects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/vnd.api+json' },
         body: JSON.stringify({
@@ -872,7 +869,7 @@ describe('DELETE /objects/:key', () => {
   const makeDeleteRepo = (keysThatExist: string[]) =>
     ({
       removeAtoms: (keys: readonly string[]) =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(emit =>
+        ContentiaStream.make<string, RemoveAtomsDone>(emit =>
           Effect.gen(function*() {
             let removed = 0;
             for (const k of keys) {
@@ -919,7 +916,7 @@ describe('DELETE /objects/:key', () => {
   it('surfaces recoverableErrors from removeAtoms as meta.warnings', async () => {
     const partialRepo = {
       removeAtoms: (keys: readonly string[]) =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(emit =>
+        ContentiaStream.make<string, RemoveAtomsDone>(emit =>
           Effect.gen(function*() {
             for (const k of keys) yield* emit.data(k);
             yield* emit.recoverableError(new NotFoundError('side-effect removal warning'));
@@ -956,7 +953,7 @@ describe('DELETE /objects/:key', () => {
   it('returns 200 when removeAtoms emits the extension-resolved path rather than the raw key (LCMS-216)', async () => {
     const extensionResolvingRepo = {
       removeAtoms: (keys: readonly string[]) =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(emit =>
+        ContentiaStream.make<string, RemoveAtomsDone>(emit =>
           Effect.gen(function*() {
             // Mirror what the FS backend does: emit the resolved on-disk path with extension,
             // not the original extension-less key supplied by the caller.
@@ -1488,7 +1485,7 @@ describe('storage-api: InternalError → 500 coverage (LCMS-432)', () => {
   it('returns 500 JSON:API error when removeAtoms raises InternalError', async () => {
     const partialRepo = {
       removeAtoms: () =>
-        ContentiaStream.make<string, { removed: number, skipped: number }>(
+        ContentiaStream.make<string, RemoveAtomsDone>(
           () => Effect.fail(new InternalError('storage outage')),
         ),
     } as unknown as StorageRepository;
@@ -1565,5 +1562,341 @@ describe('storage-api keyless root listing (LCMS-885)', () => {
 
     expect(spy).toHaveBeenCalledOnce();
     expect(spy.mock.calls[0]![0]).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A key is one path segment
+// ---------------------------------------------------------------------------
+//
+// Splitting the path and ignoring everything after the second segment made
+// `DELETE /objects/posts/hello-world` remove `posts`.
+
+describe('storage-api keyed routes with extra path segments', () => {
+  const makeUntouchableRepo = () => {
+    const fail = () => {
+      throw new Error('the repository must not be called');
+    };
+    const spies = {
+      getObject: vi.fn(fail),
+      updateObject: vi.fn(fail),
+      removeAtoms: vi.fn(fail),
+      getFolder: vi.fn(fail),
+      getAtom: vi.fn(fail),
+      listAtoms: vi.fn(fail),
+      listAtomSummaries: vi.fn(fail),
+      getCapabilities: vi.fn(fail),
+    };
+    return { repo: spies as unknown as StorageRepository, spies };
+  };
+
+  it.each([
+    ['GET', '/objects/posts/hello-world', 'posts%2Fhello-world'],
+    ['DELETE', '/objects/posts/hello-world', 'posts%2Fhello-world'],
+    ['PATCH', '/objects/posts/hello-world', 'posts%2Fhello-world'],
+    ['GET', '/folders/posts/drafts', 'posts%2Fdrafts'],
+    ['GET', '/atom/posts/hello-world', 'posts%2Fhello-world'],
+    ['GET', '/atoms/posts/drafts', 'posts%2Fdrafts'],
+    ['GET', '/atom-summaries/posts/drafts/2026', 'posts%2Fdrafts%2F2026'],
+  ])('%s %s answers 400 invalid_data and touches nothing', async (method, path, encodedKey) => {
+    const { repo, spies } = makeUntouchableRepo();
+    const authorize = vi.fn(() => true);
+    const api = buildJsonApi({ repo, authorize });
+    const res = await api.fetch(
+      new Request(`http://localhost${path}`, {
+        method,
+        ...(method === 'PATCH'
+          ? {
+            headers: { 'Content-Type': 'application/vnd.api+json' },
+            body: JSON.stringify({ data: { type: 'object', id: 'posts/hello-world', attributes: { content: {} } } }),
+          }
+          : {}),
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe('invalid_data');
+    expect(body.errors[0]?.detail).toContain('%2F');
+    expect(body.errors[0]?.detail).toContain(`/${path.split('/')[1]}/${encodedKey}`);
+    expect(authorize).not.toHaveBeenCalled();
+    for (const spy of Object.values(spies)) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('still ignores a trailing slash after the key', async () => {
+    const getObject = vi.fn((key: string) =>
+      ContentiaTask.succeed(
+        {
+          type: 'object',
+          key,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+          content: {},
+        } satisfies StorageObject,
+      )
+    );
+    const api = buildJsonApi({ repo: { getObject } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/objects/posts%2Fhello-world/'));
+    expect(res.status).toBe(200);
+    expect(getObject).toHaveBeenCalledWith('posts/hello-world');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Routes the spec does not document answer as such
+// ---------------------------------------------------------------------------
+
+describe('storage-api undocumented keyed variants', () => {
+  it('answers POST /objects/{key} with 405 and the Allow header, without creating anything', async () => {
+    const createObject = vi.fn();
+    const api = buildJsonApi({ repo: { createObject } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/objects/hello.md', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'object', id: 'hello.md', attributes: { content: {} } } }),
+      }),
+    );
+    expect(res.status).toBe(405);
+    expect(res.headers.get('Allow')).toBe('GET, PATCH, DELETE');
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe('method_not_allowed');
+    expect(body.errors[0]?.detail).toContain('POST /objects');
+    expect(createObject).not.toHaveBeenCalled();
+  });
+
+  it('answers POST /atoms/{key} with 404, without creating a folder', async () => {
+    const createFolder = vi.fn();
+    const api = buildJsonApi({ repo: { createFolder } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(
+      new Request('http://localhost/atoms/posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'folder', id: 'posts', attributes: {} } }),
+      }),
+    );
+    expect(res.status).toBe(404);
+    expect(createFolder).not.toHaveBeenCalled();
+  });
+
+  it('answers GET /capabilities/{anything} with 404', async () => {
+    const getCapabilities = vi.fn();
+    const api = buildJsonApi({ repo: { getCapabilities } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/capabilities/extra'));
+    expect(res.status).toBe(404);
+    expect(getCapabilities).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Default pagination: the page the handler lists is the page the links describe
+// ---------------------------------------------------------------------------
+
+describe('storage-api default pagination (no page[*] params)', () => {
+  const folders = Array.from({ length: 100 }, (_, i) => ({
+    type: 'folder' as const,
+    key: `posts/f-${i}`,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  }));
+  const pageOfFolders = () =>
+    ContentiaStream.make<typeof folders[0], ListAtomsDone>(emit =>
+      Effect.gen(function*() {
+        for (const folder of folders) yield* emit.data(folder);
+        return { total: 150 };
+      })
+    );
+
+  it.each([
+    ['atoms', 'listAtoms'],
+    ['atom-summaries', 'listAtomSummaries'],
+  ])('GET /%s/{key} lists page 1 of 100 and its links say size 100', async (route, method) => {
+    const list = vi.fn((_folderKey: string, _options: ListAtomsOptions) => pageOfFolders());
+    const api = buildJsonApi({ repo: { [method]: list } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(new Request(`http://localhost/${route}/posts`));
+    expect(res.status).toBe(200);
+
+    expect(list.mock.calls[0]![1].pagination).toEqual({ page: 1, perPage: 100 });
+    const body = await res.json() as { links: { first?: string, next?: string } };
+    expect(body.links.first).toBe(`http://localhost/${route}/posts?page[number]=1&page[size]=100`);
+    expect(body.links.next).toBe(`http://localhost/${route}/posts?page[number]=2&page[size]=100`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /operations — removes
+// ---------------------------------------------------------------------------
+//
+// Removes run one key per repository call: `RemoveAtomsDone` only counts, and
+// warnings carry no key, so a single-key call is the only way to tell which
+// key failed and why.
+
+describe('POST /operations removes', () => {
+  const operationsRequest = (operations: unknown[]) =>
+    new Request('http://localhost/operations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json' },
+      body: JSON.stringify({ 'atomic:operations': operations }),
+    });
+  const removeRequest = (ids: string[]) =>
+    operationsRequest(ids.map(id => ({ op: 'remove', ref: { type: 'atom', id } })));
+
+  /** A repo whose `removeAtoms` answers each key from `outcomes`. */
+  const makeRemoveRepo = (
+    outcomes: Record<string, { emit?: string, warnings?: Array<NotFoundError | BadRequestError> }>,
+  ) => {
+    const removeAtoms = vi.fn((keys: readonly string[]) =>
+      ContentiaStream.make<string, RemoveAtomsDone>(emit =>
+        Effect.gen(function*() {
+          let removed = 0;
+          for (const k of keys) {
+            const outcome = outcomes[k] ?? {};
+            for (const w of outcome.warnings ?? []) yield* emit.recoverableError(w);
+            if (outcome.emit !== undefined) {
+              yield* emit.data(outcome.emit);
+              removed += 1;
+            }
+          }
+          return { removed, skipped: keys.length - removed };
+        })
+      )
+    );
+    return { repo: { removeAtoms } as unknown as StorageRepository, removeAtoms };
+  };
+
+  type RemoveResults = {
+    'atomic:results': Array<{
+      meta?: {
+        deleted: boolean,
+        ref: { type: string, id: string },
+        warnings?: Array<{ code: string, detail: string }>,
+      },
+      errors?: Array<{ code: string, detail: string }>,
+    }>,
+  };
+
+  it('attributes each failed remove to its own error', async () => {
+    const { repo, removeAtoms } = makeRemoveRepo({
+      'notes/a': { warnings: [new NotFoundError('notes/a is already gone')] },
+      'notes/b': { warnings: [new BadRequestError('notes/b is a non-empty folder')] },
+      'notes/c': { emit: 'notes/c' },
+    });
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['notes/a', 'notes/b', 'notes/c']));
+    expect(res.status).toBe(200);
+
+    const results = (await res.json() as RemoveResults)['atomic:results'];
+    expect(results[0]?.errors).toEqual([
+      expect.objectContaining({ code: 'not_found', detail: 'notes/a is already gone' }),
+    ]);
+    expect(results[1]?.errors).toEqual([
+      expect.objectContaining({ code: 'bad_request', detail: 'notes/b is a non-empty folder' }),
+    ]);
+    expect(results[2]?.meta).toEqual({ deleted: true, ref: { type: 'atom', id: 'notes/c' } });
+    expect(removeAtoms.mock.calls.map(([keys]) => keys)).toEqual([['notes/a'], ['notes/b'], ['notes/c']]);
+  });
+
+  it('falls back to a not_found error naming the key when the repository reports none', async () => {
+    const { repo } = makeRemoveRepo({});
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['notes/missing']));
+    const results = (await res.json() as RemoveResults)['atomic:results'];
+    expect(results).toHaveLength(1);
+    expect(results[0]?.errors?.[0]?.code).toBe('not_found');
+    expect(results[0]?.errors?.[0]?.detail).toContain('notes/missing');
+  });
+
+  // LCMS-216 for /operations: the FS backend emits the removed path with its
+  // extension, so the emitted key never equals the requested one.
+  it('counts a remove reported under its on-disk path as removed', async () => {
+    const { repo } = makeRemoveRepo({ 'del-test': { emit: 'del-test.md' } });
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['del-test']));
+    const results = (await res.json() as RemoveResults)['atomic:results'];
+    expect(results).toEqual([{ meta: { deleted: true, ref: { type: 'atom', id: 'del-test' } } }]);
+  });
+
+  it("puts warnings from a successful remove on that remove's result", async () => {
+    const { repo } = makeRemoveRepo({
+      'notes/a': { emit: 'notes/a', warnings: [new NotFoundError('orphaned sidecar for notes/a')] },
+      'notes/b': { emit: 'notes/b' },
+    });
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['notes/a', 'notes/b']));
+    const results = (await res.json() as RemoveResults)['atomic:results'];
+    expect(results[0]?.meta?.warnings?.[0]?.detail).toBe('orphaned sidecar for notes/a');
+    expect(results[1]?.meta).toEqual({ deleted: true, ref: { type: 'atom', id: 'notes/b' } });
+  });
+
+  it.each([
+    [new NotFoundError('no such folder'), 404, 'not_found'],
+    [new BadRequestError('bad key'), 400, 'bad_request'],
+    [new InternalError('storage outage'), 500, 'internal_error'],
+  ])('fails the request with the mapped status when a remove call fails outright (%s)', async (error, status, code) => {
+    const removeAtoms = vi.fn(() => ContentiaStream.make<string, RemoveAtomsDone>(() => Effect.fail(error)));
+    const api = buildJsonApi({ repo: { removeAtoms } as unknown as StorageRepository, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['notes/a', 'notes/b']));
+    expect(res.status).toBe(status);
+    const body = await res.json() as { errors: Array<{ code: string }> };
+    expect(body.errors[0]?.code).toBe(code);
+    // Removes after the failed call are not attempted.
+    expect(removeAtoms).toHaveBeenCalledOnce();
+  });
+
+  it('settles every remove when a key repeats, instead of hanging', async () => {
+    const { repo } = makeRemoveRepo({ 'notes/a': { emit: 'notes/a' } });
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(removeRequest(['notes/a', 'notes/a']));
+    expect(res.status).toBe(200);
+    expect((await res.json() as RemoveResults)['atomic:results']).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /operations — folder adds take attributes as leniently as POST /atoms
+// ---------------------------------------------------------------------------
+
+describe('POST /operations folder add attributes', () => {
+  const folderRepo = () => {
+    const createFolder = vi.fn((create: FolderCreate) =>
+      ContentiaTask.succeed(
+        {
+          type: 'folder',
+          key: create.key,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+        } satisfies Folder,
+      )
+    );
+    return { repo: { createFolder } as unknown as StorageRepository, createFolder };
+  };
+  const addRequest = (data: unknown) =>
+    new Request('http://localhost/operations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/vnd.api+json' },
+      body: JSON.stringify({ 'atomic:operations': [{ op: 'add', data }] }),
+    });
+
+  it('ignores unknown keys in a folder add, as POST /atoms does', async () => {
+    const { repo, createFolder } = folderRepo();
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(addRequest({ type: 'folder', id: 'posts', attributes: { title: 'Posts' } }));
+    expect(res.status).toBe(200);
+    expect(createFolder).toHaveBeenCalledWith({ key: 'posts', type: 'folder' });
+
+    const atoms = await api.fetch(
+      new Request('http://localhost/atoms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/vnd.api+json' },
+        body: JSON.stringify({ data: { type: 'folder', id: 'drafts', attributes: { title: 'Drafts' } } }),
+      }),
+    );
+    expect(atoms.status).toBe(201);
+  });
+
+  it('still rejects unknown keys in an object add', async () => {
+    const api = buildJsonApi({ repo: stubRepo, authorize: allowAll });
+    const res = await api.fetch(addRequest({ type: 'object', id: 'posts/a', attributes: { title: 'A' } }));
+    expect(res.status).toBe(400);
   });
 });

@@ -1,9 +1,14 @@
-import type { CatalogProvider, MediaCollectionSettings } from 'contentia/catalog';
-import { ContentiaStream, ContentiaTask, EntryAlreadyExistsError } from 'contentia/core';
-import type { StorageRepository } from 'contentia/storage';
+import * as Effect from 'effect/Effect';
+
+import type { Catalog, CatalogProvider, MediaCollectionSettings } from 'contentia/catalog';
+import type { ContentiaError } from 'contentia/core';
+import { ContentiaStream, ContentiaTask, EntryAlreadyExistsError, InternalError, NotFoundError } from 'contentia/core';
+import type { RemoveAtomsDone, StorageRepository } from 'contentia/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { buildAssetsApi } from '../../api/assets-api/server.js';
 import { InMemoryStorageRepository } from '../../domain/storage/testing/in-memory-storage.js';
+import { allowAll } from '../../shared/json-api/authorize.js';
 import { TestSettingsProvider } from '../documents-catalog/testing.js';
 import { CatalogAssetsRepository } from './assets-repository.js';
 
@@ -22,20 +27,47 @@ beforeEach(() => {
 /** A settings provider whose media collection directory diverges from the collection name. */
 function makeCustomDirectorySettingsProvider(directory: string): CatalogProvider {
   const media: MediaCollectionSettings = { type: 'media', key: 'uploads', name: 'Uploads', directory };
-  return {
-    getCatalog() {
-      return ContentiaTask.succeed({ collections: { uploads: media } } as never);
-    },
-    putCatalog() {
-      return ContentiaTask.succeed(undefined as void);
-    },
-    getMediaCollectionSettings() {
+  return new class extends TestSettingsProvider {
+    override getCatalog() {
+      return ContentiaTask.succeed<Catalog>({ collections: { uploads: media } } as Catalog);
+    }
+    override getMediaCollectionSettings() {
       return ContentiaTask.succeed(media);
-    },
-    putMediaCollectionSettings() {
-      return ContentiaTask.succeed(undefined as void);
-    },
-  } as CatalogProvider;
+    }
+  }();
+}
+
+/**
+ * In-memory storage whose `removeAtoms` behaves like a real backend that can't always remove:
+ * a key in `refuse` is reported as a recoverable warning and left in place, and a removed key is
+ * emitted under an on-disk name (`<key>.json`), as the filesystem backend emits its file name.
+ */
+class RefusingStorage extends InMemoryStorageRepository {
+  constructor(private readonly refuse: ReadonlyMap<string, ContentiaError> = new Map()) {
+    super();
+  }
+
+  override removeAtoms(keys: readonly string[]): ContentiaStream.ContentiaStream<string, RemoveAtomsDone> {
+    const removeForReal = (key: string) => super.removeAtoms([key]);
+    const refuse = this.refuse;
+    return ContentiaStream.make<string, RemoveAtomsDone>(emit =>
+      Effect.gen(function*() {
+        let removed = 0;
+        for (const key of keys) {
+          const error = refuse.get(key);
+          if (error) {
+            yield* emit.recoverableError(error);
+            continue;
+          }
+          const { done } = yield* ContentiaStream.runCollect(removeForReal(key));
+          if (done.removed === 0) continue;
+          yield* emit.data(`${key}.json`);
+          removed += 1;
+        }
+        return { removed, skipped: keys.length - removed };
+      })
+    );
+  }
 }
 
 describe('CatalogAssetsRepository — createAsset / getAsset', () => {
@@ -153,6 +185,87 @@ describe('CatalogAssetsRepository — deleteAssets (bulk)', () => {
 
     const { done } = await ContentiaStream.runPromiseCollect(repo.deleteAssets([k1, k2]));
     expect(done.removed).toBeGreaterThan(0);
+  });
+});
+
+describe('CatalogAssetsRepository — deletes the storage layer does not carry out', () => {
+  const LOCKED = KEY('locked.png');
+  const readOnly = new InternalError('The volume is read-only');
+
+  const refusing = () =>
+    new CatalogAssetsRepository(new RefusingStorage(new Map([[LOCKED, readOnly]])), new TestSettingsProvider());
+
+  it('deleteAsset fails with the storage error, and the asset stays', async () => {
+    const r = refusing();
+    await ContentiaTask.runPromise(r.createAsset({ key: LOCKED, content: PNG, mimeType: 'image/png' }));
+
+    const result = await ContentiaTask.runPromiseResult(r.deleteAsset(LOCKED));
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure).toBe(readOnly);
+
+    const fetched = await ContentiaTask.runPromise(r.getAsset(LOCKED));
+    expect(fetched.key).toBe(LOCKED);
+  });
+
+  it('deleteAsset on a missing key fails with NotFoundError', async () => {
+    const result = await ContentiaTask.runPromiseResult(repo.deleteAsset(KEY('ghost.png')));
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure.code).toBe(NotFoundError.CODE);
+  });
+
+  it('deleteAsset succeeds when the backend reports the removed key under its on-disk name', async () => {
+    const r = refusing();
+    const key = KEY('photo.png');
+    await ContentiaTask.runPromise(r.createAsset({ key, content: PNG, mimeType: 'image/png' }));
+
+    await ContentiaTask.runPromise(r.deleteAsset(key));
+
+    const result = await ContentiaTask.runPromiseResult(r.getAsset(key));
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure.code).toBe(NotFoundError.CODE);
+  });
+
+  it('deleteFolder fails with the storage error when the folder is not removed', async () => {
+    const r = refusing();
+    await ContentiaTask.runPromise(r.createFolder({ key: LOCKED, type: 'folder' }));
+
+    const result = await ContentiaTask.runPromiseResult(r.deleteFolder(LOCKED));
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure).toBe(readOnly);
+  });
+
+  it('deleteAssets attributes each result to its own logical key', async () => {
+    const r = refusing();
+    const ok = KEY('ok.png');
+    const ghost = KEY('ghost.png');
+    await ContentiaTask.runPromise(r.createAsset({ key: ok, content: PNG, mimeType: 'image/png' }));
+    await ContentiaTask.runPromise(r.createAsset({ key: LOCKED, content: PNG, mimeType: 'image/png' }));
+
+    const { data, recoverableErrors, done } = await ContentiaStream.runPromiseCollect(
+      r.deleteAssets([ok, LOCKED, ghost]),
+    );
+
+    expect(data).toEqual([ok]);
+    expect(recoverableErrors).toHaveLength(2);
+    expect(recoverableErrors[0]).toBe(readOnly);
+    expect(recoverableErrors[1]?.code).toBe(NotFoundError.CODE);
+    expect(recoverableErrors[1]?.message).toContain(ghost);
+    expect(done).toEqual({ removed: 1, skipped: 2 });
+  });
+
+  it('over HTTP, DELETE reports the failure instead of 200 with meta.deleted', async () => {
+    const r = refusing();
+    await ContentiaTask.runPromise(r.createAsset({ key: LOCKED, content: PNG, mimeType: 'image/png' }));
+    const api = buildAssetsApi({ repository: r, authorize: allowAll });
+
+    const res = await api.fetch(
+      new Request(`http://localhost/api/assets/resources/${encodeURIComponent(LOCKED)}`, { method: 'DELETE' }),
+    );
+
+    expect(res.status).toBe(500);
+    const body = await res.json() as { errors: Array<{ code: string, detail: string }> };
+    expect(body.errors[0]?.code).toBe(InternalError.CODE);
+    expect(body.errors[0]?.detail).toContain('read-only');
   });
 });
 

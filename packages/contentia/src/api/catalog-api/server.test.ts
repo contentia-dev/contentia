@@ -33,6 +33,16 @@ const settingsWithBoth: Catalog = {
 // Cache-Control
 // ---------------------------------------------------------------------------
 
+const JSON_API = 'application/vnd.api+json';
+
+function jsonApiRequest(path: string, method: string, data: unknown): Request {
+  return new Request(`http://localhost${path}`, {
+    method,
+    headers: { 'Content-Type': JSON_API },
+    body: JSON.stringify({ data }),
+  });
+}
+
 describe('catalog-api Cache-Control', () => {
   it('sends Cache-Control: no-store on 404 responses', async () => {
     const api = buildJsonApi({ repo: stubRepo, authorize: allowAll });
@@ -50,6 +60,211 @@ describe('catalog-api Cache-Control', () => {
     const res = await api.fetch(new Request('http://localhost/collections'));
     expect(res.status).toBe(200);
     expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('sends Cache-Control: no-store on writes, deletes, denials and the OpenAPI routes', async () => {
+    const repo = {
+      getCatalog: () => ContentiaTask.succeed(settingsWithBoth),
+      putCatalog: () => ContentiaTask.succeed(undefined),
+      putDocumentCollectionSettings: () => ContentiaTask.succeed(undefined),
+    } as unknown as CatalogProvider;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const denied = buildJsonApi({ repo, authorize: () => false });
+
+    const responses = [
+      await api.fetch(jsonApiRequest('/collections', 'POST', { type: 'document-collection', id: 'a', attributes: {} })),
+      await api.fetch(jsonApiRequest('/collections', 'POST', { type: 'nope', id: 'a', attributes: {} })),
+      await api.fetch(new Request('http://localhost/collections/posts', { method: 'DELETE' })),
+      await api.fetch(new Request('http://localhost/openapi.json')),
+      await api.fetch(new Request('http://localhost/openapi.yaml')),
+      await denied.fetch(new Request('http://localhost/collections')),
+    ];
+    expect(responses.map(res => res.status)).toEqual([201, 400, 204, 200, 200, 403]);
+    for (const res of responses) expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Content-Type
+// ---------------------------------------------------------------------------
+
+describe('catalog-api Content-Type', () => {
+  const repo = {
+    getCatalog: () => ContentiaTask.succeed(settingsWithBoth),
+    getDocumentCollectionSettings: () => ContentiaTask.succeed(docCollection),
+    putDocumentCollectionSettings: () => ContentiaTask.succeed(undefined),
+  } as unknown as CatalogProvider;
+
+  it('answers JSON:API documents with application/vnd.api+json', async () => {
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const responses = [
+      await api.fetch(new Request('http://localhost/collections')),
+      await api.fetch(new Request('http://localhost/collections/posts')),
+      await api.fetch(jsonApiRequest('/collections', 'POST', { type: 'document-collection', id: 'a', attributes: {} })),
+      await api.fetch(jsonApiRequest('/collections/posts', 'PATCH', {
+        type: 'document-collection',
+        id: 'posts',
+        attributes: {},
+      })),
+    ];
+    expect(responses.map(res => res.status)).toEqual([200, 200, 201, 200]);
+    for (const res of responses) expect(res.headers.get('Content-Type')).toBe(JSON_API);
+  });
+
+  it('answers error documents with application/vnd.api+json', async () => {
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const denied = buildJsonApi({ repo, authorize: () => false });
+    const responses = [
+      await api.fetch(new Request('http://localhost/collections/missing')),
+      await api.fetch(new Request('http://localhost/collections', { method: 'POST', body: 'not-json' })),
+      await denied.fetch(new Request('http://localhost/collections')),
+    ];
+    expect(responses.map(res => res.status)).toEqual([404, 400, 403]);
+    for (const res of responses) expect(res.headers.get('Content-Type')).toBe(JSON_API);
+  });
+
+  it('serves the OpenAPI document, which is not a JSON:API document, as application/json', async () => {
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/openapi.json'));
+    expect(res.headers.get('Content-Type')).toBe('application/json');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// attributes.type — the collection type lives on the resource type only
+// ---------------------------------------------------------------------------
+
+describe('catalog-api attributes.type', () => {
+  it('omits the domain type from response attributes', async () => {
+    const repo = {
+      getCatalog: () => ContentiaTask.succeed(settingsWithBoth),
+    } as unknown as CatalogProvider;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+    const res = await api.fetch(new Request('http://localhost/collections'));
+    const body = await res.json() as { data: Array<{ type: string, attributes: Record<string, unknown> }> };
+    expect(body.data.map(resource => resource.type).sort()).toEqual(['document-collection', 'media-collection']);
+    for (const resource of body.data) expect(resource.attributes).not.toHaveProperty('type');
+  });
+
+  it('takes the collection type from data.type and ignores attributes.type', async () => {
+    const put = vi.fn((_key: string, _settings: DocumentCollectionSettings) => ContentiaTask.succeed(undefined));
+    const repo = { putDocumentCollectionSettings: put } as unknown as CatalogProvider;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const withoutType = await api.fetch(
+      jsonApiRequest('/collections', 'POST', { type: 'document-collection', id: 'a', attributes: { name: 'A' } }),
+    );
+    const withWrongType = await api.fetch(
+      jsonApiRequest('/collections', 'POST', {
+        type: 'document-collection',
+        id: 'b',
+        attributes: { type: 'media', name: 'B' },
+      }),
+    );
+
+    expect([withoutType.status, withWrongType.status]).toEqual([201, 201]);
+    expect(put.mock.calls.map(([, settings]) => settings)).toEqual([
+      { type: 'document', key: 'a', name: 'A' },
+      { type: 'document', key: 'b', name: 'B' },
+    ]);
+    const echoed = await withWrongType.json() as { data: { attributes: Record<string, unknown> } };
+    expect(echoed.data.attributes).toEqual({ name: 'B' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// attributes.key — the collection key comes from data.id / the URL only
+// ---------------------------------------------------------------------------
+
+describe('catalog-api attributes.key', () => {
+  function writeSpyRepo() {
+    const putDocument = vi.fn((_key: string, _settings: DocumentCollectionSettings) =>
+      ContentiaTask.succeed(undefined)
+    );
+    const putMedia = vi.fn((_key: string, _settings: MediaCollectionSettings) => ContentiaTask.succeed(undefined));
+    const repo = {
+      getCatalog: () => ContentiaTask.succeed(settingsWithBoth),
+      putDocumentCollectionSettings: putDocument,
+      putMediaCollectionSettings: putMedia,
+    } as unknown as CatalogProvider;
+    return { repo, putDocument, putMedia };
+  }
+
+  it.each(
+    [
+      ['document-collection', 'putDocument'],
+      ['media-collection', 'putMedia'],
+    ] as const,
+  )('POST writes a %s under data.id, not attributes.key', async (type, spy) => {
+    const spies = writeSpyRepo();
+    const api = buildJsonApi({ repo: spies.repo, authorize: allowAll });
+
+    const res = await api.fetch(
+      jsonApiRequest('/collections', 'POST', { type, id: 'articles', attributes: { key: 'posts', name: 'A' } }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(spies[spy]).toHaveBeenCalledOnce();
+    const [writtenKey, settings] = spies[spy].mock.calls[0]!;
+    expect([writtenKey, settings.key]).toEqual(['articles', 'articles']);
+    const body = await res.json() as { data: { id: string, attributes: Record<string, unknown> } };
+    expect(body.data.id).toBe('articles');
+    expect(body.data.attributes).not.toHaveProperty('key');
+  });
+
+  it('PATCH writes under the URL key, not attributes.key', async () => {
+    const spies = writeSpyRepo();
+    const api = buildJsonApi({ repo: spies.repo, authorize: allowAll });
+
+    const res = await api.fetch(
+      jsonApiRequest('/collections/posts', 'PATCH', {
+        type: 'document-collection',
+        id: 'posts',
+        attributes: { key: 'images', name: 'Posts' },
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(spies.putDocument).toHaveBeenCalledOnce();
+    const [writtenKey, settings] = spies.putDocument.mock.calls[0]!;
+    expect([writtenKey, settings.key]).toEqual(['posts', 'posts']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST / PATCH echo the submitted resource
+// ---------------------------------------------------------------------------
+
+describe('catalog-api write responses', () => {
+  it.each(
+    [
+      ['POST', '/collections', 201],
+      ['PATCH', '/collections/posts', 200],
+    ] as const,
+  )('%s echoes the decoded submission without reading it back', async (method, path, status) => {
+    const getDocumentCollectionSettings = vi.fn(() => ContentiaTask.succeed(docCollection));
+    const repo = {
+      getCatalog: () => ContentiaTask.succeed(settingsWithBoth),
+      getDocumentCollectionSettings,
+      putDocumentCollectionSettings: () => ContentiaTask.succeed(undefined),
+    } as unknown as CatalogProvider;
+    const api = buildJsonApi({ repo, authorize: allowAll });
+
+    const res = await api.fetch(jsonApiRequest(path, method, {
+      type: 'document-collection',
+      id: 'posts',
+      attributes: { name: 'Submitted', draftDirectory: 'drafts', ignored: true },
+    }));
+
+    expect(res.status).toBe(status);
+    expect(getDocumentCollectionSettings).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({
+      data: {
+        type: 'document-collection',
+        id: 'posts',
+        attributes: { name: 'Submitted', unpublishedStatuses: { draft: { directory: 'drafts', name: 'Draft' } } },
+      },
+    });
   });
 });
 
@@ -177,7 +392,7 @@ describe('POST /collections', () => {
           data: {
             type: 'document-collection',
             id: 'articles',
-            attributes: { type: 'document', name: 'Articles' },
+            attributes: { name: 'Articles' },
           },
         }),
       }),
@@ -204,7 +419,7 @@ describe('POST /collections', () => {
           data: {
             type: 'media-collection',
             id: 'videos',
-            attributes: { type: 'media', name: 'Videos' },
+            attributes: { name: 'Videos' },
           },
         }),
       }),
@@ -254,7 +469,7 @@ describe('PATCH /collections/:key', () => {
           data: {
             type: 'document-collection',
             id: 'posts',
-            attributes: { type: 'document', name: 'Blog Posts' },
+            attributes: { name: 'Blog Posts' },
           },
         }),
       }),
@@ -282,7 +497,7 @@ describe('PATCH /collections/:key', () => {
           data: {
             type: 'media-collection',
             id: 'images',
-            attributes: { type: 'media', name: 'Updated Images' },
+            attributes: { name: 'Updated Images' },
           },
         }),
       }),
@@ -308,7 +523,7 @@ describe('PATCH /collections/:key', () => {
           data: {
             type: 'document-collection',
             id: 'ghost',
-            attributes: { type: 'document', name: 'Ghost' },
+            attributes: { name: 'Ghost' },
           },
         }),
       }),
@@ -354,7 +569,7 @@ describe('PATCH /collections/:key', () => {
           data: {
             type: 'document-collection',
             id: 'articles',
-            attributes: { type: 'document', name: 'Articles' },
+            attributes: { name: 'Articles' },
           },
         }),
       }),
@@ -381,7 +596,7 @@ describe('PATCH /collections/:key', () => {
           data: {
             type: 'media-collection',
             id: 'videos',
-            attributes: { type: 'media', name: 'Videos' },
+            attributes: { name: 'Videos' },
           },
         }),
       }),
@@ -494,7 +709,7 @@ describe('catalog-api onError', () => {
           data: {
             type: 'document-collection',
             id: 'new-col',
-            attributes: { type: 'document', name: 'New Col' },
+            attributes: { name: 'New Col' },
           },
         }),
       }),
@@ -534,7 +749,7 @@ describe('catalog-api onError', () => {
           data: {
             type: 'media-collection',
             id: 'uploads',
-            attributes: { type: 'media', name: 'Uploads' },
+            attributes: { name: 'Uploads' },
           },
         }),
       }),
@@ -564,7 +779,7 @@ describe('catalog-api onError', () => {
           data: {
             type: 'document-collection',
             id: 'posts',
-            attributes: { type: 'document', name: 'Posts' },
+            attributes: { name: 'Posts' },
           },
         }),
       }),
@@ -594,7 +809,7 @@ describe('catalog-api onError', () => {
           data: {
             type: 'media-collection',
             id: 'images',
-            attributes: { type: 'media', name: 'Images' },
+            attributes: { name: 'Images' },
           },
         }),
       }),
@@ -696,7 +911,6 @@ describe('document-collection shorthand directory fields', () => {
             type: 'document-collection',
             id: 'posts',
             attributes: {
-              type: 'document',
               draftDirectory: 'my-drafts',
               archiveDirectory: 'my-archive',
               trashDirectory: 'my-trash',
@@ -732,7 +946,6 @@ describe('document-collection shorthand directory fields', () => {
             type: 'document-collection',
             id: 'posts',
             attributes: {
-              type: 'document',
               draftDirectory: 'shorthand-drafts',
               unpublishedStatuses: {
                 draft: { directory: 'explicit-drafts', name: 'My Drafts' },

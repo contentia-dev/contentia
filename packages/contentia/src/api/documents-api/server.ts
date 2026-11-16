@@ -84,6 +84,17 @@ const json = <
   });
 };
 
+// decodeURIComponent throws on malformed sequences; degrade to the raw segment
+// rather than 500ing on bad input. The repository then answers for a key or
+// revision that doesn't exist.
+const safeDecode = (segment: string): string => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+};
+
 // JSON:API error response
 function respondError(result: ContentiaResult<unknown>, status: ErrorStatus = 400, logger?: JsonApiLogger) {
   if (Result.isSuccess(result)) throw new Error('respondError called with success result');
@@ -223,6 +234,21 @@ async function respondVoidWithWarnings(
   return respondVoid(Result.succeed(undefined), r.success.recoverableErrors, onErrorFn, logger);
 }
 
+interface CollectionOptions<T> {
+  /** The cursor an item stands for in `page[after]` / `page[before]` links. Defaults to its `id`, else its `key`. */
+  cursorOf?: (item: T) => string | undefined;
+  /**
+   * `false` for a listing the repository returns whole: the response then
+   * carries only `links.self`, since page links would serve the same items again.
+   */
+  paginated?: boolean;
+}
+
+const defaultCursorOf = (item: unknown): string | undefined => {
+  const { id, key } = item as { id?: string, key?: string };
+  return id ?? key;
+};
+
 // JSON:API success response for resource collection with pagination
 async function respondCollection<T, R extends JsonApiResource>(
   request: Request,
@@ -232,12 +258,16 @@ async function respondCollection<T, R extends JsonApiResource>(
   basePath: string,
   done?: { total?: number, syncToken?: string },
   recoverableErrors?: ReadonlyArray<ContentiaError>,
+  options: CollectionOptions<T> = {},
 ) {
+  const { cursorOf = defaultCursorOf, paginated = true } = options;
   const url = new URL(request.url);
   const queryParams = Object.fromEntries(url.searchParams.entries());
   const pagination = parsePaginationQuery(queryParams);
-  const last = items[items.length - 1] as { id?: string, key?: string } | undefined;
-  const lastCursor: string | undefined = last?.id ?? last?.key;
+  const first = items[0];
+  const last = items[items.length - 1];
+  const firstCursor = first === undefined ? undefined : cursorOf(first);
+  const lastCursor = last === undefined ? undefined : cursorOf(last);
   const requestedLimit = 'limit' in pagination
     ? pagination.limit
     : ('perPage' in pagination ? pagination.perPage : undefined);
@@ -245,7 +275,9 @@ async function respondCollection<T, R extends JsonApiResource>(
     ? items.length === requestedLimit
     : false;
 
-  const links = buildPaginationLinks(baseUrl, pagination, hasMore, lastCursor);
+  const links = paginated
+    ? buildPaginationLinks(baseUrl, pagination, hasMore, lastCursor, firstCursor, lastCursor)
+    : { self: baseUrl };
 
   // `meta.page` carries aggregate counts; `meta.warnings` carries per-item
   // recoverable errors collected during the stream; `meta.syncToken` carries
@@ -616,6 +648,8 @@ type StateTransitionOp = S.Schema.Type<typeof StateTransitionOpSchema>;
 type UpdateUnpublishedOp = S.Schema.Type<typeof UpdateUnpublishedOpSchema>;
 type RemoveOp = S.Schema.Type<typeof RemoveOpSchema>;
 
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value !== '';
+
 /**
  * Validate an operation's request shape without performing any I/O.
  * Returns a ContentiaError when the op is malformed, null when it is valid.
@@ -628,6 +662,11 @@ function validateOperationShape(operation: AtomicOperation, index: number): Cont
     if (!op.data.id) {
       return new BadRequestError(
         `operations[${index}].data.id is required — provide the document key (e.g. 'posts/my-doc')`,
+      );
+    }
+    if (op.data.type === 'unpublished' && !isNonEmptyString(op.data.attributes['status'])) {
+      return new BadRequestError(
+        `operations[${index}].data.attributes.status is required — provide the unpublished state (e.g. 'draft')`,
       );
     }
     return null;
@@ -738,13 +777,15 @@ export function buildJsonApi(options: DocumentsApiOptions) {
 
     // Root endpoint - list available endpoints
     if (path === '' && request.method === 'GET') {
+      // The spec's `info.version` is the one version this API has.
+      const { version } = (await loadOpenApiBuilder())({ basePath }).info;
       return json({
         data: {
           type: 'api-info',
           id: 'documents',
           attributes: {
             name: 'Documents API',
-            version: '1.0.0',
+            version,
             endpoints: [
               {
                 path: '/openapi.json',
@@ -849,7 +890,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
 
     const pathParts = path.split('/');
     const resource = pathParts[0];
-    const key = pathParts[1] ? decodeURIComponent(pathParts[1]) : undefined;
+    const key = pathParts[1] ? safeDecode(pathParts[1]) : undefined;
     const action = pathParts[2];
 
     const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -1150,6 +1191,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
         const status = ErrorCodeToStatusMap[result.failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500;
         return failResponse(result, status);
       }
+      // listChanges takes no pagination: the feed comes back whole.
       return respondCollection(
         request,
         result.success.data,
@@ -1165,6 +1207,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
         basePath,
         { total: result.success.done.total, syncToken: result.success.done.syncToken as string },
         result.success.recoverableErrors,
+        { paginated: false },
       );
     }
 
@@ -1259,10 +1302,8 @@ export function buildJsonApi(options: DocumentsApiOptions) {
           409,
         );
       }
-      const updateData = {
-        key,
-        ...data.attributes,
-      };
+      // The URL key goes last so a body `attributes.key` cannot redirect the write.
+      const updateData = { ...data.attributes, key };
       const denied = await authorizeAction({ action: 'updateDocument', data: updateData });
       if (denied) return denied;
       return respondResourceWithWarnings(
@@ -1319,6 +1360,14 @@ export function buildJsonApi(options: DocumentsApiOptions) {
       if (!data.id) {
         return failResponse(
           Result.fail(new BadRequestError("data.id is required — provide the document key (e.g. 'posts/my-doc')")),
+          400,
+        );
+      }
+      if (!isNonEmptyString(data.attributes['status'])) {
+        return failResponse(
+          Result.fail(
+            new BadRequestError("data.attributes.status is required — provide the unpublished state (e.g. 'draft')"),
+          ),
           400,
         );
       }
@@ -1387,7 +1436,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
           400,
         );
       }
-      if (typeof data.attributes.revision !== 'string' || !data.attributes.revision) {
+      if (!isNonEmptyString(data.attributes['revision'])) {
         return failResponse(
           Result.fail(
             new BadRequestError(
@@ -1440,6 +1489,8 @@ export function buildJsonApi(options: DocumentsApiOptions) {
         basePath,
         { total: result.success.done.total },
         result.success.recoverableErrors,
+        // Every revision of a document shares its key; the revision tells them apart.
+        { cursorOf: rev => rev.revision },
       );
     }
 
@@ -1449,10 +1500,11 @@ export function buildJsonApi(options: DocumentsApiOptions) {
       && key
       && action
     ) {
-      const denied = await authorizeAction({ action: 'getRevision', key, revisionId: action });
+      const revisionId = safeDecode(action);
+      const denied = await authorizeAction({ action: 'getRevision', key, revisionId });
       if (denied) return denied;
       return respondResourceWithWarnings(
-        repo.getRevision(key, action),
+        repo.getRevision(key, revisionId),
         revisionToJsonApi,
         basePath,
         onError,
@@ -1535,8 +1587,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
 
       // (b) Execute ops sequentially; stop at first repository failure.
       // A mid-batch failure leaves prior ops applied — this is a fail-fast
-      // batch, not a transaction. The remaining deviation is stated explicitly
-      // in the OpenAPI description and docs/api-reference.md.
+      // batch, not a transaction. The OpenAPI description states this.
       type OpEntry = {
         op: ContentiaResult<unknown>,
         operation: AtomicOperation,
@@ -1622,7 +1673,7 @@ export function buildJsonApi(options: DocumentsApiOptions) {
         if (Result.isFailure(op)) {
           const failure = op.failure as ContentiaError;
           const status = String(ErrorCodeToStatusMap[failure.code as keyof typeof ErrorCodeToStatusMap] ?? 500);
-          return { errors: [{ status, title: 'Operation Failed', detail: failure.message }] };
+          return { errors: [{ status, code: failure.code, title: 'Operation Failed', detail: failure.message }] };
         }
 
         if (operation.op === 'remove') {
