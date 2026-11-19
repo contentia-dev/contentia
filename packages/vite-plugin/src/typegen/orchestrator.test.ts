@@ -14,16 +14,16 @@ import {
   type TypegenReader,
 } from './orchestrator.js';
 
-// These tests emit through the real TypeScript compiler. That is sub-second locally,
-// but took over 5s on a CI runner busy with every other package's tests. Load the
-// compiler once up front and give the tests and their waits CI-sized timeouts.
+// These tests emit through the real TypeScript compiler, which can take seconds to
+// load on a busy CI runner (see vitest.config.ts). Load it once up front, so no
+// vi.waitFor below spends its wait on the cold load, and give the waits CI-sized
+// timeouts instead of the 1s default.
 const CI_TIMEOUT = 30_000;
 const wait = { timeout: CI_TIMEOUT };
-vi.setConfig({ testTimeout: CI_TIMEOUT });
 
 beforeAll(async () => {
   await loadTypeScript();
-}, CI_TIMEOUT);
+});
 
 let workdir: string;
 let contentDir: string;
