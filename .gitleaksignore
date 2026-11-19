@@ -47,9 +47,10 @@ e27a1d83e5076c7a38760d89b1ceed35a7321106:packages/decap/src/decap-oauth2/passkey
 7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/documents.md:generic-api-key:1027
 7f64677afd851046de7b813f0944862781344298:docs/reference/json-api/documents.md:generic-api-key:1081
 
-# The sk-live-abc123 placeholder in the Decap auth docs.
+# The sk-live-abc123 placeholder in the Decap auth and API server docs.
 d7f8b2cd5e157186a62afd505d333cdaaf93332f:docs/guides/decap/auth.md:generic-api-key:15
 f90b76551a14eb558225521e3543fb16963e65aa:docs/decap-integration.md:generic-api-key:194
+c387bcd8f0557eb7d09d562f388fa7a80dd797de:docs/guides/api-server.md:generic-api-key:475
 
 # Demo tenant tokens in the removed multi-tenant starter.
 af10319abc601d4f3180796024bfda2981d5b36b:apps/starter-multi-tenant/README.md:curl-auth-header:26

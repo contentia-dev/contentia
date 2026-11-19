@@ -1,9 +1,10 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentiaId, ContentiaNamespace } from '../protocol.js';
 import type { ContentChangeChannel, ContentChangeEvent } from './channel.js';
+import { loadTypeScript } from './compiler-emit.js';
 import {
   ContentiaTypegen,
   createTypegen,
@@ -12,6 +13,17 @@ import {
   removeItem,
   type TypegenReader,
 } from './orchestrator.js';
+
+// These tests emit through the real TypeScript compiler. That is sub-second locally,
+// but took over 5s on a CI runner busy with every other package's tests. Load the
+// compiler once up front and give the tests and their waits CI-sized timeouts.
+const CI_TIMEOUT = 30_000;
+const wait = { timeout: CI_TIMEOUT };
+vi.setConfig({ testTimeout: CI_TIMEOUT });
+
+beforeAll(async () => {
+  await loadTypeScript();
+}, CI_TIMEOUT);
 
 let workdir: string;
 let contentDir: string;
@@ -25,7 +37,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await fs.rm(workdir, { recursive: true, force: true });
+  await fs.rm(workdir, { recursive: true, force: true, maxRetries: 3 });
 });
 
 /** Writes a `{ content, meta }` JSON item under `content/<ns>/<key>.json`. */
@@ -182,12 +194,12 @@ describe('ContentiaTypegen channel-driven incremental regen', () => {
     channel.emit({ namespace: 'doc', key: 'posts/a', kind: 'upsert' });
     await vi.waitFor(async () => {
       expect(await readTypes()).toContain("declare module 'contentia:doc/posts/a'");
-    });
+    }, wait);
 
     channel.emit({ namespace: 'doc', key: 'posts/a', kind: 'delete' });
     await vi.waitFor(async () => {
       expect(await readTypes()).not.toContain("declare module 'contentia:doc/posts/a'");
-    });
+    }, wait);
 
     await typegen.dispose();
   });
@@ -205,12 +217,12 @@ describe('standalone registry helpers', () => {
     await regenerateItem(repos, 'doc/posts/b', options);
     await vi.waitFor(async () => {
       expect(await readTypes()).toContain("declare module 'contentia:doc/posts/b'");
-    });
+    }, wait);
 
     await removeItem('doc/posts/a', options);
     await vi.waitFor(async () => {
       expect(await readTypes()).not.toContain("declare module 'contentia:doc/posts/a'");
-    });
+    }, wait);
   });
 });
 
