@@ -1,6 +1,9 @@
 {
   "name": "@contentia/cli",
-  "version": "0.0.1-alpha.1",
+  "version": "0.1.0-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "The Contentia command-line interface (bin `contentia`): local dev storage server, config-to-typed-TypeScript codegen, and storage repository migrations.",
   "keywords": [
     "headless-cms",
@@ -11,18 +14,32 @@
     "local",
     "development"
   ],
-  "author": "Sem Postma <sem@contentia.dev>",
+  "author": {
+    "name": "Sem Postma",
+    "email": "sem@contentia.dev",
+    "url": "https://sem-postma.com"
+  },
+  "homepage": "https://contentia.dev/reference/cli",
+  "bugs": {
+    "email": "sem@contentia.dev",
+    "url": "https://github.com/contentia-dev/contentia/issues"
+  },
   "license": "MIT",
-  "homepage": "https://github.com/contentia-dev/contentia",
-  "repository": "https://github.com/contentia-dev/contentia",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/contentia-dev/contentia.git",
+    "directory": "apps/cli"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "bin": {
-    "contentia": "./dist/cli.js"
+    "contentia": "dist/cli.js"
   },
   "exports": {
     ".": {
@@ -38,7 +55,8 @@
     "start": "node dist/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/check-no-pnpm-catalog-deps.mjs"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:default",

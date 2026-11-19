@@ -1,6 +1,6 @@
 {
   "name": "@contentia/vite-plugin",
-  "version": "0.0.1-alpha.1",
+  "version": "0.1.0-alpha.2",
   "publishConfig": {
     "access": "public"
   },
@@ -17,13 +17,17 @@
     "email": "sem@contentia.dev",
     "url": "https://sem-postma.com"
   },
-  "homepage": "https://github.com/contentia-dev/contentia",
+  "homepage": "https://contentia.dev/guides/vite",
   "bugs": {
     "email": "sem@contentia.dev",
     "url": "https://github.com/contentia-dev/contentia/issues"
   },
   "license": "MIT",
-  "repository": "https://github.com/contentia-dev/contentia",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/contentia-dev/contentia.git",
+    "directory": "packages/vite-plugin"
+  },
   "type": "module",
   "sideEffects": false,
   "files": [
